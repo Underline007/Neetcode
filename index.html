@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NeetCode 30 — Lộ trình thuật toán 1 tháng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="./assets/css/app.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>" />
+</head>
+<body>
+<div id="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark">30</span>
+      <div>
+        <strong>NeetCode 30</strong>
+        <small>Thuật toán trong 1 tháng</small>
+      </div>
+    </div>
+
+    <nav id="nav">
+      <a href="#/" data-route="/">🏠 Bảng điều khiển</a>
+      <a href="#/plan" data-route="/plan">🗓️ Lộ trình 30 ngày</a>
+      <a href="#/topics" data-route="/topics">📚 Thư viện chủ đề</a>
+      <a href="#/problems" data-route="/problems">⌨️ Ngân hàng bài tập</a>
+      <a href="#/review" data-route="/review">🔁 Ôn tập ngắt quãng <span id="due-badge" class="badge hidden">0</span></a>
+      <a href="#/stats" data-route="/stats">📈 Thống kê &amp; điểm</a>
+      <a href="#/guide" data-route="/guide">🧭 Cách dùng app</a>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="xp-box">
+        <div class="xp-row"><span>Tổng điểm</span><strong id="xp-total">0</strong></div>
+        <div class="xp-row"><span>Chuỗi ngày</span><strong id="streak-total">0 🔥</strong></div>
+      </div>
+      <button id="theme-toggle" class="btn ghost small">🌗 Đổi giao diện</button>
+    </div>
+  </aside>
+
+  <main id="view" class="view"></main>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
