@@ -1,3 +1,5 @@
+import { md as mdRender } from './markdown.js';
+
 /** Các tiện ích dùng chung cho phần giao diện. */
 
 export const $ = (sel, root = document) => root.querySelector(sel);
@@ -37,3 +39,8 @@ export function on(root, action, handler) {
 }
 
 export const go = (hash) => { window.location.hash = hash; };
+
+/** Render Markdown ngắn (đậm/nghiêng/code) mà không bọc thẻ <p> */
+export function inlineMd(text) {
+  return mdRender(text).replace(/^<p>/, '').replace(/<\/p>$/, '');
+}

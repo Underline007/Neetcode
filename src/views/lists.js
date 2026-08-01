@@ -2,7 +2,7 @@ import { TOPICS, PROBLEMS, PLAN, problemById, topicById } from '../data/index.js
 import { store } from '../store.js';
 import { topicMastery, BASE_POINTS, grade } from '../scoring.js';
 import { md } from '../markdown.js';
-import { bar, diffClass, diffLabel, esc } from '../ui.js';
+import { bar, diffClass, diffLabel, esc, inlineMd } from '../ui.js';
 import { nextDueLabel } from '../srs.js';
 
 /* ------------------------------- LỘ TRÌNH ------------------------------- */
@@ -47,7 +47,7 @@ function dayCard(d, st, cur) {
           ${d.quiz ? `<a class="badge" style="text-decoration:none" href="#/quiz/${d.quiz}">🧠 Quiz</a>` : ''}
           ${isToday ? '<span class="badge accent">Hôm nay</span>' : ''}
         </div>
-        <p class="muted small" style="margin:8px 0">${esc(d.focus)}</p>
+        <p class="muted small" style="margin:8px 0">${inlineMd(d.focus)}</p>
         <div class="pill-row">
           ${d.problems.map((id) => {
             const p = problemById.get(id);

@@ -2,7 +2,7 @@ import { TOPICS, PROBLEMS, PLAN, planByDay, problemById, topicById } from '../da
 import { store } from '../store.js';
 import { topicMastery, BASE_POINTS } from '../scoring.js';
 import { dueItems } from '../srs.js';
-import { bar, diffClass, diffLabel, esc } from '../ui.js';
+import { bar, diffClass, diffLabel, esc, inlineMd } from '../ui.js';
 
 export function renderDashboard() {
   const st = store.get();
@@ -68,7 +68,7 @@ function todayCard(day, plan, st) {
         <div class="spacer"></div>
         <a class="btn ghost small" href="#/plan">Xem toàn bộ lộ trình</a>
       </div>
-      <p class="muted" style="margin:8px 0 12px">${esc(plan.focus)}</p>
+      <p class="muted" style="margin:8px 0 12px">${inlineMd(plan.focus)}</p>
 
       <div class="row" style="gap:6px;margin-bottom:10px">
         ${plan.topics.map((id) => {
