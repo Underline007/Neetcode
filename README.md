@@ -21,7 +21,7 @@ và Web Worker — mở trực tiếp file `index.html` sẽ bị chặn bởi C
 ```bash
 git clone <repo>
 cd Neetcode
-python3 -m http.server 8000      # hoặc: npm start
+python -m http.server 8000       # hoặc: npm start (dùng python3 nếu cần)
 ```
 
 Mở http://localhost:8000

@@ -4,8 +4,8 @@
   "description": "Ứng dụng luyện thuật toán theo lộ trình neetcode.io/roadmap trong 30 ngày, bằng tiếng Việt: bài giảng, bài tập có chấm điểm tự động, gợi ý theo bậc và ôn tập ngắt quãng.",
   "type": "module",
   "scripts": {
-    "start": "python3 -m http.server 8000",
-    "dev": "python3 -m http.server 8000",
+    "start": "python -m http.server 8000",
+    "dev": "python -m http.server 8000",
     "verify": "node tools/verify.mjs"
   },
   "keywords": ["algorithms", "neetcode", "leetcode", "interview", "vietnamese"],

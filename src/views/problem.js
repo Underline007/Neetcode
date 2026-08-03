@@ -1,19 +1,28 @@
-import { problemById, topicById, buildTests } from '../data/index.js';
+import { problemById as jsProblemById, topicById as jsTopicById, buildTests } from '../data/index.js';
 import { store } from '../store.js';
 import { computeScore, grade, BASE_POINTS, HINT_PENALTY } from '../scoring.js';
 import { qualityFromScore, schedule, nextDueLabel } from '../srs.js';
 import { runTests } from '../runner.js';
 import { md } from '../markdown.js';
 import { $, $$, esc, toast, diffClass, diffLabel } from '../ui.js';
+import { resolveLang, pick } from '../lang.js';
+
+const JS_DOMAIN = { problemById: jsProblemById, topicById: jsTopicById, basePath: '' };
 
 let session = null;   // trạng thái phiên làm bài hiện tại
 
-export function renderProblem(id) {
+export function renderProblem(id, domain = JS_DOMAIN) {
+  const { problemById, topicById, basePath } = domain;
   const p = problemById.get(id);
   if (!p) return '<h1>Không tìm thấy bài tập</h1>';
 
   const rec = store.problem(p.id);
   const topic = topicById.get(p.topic);
+  const switchLang = store.get().lang || 'javascript';
+  const lang = resolveLang(p, switchLang);
+  const isPy = lang === 'python';
+  const langLabel = isPy ? 'Python' : 'JavaScript';
+  const notReady = switchLang === 'python' && !isPy;   // công tắc muốn Python nhưng bài này chưa có bản Python
 
   session = {
     problem: p,
@@ -23,11 +32,11 @@ export function renderProblem(id) {
     passedThisSession: false,
   };
 
-  const code = rec.code || p.starter;
+  const code = (isPy ? rec.codePy : rec.code) || pick(p, 'starter', lang);
 
   return `
     <div class="row">
-      <a class="btn ghost small" href="#/topic/${p.topic}">← ${topic.icon} ${esc(topic.name)}</a>
+      <a class="btn ghost small" href="#${basePath}/topic/${p.topic}">← ${topic.icon} ${esc(topic.name)}</a>
       <span class="badge ${diffClass(p.difficulty)}">${diffLabel(p.difficulty)}</span>
       <span class="badge">🎯 mục tiêu ${p.targetMinutes} phút</span>
       ${rec.solved ? `<span class="badge ok">Đã giải · ${rec.best} điểm</span>` : ''}
@@ -38,6 +47,7 @@ export function renderProblem(id) {
 
     <h1 style="margin-top:12px">${esc(p.title)}</h1>
     <p class="sub">${esc(p.en)} · Điểm tối đa cơ bản: ${BASE_POINTS[p.difficulty]}</p>
+    ${notReady ? '<div class="card" style="border-color:var(--warn);margin-bottom:14px"><strong>🔧 Bài này chưa có bản Python.</strong> <span class="muted small">Đang hiển thị bằng JavaScript — bài sẽ có bản Python trong các đợt cập nhật tiếp theo.</span></div>' : ''}
 
     <div class="workspace">
       <div>
@@ -72,7 +82,7 @@ export function renderProblem(id) {
         <div class="pane">
           <div class="pane-head">
             <strong>⌨️ Lời giải của bạn</strong>
-            <span class="badge">JavaScript</span>
+            <span class="badge">${langLabel}</span>
             <span class="spacer"></span>
             <button class="btn ghost small" id="reset-btn">Khôi phục code mẫu</button>
           </div>
@@ -83,6 +93,7 @@ export function renderProblem(id) {
           <button class="btn" id="run-btn">▶ Chạy &amp; chấm điểm</button>
           <span class="muted small">hoặc <span class="kbd">Ctrl</span> + <span class="kbd">Enter</span></span>
         </div>
+        ${langLabel === 'Python' ? '<p class="muted small" style="margin:8px 0 0">Lần chạy Python đầu tiên trong phiên cần vài giây để tải môi trường (Pyodide, cần internet lần đầu) — các lần sau nhanh hơn nhiều.</p>' : ''}
 
         <div id="results" style="margin-top:14px"></div>
       </div>
@@ -91,9 +102,15 @@ export function renderProblem(id) {
 }
 
 /* --------------------------- gắn sự kiện --------------------------- */
-export function mountProblem(id) {
+export function mountProblem(id, domain = JS_DOMAIN) {
+  const { problemById } = domain;
   const p = problemById.get(id);
   if (!p) return;
+  const lang = resolveLang(p, store.get().lang || 'javascript');
+  const isPy = lang === 'python';
+  const starter = pick(p, 'starter', lang);
+  const hints = pick(p, 'hints', lang);
+  const diagnostics = pick(p, 'diagnostics', lang) || [];
   const rec = store.problem(p.id);
   const editor = $('#editor');
 
@@ -116,14 +133,14 @@ export function mountProblem(id) {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); run(); }
   });
   editor.addEventListener('input', () => {
-    rec.code = editor.value;
+    if (isPy) rec.codePy = editor.value; else rec.code = editor.value;
     store.save();
   });
 
   $('#reset-btn').addEventListener('click', () => {
     if (!confirm('Khôi phục về code mẫu? Code hiện tại sẽ mất.')) return;
-    editor.value = p.starter;
-    rec.code = p.starter;
+    editor.value = starter;
+    if (isPy) rec.codePy = starter; else rec.code = starter;
     store.save();
   });
 
@@ -132,7 +149,7 @@ export function mountProblem(id) {
   // ----- gợi ý -----
   renderHints();
   $('#hint-btn').addEventListener('click', () => {
-    if (rec.hintsUsed >= p.hints.length) return;
+    if (rec.hintsUsed >= hints.length) return;
     rec.hintsUsed++;
     store.save();
     renderHints();
@@ -141,11 +158,11 @@ export function mountProblem(id) {
 
   function renderHints() {
     const box = $('#hints');
-    box.innerHTML = p.hints.slice(0, rec.hintsUsed)
+    box.innerHTML = hints.slice(0, rec.hintsUsed)
       .map((h, i) => `<div class="hint"><strong>Gợi ý ${i + 1}.</strong> ${md(h).replace(/^<p>|<\/p>$/g, '')}</div>`)
       .join('');
     const btn = $('#hint-btn');
-    if (rec.hintsUsed >= p.hints.length) {
+    if (rec.hintsUsed >= hints.length) {
       btn.textContent = 'Đã mở hết gợi ý';
       btn.disabled = true;
     } else {
@@ -160,12 +177,17 @@ export function mountProblem(id) {
     rec.revealed = true;
     store.save();
     $('#reveal-btn').classList.add('hidden');
+    const primarySolution = pick(p, 'solution', lang);
+    const otherLangBlock = p.lang === 'python'
+      ? ''   // bài thuộc track Python thuần tuý -> không có bản JS để đối chiếu
+      : (isPy
+        ? `<h3>Lời giải tham khảo (JavaScript)</h3><div class="md">${md('```js\n' + p.solution + '\n```')}</div>`
+        : `<h3>Lời giải tham khảo (Python)</h3><div class="md">${md('```python\n' + p.solutionPy + '\n```')}</div>`);
     $('#solution').innerHTML = `
       <div class="md">${md(p.approach)}</div>
-      <h3>Lời giải tham khảo (JavaScript)</h3>
-      <div class="md">${md('```js\n' + p.solution + '\n```')}</div>
-      <h3>Lời giải tham khảo (Python)</h3>
-      <div class="md">${md('```python\n' + p.solutionPy + '\n```')}</div>
+      <h3>Lời giải tham khảo (${isPy ? 'Python' : 'JavaScript'})</h3>
+      <div class="md">${md('```' + (isPy ? 'python' : 'js') + '\n' + primarySolution + '\n```')}</div>
+      ${otherLangBlock}
       <div class="hint"><strong>🌍 Ứng dụng thực tế.</strong> ${esc(p.realWorld)}</div>`;
   });
 
@@ -173,16 +195,17 @@ export function mountProblem(id) {
   async function run() {
     const btn = $('#run-btn');
     btn.disabled = true;
-    btn.textContent = '⏳ Đang chạy...';
+    btn.textContent = isPy ? '⏳ Đang chạy (lần đầu có thể mất vài giây để tải môi trường Python)...' : '⏳ Đang chạy...';
     const code = editor.value;
 
     const res = await runTests({
       code,
       entry: p.entry,
       tests: buildTests(p),
-      harnessSrc: p.harnessSrc,
-      checkerSrc: p.checkerSrc,
+      harnessSrc: pick(p, 'harnessSrc', lang),
+      checkerSrc: pick(p, 'checkerSrc', lang),
       timeoutMs: 6000,
+      lang,
     });
 
     btn.disabled = false;
@@ -217,8 +240,8 @@ export function mountProblem(id) {
     }
 
     box.innerHTML = head
-      + diagnose(code, res)
-      + (res.logs?.length ? `<div class="card tight" style="margin-top:10px"><div class="muted small">console.log</div><pre class="mono small" style="white-space:pre-wrap;margin:4px 0 0">${esc(res.logs.join('\n'))}</pre></div>` : '')
+      + diagnose(code, res, diagnostics)
+      + (res.logs?.length ? `<div class="card tight" style="margin-top:10px"><div class="muted small">${isPy ? 'print()' : 'console.log'}</div><pre class="mono small" style="white-space:pre-wrap;margin:4px 0 0">${esc(res.logs.join('\n'))}</pre></div>` : '')
       + testList(res);
     box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
@@ -362,12 +385,11 @@ function testList(res) {
 }
 
 /* ------------------- chẩn đoán tự động khi làm sai ------------------- */
-function diagnose(code, res) {
-  const p = session.problem;
+function diagnose(code, res, diagnostics) {
   const notes = [];
 
   // 1. luật chẩn đoán riêng của từng bài (dựa trên mẫu code)
-  for (const d of p.diagnostics || []) {
+  for (const d of diagnostics || []) {
     try {
       if (new RegExp(d.test, 'm').test(code)) notes.push(d.message);
     } catch { /* regex hỏng thì bỏ qua */ }

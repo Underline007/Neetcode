@@ -83,6 +83,86 @@ hàng triệu nhánh ở tầng 10.
 - **Cờ vua / AI trò chơi**: minimax chính là backtracking có đánh giá.
 - **Regex engine**: khớp mẫu với dấu \`*\` dùng quay lui — và đó cũng là nguồn gốc lỗ hổng ReDoS.
 `,
+  lessonPy: `
+## 1. Vấn đề gốc
+
+Có những bài toán mà đáp án là **một tổ hợp lựa chọn**: chọn tập con nào, sắp xếp thế nào,
+đặt quân hậu ở đâu. Không có công thức trực tiếp — bắt buộc phải **thử**.
+
+Nhưng thử một cách hỗn loạn sẽ sinh trùng lặp và bỏ sót. Quay lui là cách thử **có hệ thống**.
+
+## 2. Ý tưởng cốt lõi
+
+> Mọi bài quay lui đều là **duyệt theo chiều sâu (DFS) trên một cây quyết định ẩn**.
+> Mỗi tầng của cây = một quyết định. Mỗi đường đi từ gốc tới lá = một lời giải ứng viên.
+
+Khung mẫu **ba dòng** (thuộc lòng khung này là xong 70% chủ đề):
+
+\`\`\`python
+def backtrack(state):
+    if is_solution(state):
+        results.append(state[:])     # SAO CHÉP — xem lưu ý bên dưới
+        return
+
+    for choice in choices(state):
+        if not is_valid(choice, state):
+            continue                  # cắt tỉa (pruning)
+        state.append(choice)          # 1. CHỌN
+        backtrack(state)              # 2. ĐI TIẾP
+        state.pop()                   # 3. HOÀN TÁC  <-- linh hồn của backtracking
+\`\`\`
+
+**Vì sao phải hoàn tác?** Vì ta dùng chung **một** list trạng thái cho cả cây tìm kiếm
+(tiết kiệm bộ nhớ). Sau khi khám phá xong một nhánh, trạng thái phải trở về đúng như trước
+để nhánh anh em bắt đầu từ điểm xuất phát sạch sẽ.
+
+**Lưu ý bắt buộc:** khi lưu kết quả phải \`results.append(state[:])\` (hoặc \`list(state)\`) — sao chép!
+Nếu append thẳng \`state\`, mọi kết quả sẽ trỏ về **cùng một list** và khi state bị sửa đổi tiếp,
+mọi kết quả đã lưu cũng đổi theo — cuối cùng đều giống hệt trạng thái cuối cùng (thường là rỗng).
+Đây là bẫy tham chiếu kinh điển của Python (list là mutable, gán chỉ sao chép tham chiếu).
+
+## 3. Ba biến thể — khác nhau ở tham số \`start\`
+
+| Bài | Vòng lặp bắt đầu từ | Ý nghĩa |
+|---|---|---|
+| **Tập con / tổ hợp** | \`i = start\` | không quay lại phần tử đã qua → không sinh hoán vị trùng |
+| **Tổ hợp có lặp lại** | \`i = start\` nhưng gọi đệ quy với \`i\` (không phải \`i+1\`) | được dùng lại chính phần tử đó |
+| **Hoán vị** | \`i = 0\` + list \`used[]\` | mọi vị trí đều có thể chọn, chỉ cần chưa dùng |
+
+Chỉ một tham số nhỏ này quyết định bạn sinh ra *tập con*, *tổ hợp* hay *hoán vị*.
+Hiểu nó là hiểu cả chủ đề.
+
+## 4. Cắt tỉa — thứ biến "bất khả thi" thành "chạy được"
+
+Số lời giải có thể là 2ⁿ hoặc n!. Cắt tỉa sớm là yếu tố sống còn:
+
+- **Sắp xếp trước** rồi \`break\` khi tổng đã vượt target (bài Combination Sum).
+- **Bỏ qua nhánh trùng**: \`if i > start and a[i] == a[i-1]: continue\`
+- **Kiểm tra tính khả thi sớm** (bài N-Queens: kiểm tra cột/đường chéo ngay khi đặt).
+
+Nguyên tắc: **thất bại càng sớm càng tốt**. Một phép kiểm tra rẻ ở tầng 2 có thể xoá bỏ
+hàng triệu nhánh ở tầng 10.
+
+Lưu ý Python: đệ quy sâu (ví dụ n rất lớn) có thể chạm giới hạn \`sys.getrecursionlimit()\` (~1000).
+Với backtracking thường độ sâu = n (số phần tử chọn), nên hiếm khi là vấn đề trừ khi n rất lớn.
+
+## 5. Bẫy thường gặp
+
+- Quên \`pop()\` → trạng thái rò rỉ sang nhánh khác, kết quả sai một cách kỳ lạ.
+- Append tham chiếu (\`results.append(state)\`) thay vì bản sao (\`state[:]\`).
+- Với dữ liệu có phần tử trùng: quên sắp xếp + bỏ qua trùng → kết quả bị lặp.
+- Nhầm giữa \`i + 1\` (không dùng lại) và \`i\` (được dùng lại) khi gọi đệ quy.
+
+## 6. Ứng dụng thực tế
+
+- **Bộ giải Sudoku, sinh mê cung, xếp lịch thi**.
+- **Trình giải ràng buộc (CSP solver)**: phân công ca làm việc, xếp phòng học, tô màu bản đồ.
+- **Bộ kiểm thử sinh tổ hợp cấu hình** (pairwise testing) — module \`itertools\` của Python
+  (\`combinations\`, \`permutations\`, \`product\`) cài sẵn nhiều mẫu hình ở đây, đáng biết để không
+  "phát minh lại bánh xe" khi không cần custom logic.
+- **Cờ vua / AI trò chơi**: minimax chính là backtracking có đánh giá.
+- **Regex engine**: khớp mẫu với dấu \`*\` dùng quay lui — và đó cũng là nguồn gốc lỗ hổng ReDoS.
+`,
   quiz: [
     {
       q: 'Vì sao dòng `state.pop()` sau lời gọi đệ quy là bắt buộc?',
@@ -129,6 +209,52 @@ hàng triệu nhánh ở tầng 10.
       why: 'Không gian tìm kiếm là hàm mũ; không có cách nào làm nó đa thức. Nhưng cắt tỉa sớm loại bỏ hàng triệu nhánh chết. Một kiểm tra rẻ ở tầng nông giá trị hơn mọi tối ưu vi mô.',
     },
   ],
+  quizPy: [
+    {
+      q: 'Vì sao dòng `state.pop()` sau lời gọi đệ quy là bắt buộc?',
+      options: [
+        'Để giải phóng bộ nhớ',
+        'Để trạng thái trở về đúng như trước khi thử nhánh này, cho nhánh anh em bắt đầu sạch sẽ',
+        'Để tránh đệ quy vô hạn',
+        'Để kết quả được sắp xếp',
+      ],
+      answer: 1,
+      why: 'Ta dùng CHUNG một list trạng thái cho toàn bộ cây tìm kiếm. Không hoàn tác thì nhánh sau sẽ kế thừa rác của nhánh trước. Đây chính là chữ "back" trong backtracking.',
+    },
+    {
+      q: 'Điểm khác biệt cốt lõi giữa sinh TỔ HỢP và sinh HOÁN VỊ trong khung quay lui?',
+      options: [
+        'Tổ hợp dùng vòng lặp từ `start`, hoán vị lặp từ 0 và dùng list đánh dấu `used`',
+        'Hoán vị cần nhiều bộ nhớ hơn',
+        'Tổ hợp không cần hoàn tác trạng thái',
+        'Hoán vị phải sắp xếp list trước',
+      ],
+      answer: 0,
+      why: 'Tham số `start` ngăn việc quay lại phần tử đã qua → mỗi tập chỉ sinh một lần theo một thứ tự. Bỏ `start` và thêm `used` thì mọi thứ tự đều được sinh → hoán vị.',
+    },
+    {
+      q: 'Trong bài Combination Sum (được dùng lại phần tử nhiều lần), lời gọi đệ quy nên truyền gì?',
+      options: [
+        'backtrack(i + 1) — chuyển sang phần tử kế tiếp',
+        'backtrack(i) — giữ nguyên vị trí để được chọn lại chính phần tử đó',
+        'backtrack(0) — bắt đầu lại từ đầu',
+        'backtrack(start) — không thay đổi',
+      ],
+      answer: 1,
+      why: 'Truyền `i` cho phép chọn lại phần tử thứ i; truyền `i+1` thì không. Truyền 0 sẽ sinh trùng ([2,3] và [3,2]). Một con số nhỏ nhưng quyết định toàn bộ ngữ nghĩa bài toán.',
+    },
+    {
+      q: 'Kỹ thuật quan trọng nhất để backtracking chạy được với dữ liệu lớn là gì?',
+      options: [
+        'Dùng vòng lặp thay đệ quy',
+        'Cắt tỉa (pruning) — loại bỏ nhánh không thể dẫn tới lời giải càng sớm càng tốt',
+        'Dùng nhiều bộ nhớ hơn',
+        'Sắp xếp kết quả cuối cùng',
+      ],
+      answer: 1,
+      why: 'Không gian tìm kiếm là hàm mũ; không có cách nào làm nó đa thức. Nhưng cắt tỉa sớm loại bỏ hàng triệu nhánh chết. Một kiểm tra rẻ ở tầng nông giá trị hơn mọi tối ưu vi mô.',
+    },
+  ],
   problems: [
     {
       id: 'subsets',
@@ -146,6 +272,7 @@ Thứ tự tập con và thứ tự phần tử bên trong không quan trọng.
 - \`[0]\` → \`[[],[0]]\`
 `,
       starter: `function subsets(nums) {\n  \n}`,
+      starterPy: `def subsets(nums):\n    \n`,
       tests: [
         { args: [[1, 2, 3]], expected: [[], [1], [2], [3], [1, 2], [1, 3], [2, 3], [1, 2, 3]], name: 'Ba phần tử' },
         { args: [[0]], expected: [[], [0]], name: 'Một phần tử' },
@@ -160,14 +287,23 @@ Thứ tự tập con và thứ tự phần tử bên trong không quan trọng.
         const keys = new Set(got.map(s => [...s].sort((a,b)=>a-b).join(',')));
         return keys.size === (1 << n);
       }`,
+      checkerSrcPy: `lambda got, exp, args: (
+        isinstance(got, list)
+        and len(got) == (1 << len(args[0]))
+        and len({','.join(str(x) for x in sorted(s)) for s in got}) == (1 << len(args[0]))
+      )`,
       hints: [
         'Với mỗi phần tử, bạn có đúng **hai lựa chọn**: lấy hoặc không lấy. Đó là một cây nhị phân quyết định có 2ⁿ đường đi từ gốc tới lá.',
-        'Khung quay lui: `dfs(start, path)`. **Mọi nút** của cây (không chỉ lá) đều là một tập con hợp lệ → push `[...path]` ngay khi vào hàm.',
-        'Vòng lặp `for (let i = start; i < nums.length; i++)`: chọn `nums[i]`, gọi `dfs(i + 1, path)`, rồi `path.pop()`. Tham số `start` là thứ ngăn bạn sinh [2,1] sau khi đã có [1,2].',
+        'Khung quay lui: `dfs(start, path)`. **Mọi nút** của cây (không chỉ lá) đều là một tập con hợp lệ → append `path[:]` ngay khi vào hàm.',
+        'Vòng lặp `for i in range(start, len(nums))`: chọn `nums[i]`, gọi `dfs(i + 1)`, rồi `path.pop()`. Tham số `start` là thứ ngăn bạn sinh [2,1] sau khi đã có [1,2].',
       ],
       diagnostics: [
         { test: 'res\\.push\\(path\\)|results\\.push\\(path\\)', message: 'Bạn đang push THAM CHIẾU tới mảng path. Vì path bị thay đổi liên tục, mọi kết quả sẽ giống nhau (và rỗng ở cuối). Hãy push `[...path]`.' },
         { test: 'dfs\\(\\s*0\\s*,|backtrack\\(\\s*0\\s*,', message: 'Nếu vòng lặp luôn bắt đầu từ 0, bạn sẽ sinh cả [1,2] lẫn [2,1] — đó là hoán vị chứ không phải tập con. Hãy truyền `i + 1`.' },
+      ],
+      diagnosticsPy: [
+        { test: 'res\\.append\\(path\\)', message: 'Bạn đang append THAM CHIẾU tới list path. Vì path bị thay đổi liên tục, mọi kết quả sẽ giống nhau (và rỗng ở cuối). Hãy append `path[:]`.' },
+        { test: 'dfs\\(\\s*0\\s*\\)|backtrack\\(\\s*0\\s*\\)', message: 'Nếu vòng lặp luôn bắt đầu từ 0, bạn sẽ sinh cả [1,2] lẫn [2,1] — đó là hoán vị chứ không phải tập con. Hãy truyền `i + 1`.' },
       ],
       approach: `
 **Hai cách nhìn — nên biết cả hai.**
@@ -267,6 +403,7 @@ Hai tổ hợp là khác nhau nếu số lần chọn của ít nhất một s�
 - \`candidates = [2], target = 1\` → \`[]\`
 `,
       starter: `function combinationSum(candidates, target) {\n  \n}`,
+      starterPy: `def combinationSum(candidates, target):\n    \n`,
       tests: [
         { args: [[2, 3, 6, 7], 7], expected: [[2, 2, 3], [7]], name: 'Ví dụ 1' },
         { args: [[2, 3, 5], 8], expected: [[2, 2, 2, 2], [2, 3, 3], [3, 5]], name: 'Ví dụ 2' },
@@ -283,15 +420,26 @@ Hai tổ hợp là khác nhau nếu số lần chọn của ít nhất một s�
         if (exp) return norm(got) === norm(exp);
         return true;
       }`,
+      checkerSrcPy: `lambda got, exp, args: (
+        isinstance(got, list)
+        and all(sum(c) == args[1] for c in got)
+        and len({','.join(str(x) for x in sorted(c)) for c in got}) == len(got)
+        and (sorted(','.join(str(x) for x in sorted(c)) for c in got) == sorted(','.join(str(x) for x in sorted(c)) for c in exp) if exp else True)
+      )`,
       hints: [
         'Khung quay lui với ba tham số: `dfs(start, path, remain)`. Điều kiện dừng: `remain === 0` → lưu kết quả; `remain < 0` → nhánh chết, quay về.',
         'Vì mỗi số được dùng **nhiều lần**, lời gọi đệ quy phải truyền `i` chứ **không phải** `i + 1`. Nhưng vẫn phải có `start` để không sinh [2,3] và [3,2] trùng nhau.',
-        'Cắt tỉa mạnh: sắp xếp `candidates` tăng dần, rồi trong vòng lặp dùng `if (candidates[i] > remain) break;` — vì các phần tử sau còn lớn hơn nên chắc chắn cũng thất bại.',
+        'Cắt tỉa mạnh: sắp xếp `candidates` tăng dần, rồi trong vòng lặp dùng `if a[i] > remain: break` — vì các phần tử sau còn lớn hơn nên chắc chắn cũng thất bại.',
       ],
       diagnostics: [
         { test: 'dfs\\(\\s*i\\s*\\+\\s*1', message: 'Truyền `i + 1` nghĩa là mỗi số chỉ dùng một lần — nhưng đề cho phép dùng lại nhiều lần. Hãy truyền `i`.' },
         { test: 'dfs\\(\\s*0\\s*[,)]', message: 'Luôn bắt đầu vòng lặp từ 0 sẽ sinh tổ hợp trùng theo thứ tự khác nhau ([2,3] và [3,2]). Hãy dùng tham số `start`.' },
         { test: 'res\\.push\\(path\\)', message: 'Push tham chiếu `path` sẽ khiến mọi kết quả bị ghi đè. Dùng `[...path]`.' },
+      ],
+      diagnosticsPy: [
+        { test: 'dfs\\(\\s*i\\s*\\+\\s*1', message: 'Truyền `i + 1` nghĩa là mỗi số chỉ dùng một lần — nhưng đề cho phép dùng lại nhiều lần. Hãy truyền `i`.' },
+        { test: 'dfs\\(\\s*0\\s*[,)]', message: 'Luôn bắt đầu vòng lặp từ 0 sẽ sinh tổ hợp trùng theo thứ tự khác nhau ([2,3] và [3,2]). Hãy dùng tham số `start`.' },
+        { test: 'res\\.append\\(path\\)', message: 'Append tham chiếu `path` sẽ khiến mọi kết quả bị ghi đè. Dùng `path[:]`.' },
       ],
       approach: `
 **Điểm khó duy nhất: tránh sinh trùng.** \`[2,2,3]\` và \`[3,2,2]\` là *cùng một* tổ hợp.
@@ -386,6 +534,7 @@ Thứ tự các hoán vị trong kết quả không quan trọng.
 - \`[1]\` → \`[[1]]\`
 `,
       starter: `function permute(nums) {\n  \n}`,
+      starterPy: `def permute(nums):\n    \n`,
       tests: [
         { args: [[1, 2, 3]], expected: [[1, 2, 3], [1, 3, 2], [2, 1, 3], [2, 3, 1], [3, 1, 2], [3, 2, 1]], name: 'Ba phần tử' },
         { args: [[0, 1]], expected: [[0, 1], [1, 0]], name: 'Hai phần tử' },
@@ -402,14 +551,24 @@ Thứ tự các hoán vị trong kết quả không quan trọng.
         const src = [...args[0]].sort((a,b)=>a-b).join(',');
         return got.every(p => [...p].sort((a,b)=>a-b).join(',') === src);
       }`,
+      checkerSrcPy: `lambda got, exp, args: (
+        isinstance(got, list)
+        and len(got) == __import__('math').factorial(len(args[0]))
+        and len({','.join(str(x) for x in p) for p in got}) == __import__('math').factorial(len(args[0]))
+        and all(sorted(p) == sorted(args[0]) for p in got)
+      )`,
       hints: [
         'Khác với tập con: ở đây **thứ tự quan trọng**, nên mọi vị trí đều có thể được chọn ở mỗi bước. Bỏ tham số `start` đi.',
-        'Cần một cách để biết phần tử nào đã dùng: dùng mảng `used[]` (boolean) hoặc `Set`. Vòng lặp `for (i = 0; i < n; i++)` và `if (used[i]) continue;`.',
-        'Điều kiện dừng: `path.length === nums.length` → lưu bản sao. Đừng quên đặt lại `used[i] = false` cùng lúc với `path.pop()` khi hoàn tác.',
+        'Cần một cách để biết phần tử nào đã dùng: dùng list `used[]` (boolean) hoặc `set`. Vòng lặp `for i in range(n)` và `if used[i]: continue`.',
+        'Điều kiện dừng: `len(path) == len(nums)` → lưu bản sao. Đừng quên đặt lại `used[i] = False` cùng lúc với `path.pop()` khi hoàn tác.',
       ],
       diagnostics: [
         { test: 'dfs\\(\\s*i\\s*\\+\\s*1|dfs\\(\\s*start', message: 'Tham số `start` là dành cho tổ hợp. Với hoán vị, mọi phần tử chưa dùng đều có thể chọn ở mỗi bước — hãy lặp từ 0 và dùng mảng `used`.' },
         { test: 'res\\.push\\(path\\)', message: 'Push tham chiếu sẽ khiến tất cả hoán vị trong kết quả là cùng một mảng rỗng. Dùng `[...path]`.' },
+      ],
+      diagnosticsPy: [
+        { test: 'dfs\\(\\s*i\\s*\\+\\s*1|dfs\\(\\s*start', message: 'Tham số `start` là dành cho tổ hợp. Với hoán vị, mọi phần tử chưa dùng đều có thể chọn ở mỗi bước — hãy lặp từ 0 và dùng list `used`.' },
+        { test: 'res\\.append\\(path\\)', message: 'Append tham chiếu sẽ khiến tất cả hoán vị trong kết quả là cùng một list rỗng. Dùng `path[:]`.' },
       ],
       approach: `
 **So sánh trực tiếp với bài Subsets — đây là cách nhớ tốt nhất:**
@@ -516,6 +675,7 @@ Các ký tự phải **kề nhau** theo chiều ngang/dọc, và **mỗi ô ch�
 - cùng board, word = \`"ABCB"\` → \`false\` (phải dùng lại ô 'B')
 `,
       starter: `function exist(board, word) {\n  \n}`,
+      starterPy: `def exist(board, word):\n    \n`,
       tests: [
         { args: [[['A', 'B', 'C', 'E'], ['S', 'F', 'C', 'S'], ['A', 'D', 'E', 'E']], 'ABCCED'], expected: true, name: 'Có đường đi' },
         { args: [[['A', 'B', 'C', 'E'], ['S', 'F', 'C', 'S'], ['A', 'D', 'E', 'E']], 'SEE'], expected: true, name: 'Bắt đầu ở giữa' },
@@ -530,9 +690,18 @@ Các ký tự phải **kề nhau** theo chiều ngang/dọc, và **mỗi ô ch�
         'Hàm `dfs(r, c, i)`: nếu `i === word.length` → true. Nếu ra ngoài lưới hoặc `board[r][c] !== word[i]` → false. Ngược lại thử 4 hướng với `i + 1`.',
         'Cách đánh dấu ô đã dùng **không cần mảng phụ**: tạm ghi đè `board[r][c] = "#"` trước khi đi tiếp, rồi **khôi phục lại ký tự cũ** sau khi quay về. Đây chính là bước "hoàn tác" của backtracking, áp dụng trên lưới.',
       ],
+      hintsPy: [
+        'Với mỗi ô của lưới, thử coi nó là điểm bắt đầu và chạy DFS. Nếu bất kỳ điểm bắt đầu nào thành công → True.',
+        'Hàm `dfs(r, c, i)`: nếu `i == len(word)` → True. Nếu ra ngoài lưới hoặc `board[r][c] != word[i]` → False. Ngược lại thử 4 hướng với `i + 1`.',
+        'Cách đánh dấu ô đã dùng **không cần list phụ**: tạm ghi đè `board[r][c] = \'#\'` trước khi đi tiếp (dùng gán song song `tmp, board[r][c] = board[r][c], \'#\'`), rồi **khôi phục lại ký tự cũ** sau khi quay về.',
+      ],
       diagnostics: [
         { test: 'visited', message: 'Dùng mảng `visited` riêng vẫn đúng, nhưng nhớ reset nó khi quay lui — nếu chỉ đánh dấu mà không xoá, các đường đi khác sẽ bị chặn nhầm. Cách ghi đè ký tự tạm thời gọn hơn.' },
         { test: 'for[\\s\\S]{0,150}for[\\s\\S]{0,150}for[\\s\\S]{0,150}for', message: 'Bốn vòng lặp lồng nhau gợi ý bạn đang thử brute force theo cách khác. Cấu trúc đúng là hai vòng ngoài (chọn điểm xuất phát) + đệ quy DFS.' },
+      ],
+      diagnosticsPy: [
+        { test: 'visited', message: 'Dùng list/set `visited` riêng vẫn đúng, nhưng nhớ reset nó khi quay lui — nếu chỉ đánh dấu mà không xoá, các đường đi khác sẽ bị chặn nhầm. Cách ghi đè ký tự tạm thời gọn hơn.' },
+        { test: 'for\\s+\\w+[\\s\\S]{0,150}for\\s+\\w+[\\s\\S]{0,150}for\\s+\\w+[\\s\\S]{0,150}for\\s+\\w+', message: 'Bốn vòng lặp lồng nhau gợi ý bạn đang thử brute force theo cách khác. Cấu trúc đúng là hai vòng ngoài (chọn điểm xuất phát) + đệ quy DFS.' },
       ],
       approach: `
 Đây là bài **backtracking trên lưới** — cầu nối tự nhiên sang chủ đề Graphs
@@ -708,6 +877,96 @@ Bước 4 chính là cách phát hiện phụ thuộc vòng — thứ mà npm/ma
 - **Bộ lập lịch tác vụ**: Airflow, CI/CD pipeline đều là DAG.
 - **Xử lý ảnh**: flood fill (công cụ "xô sơn"), tách vùng liên thông.
 `,
+  lessonPy: `
+## 1. Vấn đề gốc
+
+Cây diễn tả quan hệ **phân cấp**. Nhưng đời thực còn có quan hệ **mạng lưới**:
+bạn bè, đường xá, phụ thuộc giữa các package, luồng dữ liệu. Đồ thị là mô hình tổng quát nhất —
+cây chỉ là một trường hợp đặc biệt (đồ thị liên thông, không chu trình, n-1 cạnh).
+
+**Khác biệt then chốt so với cây:** đồ thị có thể có **chu trình**, nên bạn **bắt buộc** phải nhớ
+những đỉnh đã thăm, nếu không sẽ lặp vô hạn.
+
+## 2. Biểu diễn
+
+| Cách | Bộ nhớ | Kiểm tra cạnh (u,v) | Duyệt láng giềng | Dùng khi |
+|---|---|---|---|---|
+| Danh sách kề (\`list[list]\` hoặc \`dict[list]\`) | O(V+E) | O(bậc) | O(bậc) | **mặc định** (đồ thị thưa) |
+| Ma trận kề | O(V²) | O(1) | O(V) | đồ thị dày, cần kiểm tra cạnh nhanh |
+| Lưới (grid) | ngầm định | — | 4 hoặc 8 hướng | bài toán ma trận |
+
+Xây danh sách kề từ danh sách cạnh — mẫu code cần thuộc:
+\`\`\`python
+adj = [[] for _ in range(n)]
+for u, v in edges:
+    adj[u].append(v)
+    adj[v].append(u)      # bỏ dòng này nếu đồ thị có hướng
+\`\`\`
+
+## 3. Hai thuật toán duyệt — chọn cái nào?
+
+**BFS (hàng đợi \`collections.deque\`)** — lan toả theo từng lớp:
+\`\`\`python
+from collections import deque
+q = deque([start])
+seen = {start}
+steps = 0
+while q:
+    for _ in range(len(q)):
+        u = q.popleft()
+        for v in adj[u]:
+            if v not in seen:
+                seen.add(v)
+                q.append(v)
+    steps += 1
+\`\`\`
+→ Dùng khi cần **đường đi ngắn nhất theo số cạnh**, hoặc "lan toả theo thời gian".
+Luôn dùng \`deque\` chứ không dùng \`list\` — \`list.pop(0)\` là O(n) mỗi lần.
+
+**DFS (đệ quy hoặc ngăn xếp)** — đi sâu hết một nhánh:
+\`\`\`python
+def dfs(u):
+    seen.add(u)
+    for v in adj[u]:
+        if v not in seen:
+            dfs(v)
+\`\`\`
+→ Dùng khi cần **khám phá toàn bộ thành phần liên thông**, phát hiện chu trình, topo sort.
+Cẩn thận: đồ thị lớn (~10⁴+ đỉnh) có thể khiến DFS đệ quy chạm \`RecursionError\` — chuyển sang
+DFS lặp bằng \`list\` làm stack tường minh khi cần.
+
+> Quy tắc chọn: **"ngắn nhất / ít bước nhất" → BFS. "có tồn tại / đếm vùng / thứ tự" → DFS.**
+
+## 4. Sắp xếp tôpô (topological sort)
+
+Dành cho **đồ thị có hướng không chu trình (DAG)**: sắp xếp các đỉnh sao cho mọi cạnh u→v
+thì u đứng trước v. Đây là mô hình của **phụ thuộc**: môn tiên quyết, thứ tự build, lịch thi công.
+
+**Thuật toán Kahn (BFS trên bậc vào):**
+1. Tính \`indegree\` của mọi đỉnh.
+2. Đẩy các đỉnh có \`indegree == 0\` vào hàng đợi (\`deque\`).
+3. Lấy ra một đỉnh, giảm indegree của các đỉnh kề; đỉnh nào về 0 thì đẩy vào hàng đợi.
+4. Nếu số đỉnh lấy ra < V → **có chu trình** (không thể sắp xếp).
+
+Bước 4 chính là cách phát hiện phụ thuộc vòng — thứ mà pip/poetry báo lỗi cho bạn.
+
+## 5. Bẫy thường gặp
+
+- **Quên đánh dấu đã thăm** → lặp vô hạn (khác hẳn cây!).
+- Đánh dấu \`seen\` khi **lấy ra** khỏi hàng đợi thay vì khi **đẩy vào** → một đỉnh vào hàng đợi nhiều lần,
+  BFS chậm đi rất nhiều.
+- Với đồ thị vô hướng, quên thêm cạnh hai chiều.
+- DFS đệ quy trên đồ thị lớn (10⁵ đỉnh) → \`RecursionError\`; hãy dùng bản lặp.
+- Dùng \`list.pop(0)\` cho hàng đợi BFS thay vì \`collections.deque.popleft()\` → âm thầm biến O(V+E) thành O(V²).
+
+## 6. Ứng dụng thực tế
+
+- **Mạng xã hội**: bạn chung, gợi ý kết bạn, đường đi ngắn nhất giữa hai người ("6 độ phân cách").
+- **Bản đồ & định tuyến**: Google Maps, định tuyến gói tin trên Internet.
+- **Trình quản lý gói (pip, poetry, npm)**: giải phụ thuộc bằng topo sort, phát hiện phụ thuộc vòng.
+- **Bộ lập lịch tác vụ**: Airflow (viết bằng Python!) mô hình hoá pipeline như một DAG.
+- **Xử lý ảnh**: flood fill (công cụ "xô sơn"), tách vùng liên thông.
+`,
   quiz: [
     {
       q: 'Bạn cần tìm số bước ít nhất để đi từ A tới B trong đồ thị KHÔNG trọng số. Dùng gì?',
@@ -749,6 +1008,47 @@ Bước 4 chính là cách phát hiện phụ thuộc vòng — thứ mà npm/ma
       why: 'Mỗi lần khởi động một lượt duyệt mới = phát hiện một thành phần liên thông mới. Mẫu "đếm thành phần liên thông" này áp dụng cho mọi đồ thị, không riêng lưới.',
     },
   ],
+  quizPy: [
+    {
+      q: 'Bạn cần tìm số bước ít nhất để đi từ A tới B trong đồ thị KHÔNG trọng số. Dùng gì?',
+      options: ['DFS', 'BFS', 'Dijkstra', 'Quy hoạch động'],
+      answer: 1,
+      why: 'BFS khám phá theo từng lớp khoảng cách nên lần đầu chạm B chính là đường ngắn nhất. DFS có thể tìm ra đường dài lòng vòng trước. Dijkstra là tổng quát hoá của BFS cho đồ thị CÓ trọng số.',
+    },
+    {
+      q: 'Vì sao trên đồ thị bắt buộc phải có tập `seen` còn trên cây thì không?',
+      options: [
+        'Vì đồ thị lớn hơn',
+        'Vì đồ thị có thể chứa chu trình, không đánh dấu sẽ lặp vô hạn',
+        'Vì đồ thị dùng nhiều bộ nhớ hơn',
+        'Vì cây luôn được sắp xếp',
+      ],
+      answer: 1,
+      why: 'Cây không có chu trình và mỗi nút có đúng một cha nên không bao giờ quay lại. Đây là khác biệt cấu trúc quan trọng nhất khi chuyển từ cây sang đồ thị.',
+    },
+    {
+      q: 'Trong thuật toán Kahn, điều gì cho biết đồ thị có chu trình?',
+      options: [
+        'Hàng đợi rỗng ngay từ đầu',
+        'Số đỉnh đã xử lý nhỏ hơn tổng số đỉnh khi thuật toán kết thúc',
+        'Có đỉnh với indegree lớn hơn 1',
+        'Đồ thị có nhiều hơn V-1 cạnh',
+      ],
+      answer: 1,
+      why: 'Các đỉnh nằm trong chu trình không bao giờ có indegree về 0 nên không bao giờ vào hàng đợi. Đây chính là cách pip/poetry báo "circular dependency detected".',
+    },
+    {
+      q: 'Bài "đếm số hòn đảo" trong lưới nhị phân — cách tiếp cận chuẩn là gì?',
+      options: [
+        'Đếm số ô có giá trị 1',
+        'Duyệt mọi ô; khi gặp ô đất chưa thăm thì tăng bộ đếm và DFS/BFS làm chìm toàn bộ đảo đó',
+        'Sắp xếp lưới rồi đếm',
+        'Dùng quy hoạch động trên lưới',
+      ],
+      answer: 1,
+      why: 'Mỗi lần khởi động một lượt duyệt mới = phát hiện một thành phần liên thông mới. Mẫu "đếm thành phần liên thông" này áp dụng cho mọi đồ thị, không riêng lưới.',
+    },
+  ],
   problems: [
     {
       id: 'number-of-islands',
@@ -770,6 +1070,7 @@ Một đảo là nhóm các ô đất **liên thông theo chiều ngang/dọc** 
 \`\`\`
 `,
       starter: `function numIslands(grid) {\n  \n}`,
+      starterPy: `def numIslands(grid):\n    \n`,
       tests: [
         {
           args: [[['1', '1', '1', '1', '0'], ['1', '1', '0', '1', '0'], ['1', '1', '0', '0', '0'], ['0', '0', '0', '0', '0']]],
@@ -789,8 +1090,16 @@ Một đảo là nhóm các ô đất **liên thông theo chiều ngang/dọc** 
         'Hàm `sink(r, c)`: nếu ra ngoài lưới hoặc ô không phải "1" thì return. Ngược lại đặt `grid[r][c] = "0"` (đánh dấu đã thăm) rồi gọi đệ quy 4 hướng.',
         'Ghi đè trực tiếp lên grid tiết kiệm bộ nhớ hơn mảng `visited` riêng. Nếu đề cấm sửa dữ liệu đầu vào, hãy nói rõ điều đó và dùng mảng phụ — người phỏng vấn đánh giá cao việc bạn hỏi trước.',
       ],
+      hintsPy: [
+        'Mẫu hình "đếm thành phần liên thông": duyệt mọi ô; mỗi khi gặp một ô đất **chưa thăm**, tăng bộ đếm lên 1 rồi **làm chìm toàn bộ đảo** đó bằng DFS/BFS.',
+        'Hàm `sink(r, c)`: nếu ra ngoài lưới hoặc ô không phải "1" thì return. Ngược lại đặt `grid[r][c] = \'0\'` (đánh dấu đã thăm) rồi gọi đệ quy 4 hướng.',
+        'Ghi đè trực tiếp lên grid tiết kiệm bộ nhớ hơn set `visited` riêng. Với lưới rất lớn, đệ quy có thể chạm `RecursionError` — hãy biết cách chuyển sang BFS bằng `collections.deque` nếu cần.',
+      ],
       diagnostics: [
         { test: 'count\\s*\\+\\+[\\s\\S]{0,60}\\}\\s*\\}\\s*return count', message: 'Có vẻ bạn đang đếm số ô đất chứ không phải số đảo. Sau khi tăng bộ đếm, bạn phải làm chìm TOÀN BỘ đảo liên thông với ô đó.' },
+      ],
+      diagnosticsPy: [
+        { test: 'count\\s*\\+=\\s*1[\\s\\S]{0,80}return count', message: 'Có vẻ bạn đang đếm số ô đất chứ không phải số đảo. Sau khi tăng bộ đếm, bạn phải làm chìm TOÀN BỘ đảo liên thông với ô đó.' },
       ],
       approach: `
 **Đây là bài mẫu cho cả một họ bài toán lưới.** Nắm chắc nó, bạn giải được:
@@ -890,6 +1199,7 @@ Trả về **số phút tối thiểu** để không còn cam tươi. Nếu khô
 - \`[[0,2]]\` → \`0\`
 `,
       starter: `function orangesRotting(grid) {\n  \n}`,
+      starterPy: `def orangesRotting(grid):\n    \n`,
       tests: [
         { args: [[[2, 1, 1], [1, 1, 0], [0, 1, 1]]], expected: 4, name: 'Ví dụ 1' },
         { args: [[[2, 1, 1], [0, 1, 1], [1, 0, 1]]], expected: -1, name: 'Có cam bị cô lập' },
@@ -904,8 +1214,16 @@ Trả về **số phút tối thiểu** để không còn cam tươi. Nếu khô
         'Khởi tạo hàng đợi với **tất cả** cam thối ban đầu cùng lúc (không phải từng cái một). Đồng thời đếm số cam tươi.',
         'Mỗi vòng lặp xử lý **trọn một tầng** = một phút. Sau khi BFS xong, nếu số cam tươi còn lại > 0 → trả về -1. Chú ý: nếu ban đầu không có cam tươi, đáp án là 0 chứ không phải số phút.',
       ],
+      hintsPy: [
+        'Từ khoá "mỗi phút" + "lan ra các ô kề" = **BFS đa nguồn** (multi-source BFS). Đây là dấu hiệu nhận biết quan trọng.',
+        'Khởi tạo `collections.deque` với **tất cả** cam thối ban đầu cùng lúc (không phải từng cái một). Đồng thời đếm số cam tươi.',
+        'Mỗi vòng lặp xử lý **trọn một tầng** (`for _ in range(len(q))`) = một phút. Sau khi BFS xong, nếu số cam tươi còn lại > 0 → trả về -1. Chú ý: nếu ban đầu không có cam tươi, đáp án là 0 chứ không phải số phút.',
+      ],
       diagnostics: [
         { test: 'for[\\s\\S]{0,200}orangesRotting|while\\s*\\(true\\)', message: 'Mô phỏng bằng cách quét lại toàn lưới mỗi phút là O((m·n)²). BFS đa nguồn cho O(m·n).' },
+      ],
+      diagnosticsPy: [
+        { test: '\\.pop\\(0\\)', message: '`list.pop(0)` là O(n) mỗi lần lấy phần tử đầu — dùng `collections.deque` với `popleft()` để đạt O(1).' },
       ],
       approach: `
 **BFS đa nguồn** là một trong những kỹ thuật đẹp và hữu dụng nhất của chủ đề đồ thị.
@@ -1032,6 +1350,7 @@ Trả về \`true\` nếu có thể hoàn thành tất cả các môn.
 - \`numCourses = 2, prerequisites = [[1,0],[0,1]]\` → \`false\` (phụ thuộc vòng)
 `,
       starter: `function canFinish(numCourses, prerequisites) {\n  \n}`,
+      starterPy: `def canFinish(numCourses, prerequisites):\n    \n`,
       tests: [
         { args: [2, [[1, 0]]], expected: true, name: 'Phụ thuộc đơn giản' },
         { args: [2, [[1, 0], [0, 1]]], expected: false, name: 'Chu trình 2 đỉnh' },
@@ -1046,9 +1365,18 @@ Trả về \`true\` nếu có thể hoàn thành tất cả các môn.
         'Cách 1 — **Kahn (BFS)**: tính `indegree` (số môn tiên quyết chưa học) cho mỗi môn. Đẩy các môn có indegree = 0 vào hàng đợi. Mỗi lần học một môn thì giảm indegree các môn phụ thuộc nó.',
         'Kết luận: nếu số môn học được **bằng** numCourses → true. Nếu nhỏ hơn → các môn còn lại nằm trong chu trình → false. Nhớ xây danh sách kề trước, đừng quét lại mảng prerequisites trong vòng lặp.',
       ],
+      hintsPy: [
+        'Dịch đề sang ngôn ngữ đồ thị: mỗi môn là một đỉnh, `[a,b]` là cạnh có hướng `b → a`. Câu hỏi "có học hết được không?" tương đương "đồ thị có chu trình không?".',
+        'Cách 1 — **Kahn (BFS)**: tính `indeg` (số môn tiên quyết chưa học) cho mỗi môn. Đẩy các môn có `indeg == 0` vào `collections.deque`. Mỗi lần học một môn thì giảm indegree các môn phụ thuộc nó.',
+        'Kết luận: nếu số môn học được **bằng** `numCourses` → True. Nếu nhỏ hơn → các môn còn lại nằm trong chu trình → False. Nhớ xây danh sách kề trước, đừng quét lại list `prerequisites` trong vòng lặp.',
+      ],
       diagnostics: [
         { test: 'for[\\s\\S]{0,200}prerequisites[\\s\\S]{0,200}for[\\s\\S]{0,200}prerequisites', message: 'Quét lại mảng prerequisites trong vòng lặp là O(V·E). Hãy xây danh sách kề một lần rồi dùng lại.' },
         { test: 'visited\\s*=\\s*new Set[\\s\\S]{0,400}return false', message: 'Với DFS phát hiện chu trình, một tập `visited` là chưa đủ — bạn cần phân biệt "đang trong đường đi hiện tại" (xám) với "đã xử lý xong" (đen). Nếu không sẽ báo chu trình nhầm ở đồ thị hình kim cương.' },
+      ],
+      diagnosticsPy: [
+        { test: 'for\\s+\\w+\\s+in\\s+prerequisites[\\s\\S]{0,200}for\\s+\\w+\\s+in\\s+prerequisites', message: 'Quét lại list prerequisites trong vòng lặp là O(V·E). Hãy xây danh sách kề một lần rồi dùng lại.' },
+        { test: 'visited\\s*=\\s*set\\(\\)[\\s\\S]{0,400}return False', message: 'Với DFS phát hiện chu trình, một set `visited` là chưa đủ — bạn cần phân biệt "đang trong đường đi hiện tại" (xám) với "đã xử lý xong" (đen). Nếu không sẽ báo chu trình nhầm ở đồ thị hình kim cương.' },
       ],
       approach: `
 **Bước dịch đề — kỹ năng quan trọng nhất:** nhận ra đây là bài **phát hiện chu trình trên đồ thị có hướng**.
@@ -1150,6 +1478,7 @@ Cho \`n\` đỉnh đánh số \`0..n-1\` và danh sách \`edges\` của một đ
 - \`n = 5, edges = [[0,1],[1,2],[2,3],[3,4]]\` → \`1\`
 `,
       starter: `function countComponents(n, edges) {\n  \n}`,
+      starterPy: `def countComponents(n, edges):\n    \n`,
       tests: [
         { args: [5, [[0, 1], [1, 2], [3, 4]]], expected: 2, name: 'Hai cụm' },
         { args: [5, [[0, 1], [1, 2], [2, 3], [3, 4]]], expected: 1, name: 'Một chuỗi' },
@@ -1162,6 +1491,11 @@ Cho \`n\` đỉnh đánh số \`0..n-1\` và danh sách \`edges\` của một đ
         'Cách 1 — DFS/BFS: xây danh sách kề, duyệt mọi đỉnh; mỗi lần gặp đỉnh chưa thăm thì tăng bộ đếm và duyệt toàn bộ cụm chứa nó. Giống hệt bài "đếm đảo".',
         'Cách 2 — **Union-Find (Disjoint Set Union)**: bắt đầu với n cụm; mỗi cạnh hợp nhất hai cụm nếu chúng chưa cùng cụm, và giảm bộ đếm đi 1.',
         'Union-Find gồm hai hàm: `find(x)` (tìm đại diện của cụm, có nén đường đi) và `union(a,b)` (nối hai cụm). Đây là cấu trúc bạn sẽ dùng lại cho thuật toán Kruskal ở chủ đề Advanced Graphs.',
+      ],
+      hintsPy: [
+        'Cách 1 — DFS/BFS: xây danh sách kề, duyệt mọi đỉnh; mỗi lần gặp đỉnh chưa thăm thì tăng bộ đếm và duyệt toàn bộ cụm chứa nó. Giống hệt bài "đếm đảo".',
+        'Cách 2 — **Union-Find (Disjoint Set Union)**: bắt đầu với n cụm (`parent = list(range(n))`); mỗi cạnh hợp nhất hai cụm nếu chúng chưa cùng cụm, và giảm bộ đếm đi 1.',
+        'Union-Find gồm hai hàm: `find(x)` (tìm đại diện của cụm, có nén đường đi) và hợp nhất `parent[ra] = rb`. Đây là cấu trúc bạn sẽ dùng lại cho thuật toán Kruskal ở chủ đề Advanced Graphs.',
       ],
       approach: `
 Bài này nhỏ nhưng là cửa ngõ vào **Union-Find** — cấu trúc dữ liệu bạn bắt buộc phải biết.
@@ -1316,6 +1650,75 @@ Cả hai đều **tham lam** và cùng dựa trên một định lý: với mọ
 - **Phân cụm dữ liệu**: cắt các cạnh dài nhất của MST cho ra phân cụm phân cấp.
 - **Chênh lệch giá (arbitrage)** trong tài chính: tìm chu trình âm bằng Bellman-Ford.
 `,
+  lessonPy: `
+## 1. Vấn đề gốc
+
+BFS tìm đường ngắn nhất khi **mọi cạnh bằng nhau**. Nhưng bản đồ thật thì cạnh có
+**trọng số** khác nhau (khoảng cách, thời gian, chi phí). BFS lập tức sai:
+đường 2 cạnh có thể tốn 100km, đường 5 cạnh chỉ 10km.
+
+## 2. Dijkstra — BFS với hàng đợi ưu tiên
+
+> Ý tưởng: thay hàng đợi FIFO của BFS bằng **hàng đợi ưu tiên theo khoảng cách** (\`heapq\`).
+> Luôn mở rộng đỉnh **gần nguồn nhất** trong số các đỉnh chưa xử lý.
+
+\`\`\`python
+import heapq
+
+dist = [float('inf')] * n
+dist[src] = 0
+pq = [(0, src)]                 # heapq là min-heap theo phần tử đầu của tuple
+
+while pq:
+    d, u = heapq.heappop(pq)
+    if d > dist[u]:
+        continue                 # bản cũ đã lỗi thời -> bỏ qua
+    for v, w in adj[u]:
+        if d + w < dist[v]:
+            dist[v] = d + w
+            heapq.heappush(pq, (dist[v], v))
+\`\`\`
+
+**Vì sao đúng?** Bất biến: khi một đỉnh được lấy ra khỏi heap, \`dist[u]\` đã là **tối ưu cuối cùng**.
+Lý do: mọi đường khác tới u đều phải đi qua một đỉnh đang nằm trong heap với khoảng cách ≥ d,
+và vì **trọng số không âm**, thêm cạnh chỉ làm dài thêm.
+
+**Điều kiện bắt buộc: không có cạnh âm.** Có cạnh âm → dùng Bellman-Ford (O(V·E)).
+Đây là câu hỏi bẫy rất hay gặp.
+
+## 3. Cây khung nhỏ nhất (MST)
+
+Bài toán: nối tất cả các đỉnh với **tổng chi phí nhỏ nhất**, không tạo chu trình.
+Kết quả luôn có đúng V-1 cạnh.
+
+| Thuật toán | Cách làm | Độ phức tạp | Hợp với |
+|---|---|---|---|
+| **Prim** | mở rộng dần từ một đỉnh, luôn lấy cạnh rẻ nhất chạm vào cây | O(E log V) | đồ thị dày |
+| **Kruskal** | sắp xếp mọi cạnh (\`sorted()\`), thêm dần nếu không tạo chu trình (Union-Find) | O(E log E) | đồ thị thưa |
+
+Cả hai đều **tham lam** và cùng dựa trên một định lý: với mọi cách chia đỉnh thành hai nhóm,
+**cạnh nhẹ nhất nối hai nhóm luôn thuộc một MST nào đó** (cut property).
+
+## 4. Bảng chọn thuật toán — hãy thuộc bảng này
+
+| Bài toán | Thuật toán | Độ phức tạp |
+|---|---|---|
+| Đường ngắn nhất, cạnh không trọng số | BFS | O(V+E) |
+| Đường ngắn nhất, trọng số **không âm** | **Dijkstra** (\`heapq\`) | O(E log V) |
+| Đường ngắn nhất, có **trọng số âm** | Bellman-Ford | O(V·E) |
+| Đường ngắn nhất **mọi cặp đỉnh** | Floyd-Warshall | O(V³) |
+| Nối mọi đỉnh chi phí nhỏ nhất | Prim / Kruskal | O(E log V) |
+| Thứ tự phụ thuộc | Topo sort (Kahn) | O(V+E) |
+
+## 5. Ứng dụng thực tế
+
+- **Google Maps / Waze**: Dijkstra (thực tế dùng A\\* và contraction hierarchies để nhanh hơn).
+- **Định tuyến mạng**: OSPF dùng Dijkstra; BGP dùng biến thể vector khoảng cách.
+- **Thiết kế hạ tầng**: kéo cáp/đường ống nối n điểm với chi phí thấp nhất = MST.
+- **Phân cụm dữ liệu**: cắt các cạnh dài nhất của MST cho ra phân cụm phân cấp (scikit-learn có
+  \`AgglomerativeClustering\` dựa trên ý tưởng này).
+- **Chênh lệch giá (arbitrage)** trong tài chính: tìm chu trình âm bằng Bellman-Ford.
+`,
   quiz: [
     {
       q: 'Vì sao Dijkstra KHÔNG đúng khi đồ thị có cạnh trọng số âm?',
@@ -1357,6 +1760,47 @@ Cả hai đều **tham lam** và cùng dựa trên một định lý: với mọ
       why: 'Yêu cầu là "nối TẤT CẢ các đỉnh với tổng chi phí nhỏ nhất" — chính là MST. Dijkstra tối ưu đường đi từ MỘT nguồn tới từng đỉnh, một mục tiêu hoàn toàn khác.',
     },
   ],
+  quizPy: [
+    {
+      q: 'Vì sao Dijkstra KHÔNG đúng khi đồ thị có cạnh trọng số âm?',
+      options: [
+        'Vì thuật toán sẽ chạy vô hạn',
+        'Vì Dijkstra "chốt" khoảng cách của một đỉnh khi lấy nó ra khỏi heap, nhưng cạnh âm sau đó có thể tạo ra đường ngắn hơn',
+        'Vì heapq không xử lý được số âm',
+        'Vì không thể xây được danh sách kề',
+      ],
+      answer: 1,
+      why: 'Tính đúng đắn dựa vào giả định "đi thêm cạnh thì đường chỉ dài ra". Cạnh âm phá vỡ giả định đó. Khi có cạnh âm phải dùng Bellman-Ford — biết điều này là dấu hiệu hiểu sâu.',
+    },
+    {
+      q: 'Trong Dijkstra bằng heapq, vì sao cần dòng `if d > dist[u]: continue`?',
+      options: [
+        'Để xử lý cạnh âm',
+        'Vì một đỉnh có thể được đẩy vào heap nhiều lần với các khoảng cách khác nhau; bản cũ hơn cần bị bỏ qua',
+        'Để tránh chia cho 0',
+        'Để đảm bảo đồ thị liên thông',
+      ],
+      answer: 1,
+      why: 'heapq không hỗ trợ "giảm khoá" (decrease-key), nên ta đẩy bản mới và để bản cũ lại trong heap. Dòng kiểm tra này (lazy deletion) là cách xử lý gọn nhất.',
+    },
+    {
+      q: 'Cây khung nhỏ nhất của đồ thị V đỉnh có bao nhiêu cạnh?',
+      options: ['V', 'V - 1', 'V + 1', 'Phụ thuộc trọng số'],
+      answer: 1,
+      why: 'Theo định nghĩa cây: liên thông và không chu trình → đúng V-1 cạnh. Nhớ con số này giúp bạn kiểm tra nhanh xem lời giải có hợp lý không.',
+    },
+    {
+      q: 'Bạn cần nối n toà nhà bằng cáp quang với tổng chiều dài nhỏ nhất. Đây là bài toán gì?',
+      options: [
+        'Đường đi ngắn nhất (Dijkstra)',
+        'Cây khung nhỏ nhất (Prim/Kruskal)',
+        'Sắp xếp tôpô',
+        'Luồng cực đại',
+      ],
+      answer: 1,
+      why: 'Yêu cầu là "nối TẤT CẢ các đỉnh với tổng chi phí nhỏ nhất" — chính là MST. Dijkstra tối ưu đường đi từ MỘT nguồn tới từng đỉnh, một mục tiêu hoàn toàn khác.',
+    },
+  ],
   problems: [
     {
       id: 'network-delay-time',
@@ -1376,6 +1820,7 @@ Nếu có nút không nhận được, trả về \`-1\`.
 - \`times = [], n = 2, k = 1\` → \`-1\`
 `,
       starter: `function networkDelayTime(times, n, k) {\n  \n}`,
+      starterPy: `def networkDelayTime(times, n, k):\n    \n`,
       tests: [
         { args: [[[2, 1, 1], [2, 3, 1], [3, 4, 1]], 4, 2], expected: 2, name: 'Ví dụ chuẩn' },
         { args: [[], 1, 1], expected: 0, name: 'Một nút, không cạnh' },
@@ -1389,9 +1834,18 @@ Nếu có nút không nhận được, trả về \`-1\`.
         'Xây danh sách kề `adj[u] = [[v, w], ...]`. Khởi tạo `dist` toàn `Infinity` trừ `dist[k] = 0`. Dùng min-heap chứa `[khoảng_cách, đỉnh]`.',
         'Ba chi tiết dễ sai: (1) nút đánh số từ 1 nên mảng cần n+1 phần tử; (2) bỏ qua mục lỗi thời bằng `if (d > dist[u]) continue`; (3) nếu còn `Infinity` trong dist → trả về -1.',
       ],
+      hintsPy: [
+        'Đây là bài "đường đi ngắn nhất từ một nguồn" với trọng số không âm → **Dijkstra**. Đáp án là **giá trị lớn nhất** trong mảng khoảng cách (nút nhận muộn nhất quyết định tổng thời gian).',
+        'Xây danh sách kề `adj[u] = [(v, w), ...]`. Khởi tạo `dist` toàn `float(\'inf\')` trừ `dist[k] = 0`. Dùng `heapq` chứa `(khoảng_cách, đỉnh)`.',
+        'Ba chi tiết dễ sai: (1) nút đánh số từ 1 nên list cần n+1 phần tử; (2) bỏ qua mục lỗi thời bằng `if d > dist[u]: continue`; (3) nếu còn `float(\'inf\')` trong dist → trả về -1.',
+      ],
       diagnostics: [
         { test: 'shift\\s*\\(\\s*\\)[\\s\\S]{0,200}dist', message: 'Dùng hàng đợi FIFO (BFS thường) sẽ cho kết quả sai với đồ thị có trọng số. Bạn cần hàng đợi ưu tiên theo khoảng cách.' },
         { test: 'sort\\s*\\([\\s\\S]{0,60}\\)[\\s\\S]{0,200}while', message: 'Sắp xếp lại mảng mỗi vòng lặp là O(V² log V) — vẫn qua test nhỏ nhưng hãy cài min-heap để đạt O(E log V).' },
+      ],
+      diagnosticsPy: [
+        { test: '\\.pop\\(0\\)[\\s\\S]{0,200}dist', message: 'Dùng hàng đợi FIFO (BFS thường / list.pop(0)) sẽ cho kết quả sai với đồ thị có trọng số. Bạn cần `heapq` — hàng đợi ưu tiên theo khoảng cách.' },
+        { test: '\\.sort\\s*\\(\\)[\\s\\S]{0,200}while|sorted\\s*\\([\\s\\S]{0,60}\\)[\\s\\S]{0,200}while', message: 'Sắp xếp lại list mỗi vòng lặp là O(V² log V) — vẫn qua test nhỏ nhưng hãy dùng `heapq` để đạt O(E log V).' },
       ],
       approach: `
 **Bước 1 — Nhận dạng.** "Thời gian tới mọi nút" + trọng số dương = Dijkstra từ nguồn k,
@@ -1528,6 +1982,7 @@ Trả về **chi phí nhỏ nhất** để mọi điểm đều liên thông v�
 - \`[[3,12],[-2,5],[-4,1]]\` → \`18\`
 `,
       starter: `function minCostConnectPoints(points) {\n  \n}`,
+      starterPy: `def minCostConnectPoints(points):\n    \n`,
       tests: [
         { args: [[[0, 0], [2, 2], [3, 10], [5, 2], [7, 0]]], expected: 20, name: 'Ví dụ chuẩn' },
         { args: [[[3, 12], [-2, 5], [-4, 1]]], expected: 18, name: 'Toạ độ âm' },
@@ -1541,9 +1996,18 @@ Trả về **chi phí nhỏ nhất** để mọi điểm đều liên thông v�
         'Vì đồ thị đầy đủ (E = V²), **Prim** phù hợp hơn Kruskal. Prim: giữ mảng `minDist[i]` = chi phí rẻ nhất để nối điểm i vào cây hiện tại.',
         'Vòng lặp n lần: chọn điểm chưa thuộc cây có `minDist` nhỏ nhất, cộng vào tổng, đánh dấu đã thuộc cây, rồi **cập nhật** `minDist` của mọi điểm còn lại bằng khoảng cách tới điểm vừa thêm. O(n²) là đủ tốt với n ≤ 1000.',
       ],
+      hintsPy: [
+        'Nhận dạng: "nối TẤT CẢ các điểm với tổng chi phí nhỏ nhất" = **cây khung nhỏ nhất (MST)**. Đồ thị ở đây là **đầy đủ**: mọi cặp điểm đều có cạnh.',
+        'Vì đồ thị đầy đủ (E = V²), **Prim** phù hợp hơn Kruskal. Prim: giữ list `min_dist[i]` = chi phí rẻ nhất để nối điểm i vào cây hiện tại.',
+        'Vòng lặp n lần: chọn điểm chưa thuộc cây có `min_dist` nhỏ nhất (dùng `min(..., key=...)` hoặc vòng for thủ công), cộng vào tổng, đánh dấu đã thuộc cây, rồi **cập nhật** `min_dist` của mọi điểm còn lại. O(n²) là đủ tốt với n ≤ 1000.',
+      ],
       diagnostics: [
         { test: 'Math\\.sqrt|\\*\\*\\s*2', message: 'Đề dùng khoảng cách MANHATTAN (|dx| + |dy|), không phải Euclid. Không cần bình phương hay căn.' },
         { test: 'sort\\s*\\(\\s*\\)[\\s\\S]{0,100}return', message: 'Chỉ sắp xếp các cạnh là chưa đủ — Kruskal còn cần Union-Find để bỏ qua cạnh tạo chu trình.' },
+      ],
+      diagnosticsPy: [
+        { test: 'math\\.sqrt|\\*\\*\\s*2', message: 'Đề dùng khoảng cách MANHATTAN (|dx| + |dy|), không phải Euclid. Không cần bình phương hay căn.' },
+        { test: '\\.sort\\s*\\(\\)[\\s\\S]{0,100}return|sorted\\s*\\([\\s\\S]{0,60}\\)[\\s\\S]{0,100}return', message: 'Chỉ sắp xếp các cạnh là chưa đủ — Kruskal còn cần Union-Find để bỏ qua cạnh tạo chu trình.' },
       ],
       approach: `
 **Nhận dạng là 80% công việc:** "nối tất cả, chi phí nhỏ nhất, không cần đường đi ngắn nhất giữa từng cặp"

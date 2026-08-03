@@ -88,6 +88,101 @@ for (let i = 1; i < n; i++) dp[i] = Math.max(dp[i-1], (dp[i-2] ?? 0) + nums[i]);
 - **Tối ưu tài chính**: phân bổ ngân sách theo từng giai đoạn.
 - **Nén video**: chọn khung hình tham chiếu tối ưu bằng DP.
 `,
+  lessonPy: `
+## 1. Vấn đề gốc
+
+Đệ quy tự nhiên thường tính **đi tính lại** cùng một bài toán con.
+Ví dụ Fibonacci đệ quy: \`fib(5)\` gọi \`fib(3)\` hai lần, \`fib(2)\` ba lần...
+Số lời gọi tăng theo hàm mũ 2ⁿ dù chỉ có n giá trị khác nhau.
+
+**Quy hoạch động = đệ quy + ghi nhớ.** Chỉ vậy thôi. Python có sẵn \`functools.lru_cache\`
+để memo hoá tự động — nhưng vẫn nên biết cách tự viết bằng \`dict\` để hiểu bản chất.
+
+## 2. Ba câu hỏi để giải MỌI bài DP
+
+Đừng học thuộc lời giải. Hãy tập trả lời ba câu hỏi này — chúng áp dụng cho mọi bài:
+
+1. **Trạng thái là gì?** \`dp[i]\` mang ý nghĩa gì? *(Đây là câu khó nhất. 80% thời gian nằm ở đây.)*
+2. **Công thức truy hồi?** \`dp[i]\` tính từ các trạng thái nhỏ hơn thế nào?
+3. **Trường hợp cơ sở và thứ tự tính?** Bắt đầu từ đâu, đi theo hướng nào?
+
+Ví dụ với bài Trộm nhà (House Robber):
+1. \`dp[i]\` = số tiền lớn nhất trộm được khi **chỉ xét i căn nhà đầu tiên**.
+2. \`dp[i] = max(dp[i-1], dp[i-2] + nums[i])\` — bỏ qua nhà i, hoặc trộm nhà i (cộng với dp cách 2 nhà).
+3. \`dp[0] = nums[0]\`, \`dp[1] = max(nums[0], nums[1])\`, tính tăng dần.
+
+## 3. Dấu hiệu nhận biết bài DP
+
+| Đề bài nói | Khả năng cao là DP |
+|---|---|
+| "số cách", "đếm số phương án" | ✔ |
+| "giá trị lớn nhất / nhỏ nhất có thể" | ✔ |
+| "có thể đạt được hay không" (khả thi) | ✔ |
+| "dài nhất / ngắn nhất" trên **dãy con** | ✔ |
+| n ≤ 20 và hỏi mọi tổ hợp | backtracking, không phải DP |
+| "chọn ngay tại chỗ luôn tối ưu" | Greedy, không cần DP |
+
+**Phân biệt DP với Greedy:** Greedy chọn một lần rồi không nhìn lại.
+DP giữ **mọi khả năng** và chọn tốt nhất ở cuối. Nếu lựa chọn tốt cục bộ có thể sai về sau
+→ bắt buộc dùng DP.
+
+## 4. Hai cách viết — nên biết cả hai
+
+**Top-down (đệ quy + memo)** — gần với suy nghĩ tự nhiên:
+\`\`\`python
+memo = {}
+def f(i):
+    if i < 0:
+        return 0
+    if i in memo:
+        return memo[i]
+    res = max(f(i - 1), f(i - 2) + nums[i])
+    memo[i] = res
+    return res
+\`\`\`
+Hoặc gọn hơn với decorator có sẵn:
+\`\`\`python
+from functools import lru_cache
+
+@lru_cache(maxsize=None)
+def f(i):
+    if i < 0:
+        return 0
+    return max(f(i - 1), f(i - 2) + nums[i])
+\`\`\`
+
+**Bottom-up (bảng lặp)** — nhanh hơn, không lo \`RecursionError\`:
+\`\`\`python
+dp = [0] * n
+dp[0] = nums[0]
+for i in range(1, n):
+    dp[i] = max(dp[i-1], (dp[i-2] if i >= 2 else 0) + nums[i])
+\`\`\`
+
+**Tối ưu bộ nhớ:** nếu \`dp[i]\` chỉ phụ thuộc vài trạng thái gần nhất, hãy thay list bằng **vài biến**
+→ O(1) bộ nhớ. Đây là "câu hỏi tiếp theo" gần như chắc chắn sẽ được hỏi.
+
+**Lưu ý Python:** top-down đệ quy có thể chạm giới hạn \`sys.getrecursionlimit()\` (~1000) với n lớn.
+Bottom-up không có rủi ro này — đó là lý do nhiều lời giải "chuẩn" trong Python ưu tiên bottom-up
+khi n có thể lớn.
+
+## 5. Bẫy thường gặp
+
+- **Định nghĩa trạng thái mơ hồ** → công thức truy hồi sai. Hãy viết ra bằng lời trước khi code.
+- Quên trường hợp cơ sở (mảng 1 phần tử, mảng rỗng).
+- Với bài "khả thi/không", giá trị khởi tạo phải là \`False\`/\`float('inf')\` đúng ngữ nghĩa
+  (ví dụ Coin Change dùng \`float('inf')\` để đánh dấu "không đạt được").
+- Nhầm **dãy con** (subsequence, không cần liên tiếp) với **đoạn con** (subarray, phải liên tiếp).
+
+## 6. Ứng dụng thực tế
+
+- **So sánh chuỗi (diff)**: \`git diff\` dùng thuật toán dãy con chung dài nhất.
+- **Sinh học tính toán**: căn chỉnh chuỗi DNA (Needleman-Wunsch) là DP 2 chiều — thư viện Biopython
+  (Python) cài sẵn các thuật toán này.
+- **Gõ phím dự đoán / sửa lỗi chính tả**: khoảng cách Levenshtein.
+- **Tối ưu tài chính**: phân bổ ngân sách theo từng giai đoạn.
+- **Nén video**: chọn khung hình tham chiếu tối ưu bằng DP.
+`,
   quiz: [
     {
       q: 'Điều gì phân biệt quy hoạch động với đệ quy thông thường?',
@@ -134,6 +229,52 @@ for (let i = 1; i < n; i++) dp[i] = Math.max(dp[i-1], (dp[i-2] ?? 0) + nums[i]);
       why: 'Chỉ có n giá trị khác nhau, nhưng cây đệ quy có 2ⁿ nút vì mỗi giá trị bị tính lại nhiều lần. Ghi nhớ biến 2ⁿ thành n — đây là ví dụ rõ nhất về sức mạnh của DP.',
     },
   ],
+  quizPy: [
+    {
+      q: 'Điều gì phân biệt quy hoạch động với đệ quy thông thường?',
+      options: [
+        'DP luôn dùng vòng lặp',
+        'DP lưu lại kết quả các bài toán con đã tính (memo, ví dụ bằng dict hoặc @lru_cache) nên mỗi bài toán con chỉ giải một lần',
+        'DP nhanh hơn vì dùng ít bộ nhớ',
+        'DP không dùng hàm đệ quy',
+      ],
+      answer: 1,
+      why: 'Bản chất DP = đệ quy + ghi nhớ. Điều kiện áp dụng: bài toán phải có "bài toán con gối nhau" (overlapping subproblems) — nếu không gối nhau thì memo vô dụng, đó là chia để trị.',
+    },
+    {
+      q: 'Bước KHÓ NHẤT và quan trọng nhất khi giải một bài DP là gì?',
+      options: [
+        'Viết vòng lặp đúng thứ tự',
+        'Định nghĩa trạng thái dp[i] mang ý nghĩa gì',
+        'Tối ưu bộ nhớ xuống O(1)',
+        'Chọn dùng list hay dict để lưu bảng',
+      ],
+      answer: 1,
+      why: 'Định nghĩa trạng thái sai thì công thức truy hồi không bao giờ đúng. Hãy viết ra bằng lời: "dp[i] là ... khi xét ... đầu tiên". Nếu không phát biểu được rõ ràng, bạn chưa hiểu bài toán.',
+    },
+    {
+      q: 'Khi nào KHÔNG nên dùng greedy mà phải dùng DP?',
+      options: [
+        'Khi mảng chưa được sắp xếp',
+        'Khi lựa chọn tối ưu cục bộ ở bước hiện tại có thể dẫn tới kết quả tổng thể tệ hơn',
+        'Khi n quá lớn',
+        'Khi có nhiều số âm',
+      ],
+      answer: 1,
+      why: 'Ví dụ Coin Change với mệnh giá [1,3,4] và target 6: greedy lấy 4+1+1 = 3 đồng, còn tối ưu là 3+3 = 2 đồng. Greedy chỉ đúng khi chứng minh được tính chất lựa chọn tham lam.',
+    },
+    {
+      q: 'Với bài Fibonacci, vì sao bản đệ quy thuần là O(2ⁿ) còn bản DP là O(n)?',
+      options: [
+        'Vì DP dùng vòng lặp nhanh hơn đệ quy',
+        'Vì đệ quy thuần tính lại cùng một fib(k) rất nhiều lần; DP tính mỗi giá trị đúng một lần',
+        'Vì DP dùng ít bộ nhớ hơn',
+        'Vì đệ quy tạo ra nhiều luồng',
+      ],
+      answer: 1,
+      why: 'Chỉ có n giá trị khác nhau, nhưng cây đệ quy có 2ⁿ nút vì mỗi giá trị bị tính lại nhiều lần. Ghi nhớ biến 2ⁿ thành n — đây là ví dụ rõ nhất về sức mạnh của DP.',
+    },
+  ],
   problems: [
     {
       id: 'climbing-stairs',
@@ -151,6 +292,7 @@ Hỏi có bao nhiêu cách khác nhau để lên tới đỉnh?
 - \`n = 3\` → \`3\` (1+1+1, 1+2, 2+1)
 `,
       starter: `function climbStairs(n) {\n  \n}`,
+      starterPy: `def climbStairs(n):\n    \n`,
       tests: [
         { args: [2], expected: 2, name: 'n = 2' },
         { args: [3], expected: 3, name: 'n = 3' },
@@ -164,8 +306,16 @@ Hỏi có bao nhiêu cách khác nhau để lên tới đỉnh?
         'Vậy `cách(n) = cách(n-1) + cách(n-2)` — chính là dãy Fibonacci! Cơ sở: `cách(1) = 1`, `cách(2) = 2`.',
         'Đệ quy thuần sẽ là O(2ⁿ) và treo ở n = 45. Hãy dùng vòng lặp với hai biến `prev` và `cur` — O(n) thời gian, O(1) bộ nhớ.',
       ],
+      hintsPy: [
+        'Hỏi ngược: để đứng ở bậc n, bước cuối cùng của bạn xuất phát từ đâu? Chỉ có hai khả năng: từ bậc n-1 (bước 1) hoặc bậc n-2 (bước 2).',
+        'Vậy `cách(n) = cách(n-1) + cách(n-2)` — chính là dãy Fibonacci! Cơ sở: `cách(1) = 1`, `cách(2) = 2`.',
+        'Đệ quy thuần sẽ là O(2ⁿ) và treo ở n = 45 (và có thể chạm `RecursionError` trước cả khi chậm). Hãy dùng vòng lặp với hai biến `prev` và `cur` — O(n) thời gian, O(1) bộ nhớ.',
+      ],
       diagnostics: [
         { test: 'return\\s+climbStairs\\(n\\s*-\\s*1\\)\\s*\\+\\s*climbStairs\\(n\\s*-\\s*2\\)', message: 'Công thức đúng nhưng thiếu ghi nhớ! Đệ quy thuần là O(2ⁿ) — test n=45 sẽ hết giờ. Hãy thêm memo hoặc chuyển sang vòng lặp.' },
+      ],
+      diagnosticsPy: [
+        { test: 'return\\s+climbStairs\\(n\\s*-\\s*1\\)\\s*\\+\\s*climbStairs\\(n\\s*-\\s*2\\)', message: 'Công thức đúng nhưng thiếu ghi nhớ! Đệ quy thuần là O(2ⁿ) — test n=45 sẽ hết giờ (và có nguy cơ RecursionError). Hãy thêm @lru_cache hoặc chuyển sang vòng lặp.' },
       ],
       approach: `
 Bài này là **cửa vào** của quy hoạch động. Hãy dùng nó để luyện đúng ba câu hỏi:
@@ -233,6 +383,7 @@ Trả về số tiền lớn nhất có thể trộm được.
 - \`[2,7,9,3,1]\` → \`12\` (nhà 0, 2, 4)
 `,
       starter: `function rob(nums) {\n  \n}`,
+      starterPy: `def rob(nums):\n    \n`,
       tests: [
         { args: [[1, 2, 3, 1]], expected: 4, name: 'Ví dụ 1' },
         { args: [[2, 7, 9, 3, 1]], expected: 12, name: 'Ví dụ 2' },
@@ -247,9 +398,18 @@ Trả về số tiền lớn nhất có thể trộm được.
         '`dp[i] = max(dp[i-1], dp[i-2] + nums[i])`. Hãy phát biểu bằng lời: "số tiền lớn nhất khi chỉ xét i căn nhà đầu tiên".',
         'Test `[2,1,1,2]` là bẫy dành cho greedy: nếu cứ chọn nhà nhiều tiền nhất còn khả dụng, bạn sẽ ra 3 thay vì 4. Đây là lý do bài này bắt buộc dùng DP.',
       ],
+      hintsPy: [
+        'Với căn nhà i, bạn có đúng hai lựa chọn: **trộm** (thì không được trộm i-1) hoặc **bỏ qua** (giữ nguyên kết quả tới i-1).',
+        '`dp[i] = max(dp[i-1], dp[i-2] + nums[i])`. Hãy phát biểu bằng lời: "số tiền lớn nhất khi chỉ xét i căn nhà đầu tiên".',
+        'Test `[2,1,1,2]` là bẫy dành cho greedy: nếu cứ chọn nhà nhiều tiền nhất còn khả dụng, bạn sẽ ra 3 thay vì 4. Đây là lý do bài này bắt buộc dùng DP. Dùng gán song song `prev2, prev1 = prev1, max(prev1, prev2 + money)` để nén về O(1) bộ nhớ.',
+      ],
       diagnostics: [
         { test: 'sort\\s*\\(', message: 'Sắp xếp làm mất thông tin vị trí — mà ràng buộc "không liền kề" phụ thuộc hoàn toàn vào vị trí. Hướng đi này không cứu được.' },
         { test: 'i\\s*\\+=\\s*2|i\\s*=\\s*i\\s*\\+\\s*2', message: 'Chọn xen kẽ (nhà chẵn hoặc nhà lẻ) là một dạng greedy và sẽ sai với [2,1,1,2]. Bạn cần xét cả hai lựa chọn ở mỗi bước.' },
+      ],
+      diagnosticsPy: [
+        { test: '\\.sort\\s*\\(\\)|sorted\\s*\\(', message: 'Sắp xếp làm mất thông tin vị trí — mà ràng buộc "không liền kề" phụ thuộc hoàn toàn vào vị trí. Hướng đi này không cứu được.' },
+        { test: 'range\\s*\\([^)]*,\\s*2\\s*\\)', message: 'Chọn xen kẽ (nhà chẵn hoặc nhà lẻ, bước nhảy 2) là một dạng greedy và sẽ sai với [2,1,1,2]. Bạn cần xét cả hai lựa chọn ở mỗi bước.' },
       ],
       approach: `
 Bài này dạy bạn **mẫu "lấy hay không lấy"** — xuất hiện trong hàng chục bài DP khác.
@@ -329,6 +489,7 @@ Trả về **số đồng xu ít nhất** để đổi đúng \`amount\`. Nếu 
 - \`coins = [1], amount = 0\` → \`0\`
 `,
       starter: `function coinChange(coins, amount) {\n  \n}`,
+      starterPy: `def coinChange(coins, amount):\n    \n`,
       tests: [
         { args: [[1, 2, 5], 11], expected: 3, name: 'Ví dụ 1' },
         { args: [[2], 3], expected: -1, name: 'Không thể đổi' },
@@ -343,9 +504,18 @@ Trả về **số đồng xu ít nhất** để đổi đúng \`amount\`. Nếu 
         'Truy hồi: `dp[a] = 1 + min(dp[a - c])` với mọi mệnh giá `c <= a`. Nghĩa là: dùng một đồng xu c, phần còn lại là bài toán con `a - c`.',
         'Khởi tạo `dp[0] = 0`, còn lại là `Infinity` (chưa đạt được). Cuối cùng nếu `dp[amount] === Infinity` thì trả về -1. Test `[1,3,4], 6` sẽ đánh trượt mọi lời giải tham lam.',
       ],
+      hintsPy: [
+        'Trạng thái: `dp[a]` = số xu ít nhất để đổi đúng số tiền `a`. Đích cần tìm là `dp[amount]`.',
+        'Truy hồi: `dp[a] = 1 + min(dp[a - c])` với mọi mệnh giá `c <= a`. Nghĩa là: dùng một đồng xu c, phần còn lại là bài toán con `a - c`.',
+        'Khởi tạo `dp[0] = 0`, còn lại là `float(\'inf\')` (chưa đạt được). Cuối cùng nếu `dp[amount] == float(\'inf\')` thì trả về -1. Test `[1,3,4], 6` sẽ đánh trượt mọi lời giải tham lam.',
+      ],
       diagnostics: [
         { test: 'sort\\s*\\([\\s\\S]{0,40}\\)[\\s\\S]{0,200}while[\\s\\S]{0,200}amount', message: 'Đây là chiến lược tham lam (lấy mệnh giá lớn nhất trước). Nó sai với coins=[1,3,4], amount=6: greedy cho 3 đồng (4+1+1) nhưng tối ưu là 2 đồng (3+3).' },
         { test: 'dp\\.fill\\(0\\)|fill\\(\\s*-1\\s*\\)', message: 'Khởi tạo bằng 0 hoặc -1 sẽ làm phép `min` sai. Hãy dùng `Infinity` để biểu diễn "chưa đạt được", rồi đổi thành -1 ở cuối.' },
+      ],
+      diagnosticsPy: [
+        { test: 'sorted\\s*\\([\\s\\S]{0,40}\\)[\\s\\S]{0,200}while[\\s\\S]{0,200}amount', message: 'Đây là chiến lược tham lam (lấy mệnh giá lớn nhất trước). Nó sai với coins=[1,3,4], amount=6: greedy cho 3 đồng (4+1+1) nhưng tối ưu là 2 đồng (3+3).' },
+        { test: '\\[0\\]\\s*\\*\\s*\\(amount|\\[-1\\]\\s*\\*', message: 'Khởi tạo bằng 0 hoặc -1 sẽ làm phép `min` sai. Hãy dùng `float(\'inf\')` để biểu diễn "chưa đạt được", rồi đổi thành -1 ở cuối.' },
       ],
       approach: `
 **Đây là bài kinh điển chứng minh greedy sai.** Với hệ tiền tệ thật (1, 2, 5, 10...)
@@ -427,6 +597,7 @@ Dãy con (subsequence) **không cần liên tiếp** — chỉ cần giữ đún
 - \`[7,7,7,7]\` → \`1\`
 `,
       starter: `function lengthOfLIS(nums) {\n  \n}`,
+      starterPy: `def lengthOfLIS(nums):\n    \n`,
       tests: [
         { args: [[10, 9, 2, 5, 3, 7, 101, 18]], expected: 4, name: 'Ví dụ chuẩn' },
         { args: [[0, 1, 0, 3, 2, 3]], expected: 4, name: 'Có phần tử gây nhiễu' },
@@ -441,8 +612,17 @@ Dãy con (subsequence) **không cần liên tiếp** — chỉ cần giữ đún
         'Chú ý: đáp án là `max(dp)` chứ không phải `dp[n-1]` — dãy tốt nhất có thể kết thúc ở bất kỳ đâu.',
         'Bản O(n log n) (patience sorting): giữ mảng `tails`, trong đó `tails[k]` = phần tử cuối **nhỏ nhất** của mọi dãy tăng độ dài k+1. Với mỗi số, dùng binary search tìm vị trí đầu tiên `>= x` rồi ghi đè. Độ dài `tails` chính là đáp án.',
       ],
+      hintsPy: [
+        'Bản DP O(n²): `dp[i]` = độ dài dãy tăng dài nhất **kết thúc tại i**. Với mỗi i, nhìn lại mọi j < i có `nums[j] < nums[i]` và lấy `dp[i] = max(dp[j]) + 1`.',
+        'Chú ý: đáp án là `max(dp)` chứ không phải `dp[n-1]` — dãy tốt nhất có thể kết thúc ở bất kỳ đâu.',
+        'Bản O(n log n) (patience sorting): giữ list `tails`, dùng `bisect.bisect_left(tails, x)` để tìm vị trí đầu tiên `>= x` — nếu vị trí đó bằng `len(tails)` thì `append`, ngược lại ghi đè. Độ dài `tails` chính là đáp án.',
+      ],
       diagnostics: [
         { test: 'sort\\s*\\(', message: 'Sắp xếp phá vỡ thứ tự — mà "dãy con" bắt buộc giữ nguyên thứ tự gốc. (Ngoại lệ: bài LIS có thể quy về LCS giữa mảng gốc và mảng đã sắp, nhưng đó là O(n²) và phức tạp hơn.)' },
+        { test: '<=\\s*nums\\[i\\]|nums\\[j\\]\\s*<=', message: 'Đề yêu cầu tăng NGHIÊM NGẶT — dùng `<` chứ không phải `<=`. Test [7,7,7,7] sẽ phát hiện lỗi này.' },
+      ],
+      diagnosticsPy: [
+        { test: '\\.sort\\s*\\(\\)|sorted\\s*\\(', message: 'Sắp xếp phá vỡ thứ tự — mà "dãy con" bắt buộc giữ nguyên thứ tự gốc.' },
         { test: '<=\\s*nums\\[i\\]|nums\\[j\\]\\s*<=', message: 'Đề yêu cầu tăng NGHIÊM NGẶT — dùng `<` chứ không phải `<=`. Test [7,7,7,7] sẽ phát hiện lỗi này.' },
       ],
       approach: `
@@ -602,6 +782,81 @@ quyết định bạn đang giải bài 0/1 hay bài không giới hạn — hay
 - **Phân bổ nguồn lực có ràng buộc ngân sách**: knapsack trong quảng cáo, đầu tư, lập lịch.
 - **Nhận dạng giọng nói**: thuật toán Viterbi trên mô hình Markov ẩn cũng là DP 2 chiều.
 `,
+  lessonPy: `
+## 1. Khi nào cần 2 chiều?
+
+Khi một chỉ số không đủ mô tả trạng thái. Ba tình huống điển hình:
+
+1. **Hai dãy dữ liệu**: \`dp[i][j]\` = kết quả khi xét i ký tự đầu của chuỗi A và j ký tự đầu của B.
+   *(so sánh chuỗi, khoảng cách chỉnh sửa, dãy con chung)*
+2. **Lưới**: \`dp[r][c]\` = kết quả khi đứng tại ô (r, c). *(đếm đường đi, tổng nhỏ nhất)*
+3. **Vị trí + tài nguyên**: \`dp[i][w]\` = giá trị tốt nhất khi xét i món đầu với sức chứa w.
+   *(bài toán cái túi — knapsack)*
+
+## 2. Khung tư duy — vẫn là ba câu hỏi cũ
+
+Chỉ khác là trạng thái có hai chiều:
+1. \`dp[i][j]\` nghĩa là gì? (phát biểu bằng lời!)
+2. Truy hồi: \`dp[i][j]\` phụ thuộc những ô nào? *(thường là ô trên, ô trái, và ô chéo trên-trái)*
+3. Cơ sở: hàng 0 và cột 0 bằng bao nhiêu?
+
+**Mẹo cực kỳ hữu ích:** dùng bảng kích thước **(m+1) × (n+1)** với hàng/cột 0 làm "biên rỗng".
+Nó xoá bỏ hầu hết các phép kiểm tra biên rườm rà. Trong Python, tạo bảng 2D đúng cách là
+\`[[0] * (n+1) for _ in range(m+1)]\` — **không** dùng \`[[0]*(n+1)] * (m+1)\`, vì cách đó tạo
+\`m+1\` tham chiếu tới **cùng một** list con, và sửa một hàng sẽ vô tình sửa tất cả các hàng khác!
+
+## 3. Bài toán cái túi 0/1 — mẫu hình phải thuộc
+
+\`\`\`
+dp[i][w] = giá trị lớn nhất khi xét i món đầu tiên với sức chứa w
+
+dp[i][w] = max(
+    dp[i-1][w],                            # không lấy món i
+    dp[i-1][w - weight[i]] + value[i]      # lấy món i (nếu vừa túi)
+)
+\`\`\`
+
+Rất nhiều bài "khó" chỉ là knapsack đội lốt:
+- *Partition Equal Subset Sum* → knapsack với sức chứa \`tổng/2\`, hỏi khả thi.
+- *Target Sum* → knapsack đếm số cách.
+- *Coin Change II* → knapsack không giới hạn số lượng (unbounded).
+
+Nhận ra "đây là knapsack" là kỹ năng đáng giá nhất của chủ đề này.
+
+## 4. Nén bộ nhớ từ 2D xuống 1D
+
+Nếu \`dp[i][*]\` chỉ phụ thuộc \`dp[i-1][*]\`, ta chỉ cần **một list**:
+
+\`\`\`python
+# knapsack 0/1 với list 1 chiều — CHÚ Ý: vòng w phải duyệt NGƯỢC
+for item in items:
+    for w in range(W, item.weight - 1, -1):
+        dp[w] = max(dp[w], dp[w - item.weight] + item.value)
+\`\`\`
+
+**Vì sao duyệt ngược?** Vì duyệt xuôi sẽ dùng giá trị *đã cập nhật ở vòng này* →
+biến thành "được lấy món nhiều lần" (unbounded knapsack). Chi tiết một dòng này
+quyết định bạn đang giải bài 0/1 hay bài không giới hạn — hay bị hỏi trong phỏng vấn.
+\`range(W, item.weight - 1, -1)\` là cách viết Python cho "từ W xuống tới item.weight, bước -1".
+
+## 5. Bẫy thường gặp
+
+- Sai thứ tự vòng lặp → dùng giá trị chưa được tính.
+- Nhầm chỉ số: \`dp[i][j]\` ứng với ký tự \`A[i-1]\` và \`B[j-1]\` khi dùng biên rỗng.
+- Quên khởi tạo hàng/cột 0.
+- Bảng quá lớn: \`dp[10⁴][10⁴]\` = 10⁸ ô → hết bộ nhớ. Phải nén xuống 1 chiều.
+- **Bẫy Python riêng:** \`[[0]*n] * m\` tạo ra \`m\` tham chiếu tới CÙNG MỘT hàng — dùng list
+  comprehension \`[[0]*n for _ in range(m)]\` để có các hàng độc lập.
+
+## 6. Ứng dụng thực tế
+
+- **git diff / so sánh văn bản**: dãy con chung dài nhất (LCS).
+- **Sửa lỗi chính tả, gợi ý tìm kiếm**: khoảng cách Levenshtein (thư viện \`python-Levenshtein\`).
+- **Sinh tin học**: căn chỉnh chuỗi DNA/protein (Smith-Waterman) — DP 2 chiều quy mô lớn.
+- **Phân bổ nguồn lực có ràng buộc ngân sách**: knapsack trong quảng cáo, đầu tư, lập lịch.
+- **Nhận dạng giọng nói**: thuật toán Viterbi trên mô hình Markov ẩn cũng là DP 2 chiều
+  (thư viện \`hmmlearn\` của Python cài sẵn).
+`,
   quiz: [
     {
       q: 'Trong knapsack 0/1 nén xuống mảng 1 chiều, vì sao vòng lặp sức chứa phải duyệt NGƯỢC?',
@@ -648,6 +903,52 @@ quyết định bạn đang giải bài 0/1 hay bài không giới hạn — hay
       why: 'Vì hàng/cột 0 biểu diễn "chuỗi rỗng", nên dp[i][j] xét i ký tự ĐẦU TIÊN, tức ký tự cuối là A[i-1]. Lệch chỉ số này là nguồn lỗi số một của DP 2 chiều — hãy viết chú thích ngay khi code.',
     },
   ],
+  quizPy: [
+    {
+      q: 'Trong knapsack 0/1 nén xuống list 1 chiều, vì sao vòng lặp sức chứa phải duyệt NGƯỢC?',
+      options: [
+        'Để chạy nhanh hơn',
+        'Vì duyệt xuôi sẽ dùng giá trị vừa cập nhật trong cùng vòng, tương đương cho phép lấy một món nhiều lần',
+        'Vì mảng được sắp xếp giảm dần',
+        'Không quan trọng, cả hai chiều đều đúng',
+      ],
+      answer: 1,
+      why: 'Duyệt ngược (`range(W, weight-1, -1)`) đảm bảo dp[w - weight] vẫn là giá trị của "hàng i-1". Duyệt xuôi biến bài 0/1 thành unbounded — đúng một dòng code phân biệt hai bài toán khác nhau.',
+    },
+    {
+      q: 'Bài "chia mảng thành hai tập có tổng bằng nhau" thực chất là bài toán gì?',
+      options: [
+        'Sắp xếp',
+        'Knapsack 0/1: có tồn tại tập con có tổng bằng tổng/2 hay không',
+        'Đồ thị hai phía',
+        'Cửa sổ trượt',
+      ],
+      answer: 1,
+      why: 'Nếu tìm được tập con có tổng = tổng/2 thì phần còn lại tự động cũng bằng thế. Nhận ra "đây là knapsack đội lốt" là kỹ năng quan trọng nhất của chủ đề.',
+    },
+    {
+      q: 'Với bài LCS của hai chuỗi dài m và n, độ phức tạp thời gian và bộ nhớ tối thiểu là bao nhiêu?',
+      options: [
+        'O(m·n) thời gian, O(m·n) bộ nhớ — không thể giảm',
+        'O(m·n) thời gian, có thể giảm bộ nhớ xuống O(min(m,n)) nếu chỉ cần ĐỘ DÀI',
+        'O(m+n) cả hai',
+        'O(m·n·log n) thời gian',
+      ],
+      answer: 1,
+      why: 'Vì mỗi hàng chỉ phụ thuộc hàng trước, ta có thể giữ hai list. Nhưng nếu cần dựng lại chuỗi LCS thực tế thì phải giữ cả bảng (hoặc dùng thuật toán Hirschberg chia để trị).',
+    },
+    {
+      q: 'Trong bảng DP 2 chiều dùng biên rỗng (kích thước (m+1)×(n+1)), dp[i][j] tương ứng với ký tự nào?',
+      options: [
+        'A[i] và B[j]',
+        'A[i-1] và B[j-1]',
+        'A[i+1] và B[j+1]',
+        'Không liên quan tới ký tự cụ thể',
+      ],
+      answer: 1,
+      why: 'Vì hàng/cột 0 biểu diễn "chuỗi rỗng", nên dp[i][j] xét i ký tự ĐẦU TIÊN, tức ký tự cuối là A[i-1]. Lệch chỉ số này là nguồn lỗi số một của DP 2 chiều — hãy viết chú thích ngay khi code.',
+    },
+  ],
   problems: [
     {
       id: 'unique-paths',
@@ -665,6 +966,7 @@ Hỏi có bao nhiêu đường đi khác nhau tới góc dưới-phải?
 - \`m = 3, n = 2\` → \`3\`
 `,
       starter: `function uniquePaths(m, n) {\n  \n}`,
+      starterPy: `def uniquePaths(m, n):\n    \n`,
       tests: [
         { args: [3, 7], expected: 28, name: 'Ví dụ 1' },
         { args: [3, 2], expected: 3, name: 'Ví dụ 2' },
@@ -678,6 +980,11 @@ Hỏi có bao nhiêu đường đi khác nhau tới góc dưới-phải?
         'Để tới ô (r, c), robot chỉ có thể đến từ ô bên trên (r-1, c) hoặc ô bên trái (r, c-1). Vậy số đường đi tới (r,c) = tổng của hai ô đó.',
         '`dp[r][c] = dp[r-1][c] + dp[r][c-1]`. Cơ sở: toàn bộ hàng đầu và cột đầu đều bằng 1 (chỉ có một cách đi thẳng).',
         'Tối ưu bộ nhớ: chỉ cần **một hàng**. Duyệt từng hàng, `dp[c] += dp[c-1]` — vì `dp[c]` trước khi cập nhật chính là giá trị hàng trên, còn `dp[c-1]` là ô bên trái đã cập nhật.',
+      ],
+      hintsPy: [
+        'Để tới ô (r, c), robot chỉ có thể đến từ ô bên trên (r-1, c) hoặc ô bên trái (r, c-1). Vậy số đường đi tới (r,c) = tổng của hai ô đó.',
+        '`dp[r][c] = dp[r-1][c] + dp[r][c-1]`. Cơ sở: toàn bộ hàng đầu và cột đầu đều bằng 1 (chỉ có một cách đi thẳng).',
+        'Tối ưu bộ nhớ: chỉ cần **một list**. Duyệt từng hàng, `dp[c] += dp[c-1]` — vì `dp[c]` trước khi cập nhật chính là giá trị hàng trên, còn `dp[c-1]` là ô bên trái đã cập nhật.',
       ],
       approach: `
 **Ba câu hỏi:**
@@ -755,6 +1062,7 @@ Dãy con: xoá bớt một số ký tự (có thể không xoá) mà **không đ
 - \`"abc"\`, \`"def"\` → \`0\`
 `,
       starter: `function longestCommonSubsequence(text1, text2) {\n  \n}`,
+      starterPy: `def longestCommonSubsequence(text1, text2):\n    \n`,
       tests: [
         { args: ['abcde', 'ace'], expected: 3, name: 'Ví dụ chuẩn' },
         { args: ['abc', 'abc'], expected: 3, name: 'Hai chuỗi giống nhau' },
@@ -769,9 +1077,18 @@ Dãy con: xoá bớt một số ký tự (có thể không xoá) mà **không đ
         'Nếu `text1[i-1] === text2[j-1]`: hai ký tự này ghép được với nhau → `dp[i][j] = dp[i-1][j-1] + 1`.',
         'Nếu khác nhau: phải bỏ một trong hai ký tự → `dp[i][j] = max(dp[i-1][j], dp[i][j-1])`. Khởi tạo hàng 0 và cột 0 bằng 0 (LCS với chuỗi rỗng luôn là 0).',
       ],
+      hintsPy: [
+        'Trạng thái: `dp[i][j]` = độ dài LCS của `text1[0..i-1]` và `text2[0..j-1]` (dùng biên rỗng cho gọn).',
+        'Nếu `text1[i-1] == text2[j-1]`: hai ký tự này ghép được với nhau → `dp[i][j] = dp[i-1][j-1] + 1`.',
+        'Nếu khác nhau: phải bỏ một trong hai ký tự → `dp[i][j] = max(dp[i-1][j], dp[i][j-1])`. Khởi tạo hàng 0 và cột 0 bằng 0. Có thể nén xuống hai list `prev`/`cur`.',
+      ],
       diagnostics: [
         { test: 'includes\\s*\\(|indexOf\\s*\\(', message: 'Bài này không giải được bằng cách tìm chuỗi con — "dãy con" cho phép các ký tự KHÔNG liên tiếp. Cần DP 2 chiều.' },
         { test: 'text1\\[i\\]\\s*===\\s*text2\\[j\\]', message: 'Cẩn thận lệch chỉ số: với bảng có biên rỗng, dp[i][j] ứng với text1[i-1] và text2[j-1].' },
+      ],
+      diagnosticsPy: [
+        { test: '\\bin\\s+text2\\b|\\.find\\s*\\(', message: 'Bài này không giải được bằng cách tìm chuỗi con — "dãy con" cho phép các ký tự KHÔNG liên tiếp. Cần DP 2 chiều.' },
+        { test: 'text1\\[i\\]\\s*==\\s*text2\\[j\\]', message: 'Cẩn thận lệch chỉ số: với bảng có biên rỗng, dp[i][j] ứng với text1[i-1] và text2[j-1].' },
       ],
       approach: `
 **Đây là bài DP 2 chiều mẫu mực nhất** — và cũng là thuật toán đứng sau \`git diff\`.
@@ -860,6 +1177,7 @@ Cho mảng số nguyên dương \`nums\`, xác định có thể chia nó thành
 - \`[1,2,3,5]\` → \`false\`
 `,
       starter: `function canPartition(nums) {\n  \n}`,
+      starterPy: `def canPartition(nums):\n    \n`,
       tests: [
         { args: [[1, 5, 11, 5]], expected: true, name: 'Ví dụ 1' },
         { args: [[1, 2, 3, 5]], expected: false, name: 'Tổng lẻ' },
@@ -875,9 +1193,18 @@ Cho mảng số nguyên dương \`nums\`, xác định có thể chia nó thành
         'Nếu tìm được tập con có tổng = `tổng/2` thì phần còn lại tự động cũng bằng thế. Vậy bài toán rút gọn thành: **có tồn tại tập con có tổng bằng target = tổng/2 không?** — đó chính là knapsack 0/1 dạng khả thi.',
         'Dùng mảng boolean `dp[s]` = "có thể tạo ra tổng s không". Khởi tạo `dp[0] = true`. Với mỗi số, duyệt `s` từ **target xuống num** (ngược!) và đặt `dp[s] = dp[s] || dp[s - num]`.',
       ],
+      hintsPy: [
+        'Nhận xét đầu tiên: nếu tổng mảng là **số lẻ** thì chắc chắn không chia được → trả về False ngay.',
+        'Nếu tìm được tập con có tổng = `tổng/2` thì phần còn lại tự động cũng bằng thế. Vậy bài toán rút gọn thành: **có tồn tại tập con có tổng bằng target = tổng/2 không?** — đó chính là knapsack 0/1 dạng khả thi.',
+        'Dùng list boolean `dp[s]` = "có thể tạo ra tổng s không". Khởi tạo `dp[0] = True`. Với mỗi số, duyệt `s` bằng `range(target, num - 1, -1)` (ngược!) và đặt `dp[s] = dp[s] or dp[s - num]`.',
+      ],
       diagnostics: [
         { test: 'for\\s*\\(\\s*let\\s+s\\s*=\\s*(num|nums\\[i\\])', message: 'Duyệt xuôi sẽ cho phép dùng lại cùng một số nhiều lần (unbounded knapsack) → kết quả sai. Với knapsack 0/1 phải duyệt NGƯỢC từ target về num.' },
         { test: 'sort\\s*\\([\\s\\S]{0,60}\\)[\\s\\S]{0,150}return', message: 'Chiến lược tham lam (xếp số lớn vào bên nhẹ hơn) không đúng cho bài này. Ví dụ [2,2,3,5] tổng 12, greedy dễ ra kết quả sai.' },
+      ],
+      diagnosticsPy: [
+        { test: 'range\\s*\\(\\s*num\\s*,\\s*target', message: 'Duyệt xuôi sẽ cho phép dùng lại cùng một số nhiều lần (unbounded knapsack) → kết quả sai. Với knapsack 0/1 phải duyệt NGƯỢC: `range(target, num - 1, -1)`.' },
+        { test: '\\.sort\\s*\\(\\)[\\s\\S]{0,150}return|sorted\\s*\\([\\s\\S]{0,60}\\)[\\s\\S]{0,150}return', message: 'Chiến lược tham lam (xếp số lớn vào bên nhẹ hơn) không đúng cho bài này. Ví dụ [2,2,3,5] tổng 12, greedy dễ ra kết quả sai.' },
       ],
       approach: `
 **Bước 1 — Rút gọn bài toán (kỹ năng quan trọng nhất).**
@@ -1024,6 +1351,64 @@ lựa chọn hiện tại có **chặn** khả năng tương lai hay không.
 - **Thuật toán Dijkstra và Prim** đều là greedy (có chứng minh đúng).
 - **Đặt giá quảng cáo, phân bổ ngân sách** theo tỉ lệ hiệu quả giảm dần.
 `,
+  lessonPy: `
+## 1. Ý tưởng cốt lõi
+
+> Greedy = ở mỗi bước, chọn phương án **tốt nhất tại thời điểm đó** và **không bao giờ nhìn lại**.
+
+Ưu điểm: thường O(n) hoặc O(n log n), code ngắn gọn.
+Nhược điểm chí mạng: **rất hay sai** và cái sai đó khó phát hiện — nó chạy đúng với ví dụ trong đề
+nhưng sai với test ẩn.
+
+## 2. Khi nào greedy đúng?
+
+Cần một trong hai tính chất (lý tưởng là cả hai):
+
+1. **Tính chất lựa chọn tham lam** (greedy choice property):
+   tồn tại một lời giải tối ưu *chứa* lựa chọn tham lam ở bước đầu tiên.
+2. **Cấu trúc con tối ưu**: sau khi chọn, bài toán còn lại vẫn cùng dạng.
+
+**Ba cách kiểm tra nhanh trong phỏng vấn:**
+- Thử tìm **phản ví dụ** trong 30 giây. Không tìm được → có thể greedy đúng.
+- **Lập luận trao đổi (exchange argument)**: giả sử có lời giải tối ưu khác lựa chọn của tôi;
+  chứng minh có thể "đổi" nó về lựa chọn của tôi mà không tệ đi.
+- So sánh với DP trên vài ví dụ nhỏ.
+
+## 3. Greedy vs DP — bảng phân biệt
+
+| | Greedy | DP |
+|---|---|---|
+| Số lựa chọn xét ở mỗi bước | 1 (tốt nhất tại chỗ) | tất cả |
+| Có quay lại không | không | có (qua bảng trạng thái) |
+| Chi phí | O(n) ~ O(n log n) | thường O(n²) trở lên |
+| Rủi ro | có thể sai | luôn đúng nếu trạng thái đúng |
+
+**Ví dụ kinh điển:** Coin Change với \`[1,3,4]\`, target 6 → greedy cho 3 đồng, DP cho 2 đồng.
+Nhưng bài *Jump Game* thì greedy đúng và DP là thừa thãi. Sự khác biệt nằm ở việc
+lựa chọn hiện tại có **chặn** khả năng tương lai hay không.
+
+## 4. Ba mẫu greedy hay gặp
+
+1. **Sắp xếp rồi quét** (\`sorted(..., key=...)\`): xếp lịch (sắp theo thời gian kết thúc), gộp khoảng, bài toán phân công.
+2. **Duy trì một cực trị đang chạy**: Kadane (tổng lớn nhất), Jump Game (tầm xa nhất),
+   Best Time to Buy Stock (đáy thấp nhất).
+3. **Đổi tài nguyên bằng heap** (\`heapq\`): luôn phục vụ yêu cầu "cấp bách nhất" tiếp theo.
+
+## 5. Bẫy thường gặp
+
+- Áp greedy mà không kiểm chứng → sai âm thầm.
+- Sắp xếp theo **tiêu chí sai** (bài xếp lịch: phải sắp theo *thời gian kết thúc*, không phải thời gian bắt đầu
+  hay độ dài) — nhớ dùng đúng \`key=lambda x: x[1]\`.
+- Bỏ qua trường hợp biên: mảng rỗng, toàn số âm.
+
+## 6. Ứng dụng thực tế
+
+- **Nén Huffman**: luôn gộp hai nút tần suất nhỏ nhất — greedy có chứng minh chặt chẽ.
+- **Lập lịch CPU**: shortest job first tối ưu thời gian chờ trung bình.
+- **Định tuyến gói tin, cân bằng tải**: chọn đường/máy chủ tốt nhất tại thời điểm hiện tại.
+- **Thuật toán Dijkstra và Prim** đều là greedy (có chứng minh đúng).
+- **Đặt giá quảng cáo, phân bổ ngân sách** theo tỉ lệ hiệu quả giảm dần.
+`,
   quiz: [
     {
       q: 'Cách thuyết phục nhất để chứng minh một thuật toán tham lam là đúng?',
@@ -1070,6 +1455,52 @@ lựa chọn hiện tại có **chặn** khả năng tương lai hay không.
       why: 'Đây là ranh giới cốt lõi. Greedy đúng khi lựa chọn hiện tại KHÔNG thu hẹp không gian nghiệm tương lai. Hãy luôn tự hỏi câu này trước khi dùng greedy.',
     },
   ],
+  quizPy: [
+    {
+      q: 'Cách thuyết phục nhất để chứng minh một thuật toán tham lam là đúng?',
+      options: [
+        'Chạy thử với nhiều test case',
+        'Lập luận trao đổi (exchange argument): chứng minh mọi lời giải tối ưu đều có thể biến đổi thành lời giải chứa lựa chọn tham lam mà không tệ đi',
+        'So sánh độ phức tạp với DP',
+        'Kiểm tra mảng đã được sắp xếp',
+      ],
+      answer: 1,
+      why: 'Test nhiều không chứng minh được gì (greedy sai thường vẫn qua test đơn giản). Exchange argument là công cụ chuẩn — và nói ra nó trong phỏng vấn thể hiện chiều sâu tư duy.',
+    },
+    {
+      q: 'Trong bài Maximum Subarray (Kadane), tại mỗi vị trí ta quyết định điều gì?',
+      options: [
+        'Có sắp xếp lại mảng hay không',
+        'Nối tiếp đoạn con hiện tại, hay bắt đầu đoạn mới tại phần tử này',
+        'Chọn phần tử lớn nhất',
+        'Chia mảng thành hai nửa',
+      ],
+      answer: 1,
+      why: '`cur = max(x, cur + x)`. Nếu tổng tích luỹ đang âm thì nó chỉ làm hại — vứt đi và bắt đầu lại. Đây là greedy có chứng minh chặt và cũng là DP với trạng thái O(1).',
+    },
+    {
+      q: 'Bài xếp lịch "chọn nhiều cuộc họp không chồng chéo nhất" nên sắp xếp theo tiêu chí nào?',
+      options: [
+        'Thời gian bắt đầu sớm nhất',
+        'Thời gian KẾT THÚC sớm nhất',
+        'Cuộc họp ngắn nhất',
+        'Số người tham dự ít nhất',
+      ],
+      answer: 1,
+      why: 'Kết thúc sớm nhất để lại nhiều thời gian nhất cho phần còn lại. Sắp theo thời gian bắt đầu hay độ dài đều có phản ví dụ — chọn đúng `key=lambda x: x[1]` khi sort chính là chọn đúng thuật toán.',
+    },
+    {
+      q: 'Vì sao greedy đúng cho bài Jump Game nhưng sai cho bài Coin Change?',
+      options: [
+        'Vì Jump Game có mảng nhỏ hơn',
+        'Vì trong Jump Game, "đi xa nhất có thể" không loại bỏ khả năng nào ở tương lai; còn trong Coin Change, chọn đồng xu lớn có thể khiến phần còn lại cần nhiều xu hơn',
+        'Vì Coin Change có số âm',
+        'Vì Jump Game đã được sắp xếp',
+      ],
+      answer: 1,
+      why: 'Đây là ranh giới cốt lõi. Greedy đúng khi lựa chọn hiện tại KHÔNG thu hẹp không gian nghiệm tương lai. Hãy luôn tự hỏi câu này trước khi dùng greedy.',
+    },
+  ],
   problems: [
     {
       id: 'maximum-subarray',
@@ -1087,6 +1518,7 @@ Cho mảng \`nums\`, tìm **đoạn con liên tiếp** (ít nhất một phần 
 - \`[5,4,-1,7,8]\` → \`23\`
 `,
       starter: `function maxSubArray(nums) {\n  \n}`,
+      starterPy: `def maxSubArray(nums):\n    \n`,
       tests: [
         { args: [[-2, 1, -3, 4, -1, 2, 1, -5, 4]], expected: 6, name: 'Ví dụ chuẩn' },
         { args: [[1]], expected: 1, name: 'Một phần tử' },
@@ -1102,9 +1534,18 @@ Cho mảng \`nums\`, tìm **đoạn con liên tiếp** (ít nhất một phần 
         'Câu trả lời: nếu tổng tích luỹ hiện tại đang **âm**, nó chỉ làm giảm mọi thứ phía sau → vứt đi. `cur = Math.max(x, cur + x)`.',
         'Cẩn thận với mảng toàn số âm: khởi tạo `best = -Infinity` (hoặc `nums[0]`), **không** khởi tạo bằng 0 — nếu không, test `[-2,-1]` sẽ trả về 0 thay vì -1.',
       ],
+      hintsPy: [
+        'Câu hỏi then chốt tại mỗi phần tử: "tôi nên **nối tiếp** đoạn con đang có, hay **bắt đầu lại** từ phần tử này?"',
+        'Câu trả lời: nếu tổng tích luỹ hiện tại đang **âm**, nó chỉ làm giảm mọi thứ phía sau → vứt đi. `cur = max(x, cur + x)`.',
+        'Cẩn thận với mảng toàn số âm: khởi tạo `best = nums[0]`, **không** khởi tạo bằng 0 — nếu không, test `[-2,-1]` sẽ trả về 0 thay vì -1.',
+      ],
       diagnostics: [
         { test: 'best\\s*=\\s*0|max\\s*=\\s*0', message: 'Khởi tạo đáp án bằng 0 sẽ sai với mảng toàn số âm (đề yêu cầu đoạn con có ít nhất 1 phần tử). Hãy khởi tạo bằng `-Infinity` hoặc `nums[0]`.' },
         { test: 'for[\\s\\S]{0,200}for', message: 'Hai vòng lồng nhau là O(n²). Kadane chỉ cần một lượt duyệt O(n).' },
+      ],
+      diagnosticsPy: [
+        { test: 'best\\s*=\\s*0|cur\\s*=\\s*0\\b', message: 'Khởi tạo đáp án bằng 0 sẽ sai với mảng toàn số âm (đề yêu cầu đoạn con có ít nhất 1 phần tử). Hãy khởi tạo bằng `nums[0]`.' },
+        { test: 'for\\s+\\w+[\\s\\S]{0,200}for\\s+\\w+', message: 'Hai vòng lồng nhau là O(n²). Kadane chỉ cần một lượt duyệt O(n).' },
       ],
       approach: `
 **Thuật toán Kadane** — vừa là greedy vừa là DP, nên nó là bài học hoàn hảo về ranh giới hai chủ đề.
@@ -1179,6 +1620,7 @@ Trả về \`true\` nếu có thể tới được vị trí cuối cùng.
 - \`[3,2,1,0,4]\` → \`false\` (luôn kẹt ở chỉ số 3)
 `,
       starter: `function canJump(nums) {\n  \n}`,
+      starterPy: `def canJump(nums):\n    \n`,
       tests: [
         { args: [[2, 3, 1, 1, 4]], expected: true, name: 'Đi được' },
         { args: [[3, 2, 1, 0, 4]], expected: false, name: 'Kẹt ở số 0' },
@@ -1194,9 +1636,18 @@ Trả về \`true\` nếu có thể tới được vị trí cuối cùng.
         'Duyệt i từ 0: nếu `i > reach` thì bạn không bao giờ tới được i → trả về false. Ngược lại cập nhật `reach = Math.max(reach, i + nums[i])`.',
         'Nếu `reach >= n - 1` thì có thể trả về true ngay. Vì sao greedy đúng? Vì "với tới được xa hơn" không bao giờ làm mất đi khả năng nào — không có đánh đổi ở đây.',
       ],
+      hintsPy: [
+        'Đừng thử mọi đường nhảy (đó là hàm mũ). Chỉ cần theo dõi **một con số**: vị trí xa nhất bạn có thể với tới tính tới hiện tại.',
+        'Duyệt i từ 0 (dùng `enumerate(nums)`): nếu `i > reach` thì bạn không bao giờ tới được i → trả về False. Ngược lại cập nhật `reach = max(reach, i + step)`.',
+        'Nếu `reach >= len(nums) - 1` thì có thể trả về True ngay. Vì sao greedy đúng? Vì "với tới được xa hơn" không bao giờ làm mất đi khả năng nào — không có đánh đổi ở đây.',
+      ],
       diagnostics: [
         { test: 'canJump\\s*\\([\\s\\S]{0,200}canJump\\s*\\(', message: 'Đệ quy thử mọi bước nhảy là O(2ⁿ) — sẽ hết giờ. Chỉ cần một biến "tầm với xa nhất".' },
         { test: 'dp\\s*=\\s*new Array', message: 'DP O(n²) chạy đúng nhưng thừa. Greedy O(n) với một biến là lời giải chuẩn cho bài này — hãy tìm ra vì sao greedy hợp lệ.' },
+      ],
+      diagnosticsPy: [
+        { test: 'canJump\\s*\\([\\s\\S]{0,200}canJump\\s*\\(', message: 'Đệ quy thử mọi bước nhảy là O(2ⁿ) — sẽ hết giờ. Chỉ cần một biến "tầm với xa nhất".' },
+        { test: '\\[0\\]\\s*\\*\\s*len\\(nums\\)', message: 'DP O(n²) chạy đúng nhưng thừa. Greedy O(n) với một biến là lời giải chuẩn cho bài này — hãy tìm ra vì sao greedy hợp lệ.' },
       ],
       approach: `
 **Vì sao greedy đúng ở đây mà sai ở Coin Change?**
@@ -1281,6 +1732,7 @@ hoặc \`-1\` nếu không thể. Đề đảm bảo đáp án là **duy nhất*
 - \`gas = [2,3,4], cost = [3,4,3]\` → \`-1\`
 `,
       starter: `function canCompleteCircuit(gas, cost) {\n  \n}`,
+      starterPy: `def canCompleteCircuit(gas, cost):\n    \n`,
       tests: [
         { args: [[1, 2, 3, 4, 5], [3, 4, 5, 1, 2]], expected: 3, name: 'Ví dụ 1' },
         { args: [[2, 3, 4], [3, 4, 3]], expected: -1, name: 'Không đủ xăng' },
@@ -1296,8 +1748,16 @@ hoặc \`-1\` nếu không thể. Đề đảm bảo đáp án là **duy nhất*
         'Nhận xét 2 (chìa khoá): nếu bạn xuất phát từ i và hết xăng tại j, thì **mọi trạm giữa i và j đều không thể là điểm xuất phát**. Vì sao? Vì khi tới các trạm đó bạn đã có sẵn xăng dư (≥ 0) mà vẫn không đi nổi.',
         'Vậy chỉ cần một lượt duyệt: giữ `tank` (xăng hiện tại) và `start`. Khi `tank < 0`, đặt `start = i + 1` và `tank = 0`. Đáp án là `start` cuối cùng — O(n), không cần thử từng điểm.',
       ],
+      hintsPy: [
+        'Nhận xét 1 (điều kiện tồn tại): nếu `sum(gas) < sum(cost)` thì chắc chắn không thể → trả về -1. Nếu `sum(gas) >= sum(cost)` thì **luôn tồn tại** một điểm xuất phát hợp lệ.',
+        'Nhận xét 2 (chìa khoá): nếu bạn xuất phát từ i và hết xăng tại j, thì **mọi trạm giữa i và j đều không thể là điểm xuất phát**. Vì sao? Vì khi tới các trạm đó bạn đã có sẵn xăng dư (≥ 0) mà vẫn không đi nổi.',
+        'Vậy chỉ cần một lượt duyệt: giữ `tank` (xăng hiện tại) và `start`. Khi `tank < 0`, đặt `start = i + 1` và `tank = 0`. Đáp án là `start` cuối cùng — O(n), không cần thử từng điểm.',
+      ],
       diagnostics: [
         { test: 'for[\\s\\S]{0,200}for', message: 'Thử mọi điểm xuất phát là O(n²) — trượt test 100.000 trạm. Có lời giải một lượt duyệt O(n) nhờ nhận xét "mọi trạm giữa i và j đều không dùng được".' },
+      ],
+      diagnosticsPy: [
+        { test: 'for\\s+\\w+[\\s\\S]{0,200}for\\s+\\w+', message: 'Thử mọi điểm xuất phát là O(n²) — trượt test 100.000 trạm. Có lời giải một lượt duyệt O(n) nhờ nhận xét "mọi trạm giữa i và j đều không dùng được".' },
       ],
       approach: `
 Bài này là **ví dụ mẫu mực về việc chứng minh greedy**. Có hai nhận xét, và mỗi nhận xét đều cần lập luận.

@@ -88,6 +88,86 @@ Vì sao O(n)? Mỗi chỉ số vào stack đúng 1 lần và ra đúng 1 lần. 
 - **Máy ảo dựa trên stack**: JVM, WebAssembly, EVM (Ethereum) đều là stack machine.
 - **Backtracking** (chủ đề sau) chính là đệ quy + stack ngầm.
 `,
+  lessonPy: `
+## 1. Vấn đề gốc
+
+Có một lớp bài toán mà **thứ tự xử lý phải ngược với thứ tự xuất hiện**: cái mở sau phải đóng trước.
+Ngoặc lồng nhau, thẻ HTML, lời gọi hàm, phép toán ưu tiên — tất cả đều có cấu trúc *lồng*.
+List thường không nắm bắt được cấu trúc này một cách tự nhiên; ngăn xếp thì có.
+
+## 2. Ý tưởng cốt lõi
+
+> Ngăn xếp = **trí nhớ về những việc còn dang dở**, theo thứ tự "việc mới nhất chưa xong thì xử lý trước".
+
+\`append\` (push) = "tôi bắt đầu một việc mới, việc cũ tạm gác lại".
+\`pop\` = "việc mới nhất đã xong, quay lại việc trước đó".
+
+Chính vì thế **đệ quy và ngăn xếp là một**: máy tính cài đặt đệ quy bằng call stack
+(và Python giới hạn độ sâu đệ quy mặc định ~1000 — \`sys.setrecursionlimit\` có thể nâng nhưng
+đổi lại là rủi ro tràn stack thật của trình thông dịch).
+Mọi thuật toán đệ quy đều viết lại được bằng vòng lặp + \`list\` làm stack (và ngược lại).
+
+## 3. Hai mẫu hình phải thuộc
+
+**(a) Ghép cặp / kiểm tra tính hợp lệ lồng nhau**
+\`\`\`python
+st = []
+for c in s:
+    if is_open(c):
+        st.append(c)
+    else:
+        if not st or not matches(st.pop(), c):
+            return False
+return len(st) == 0   # đừng quên: còn thừa dấu mở là SAI
+\`\`\`
+
+**(b) Ngăn xếp đơn điệu (monotonic stack) — kỹ thuật ăn điểm**
+
+Dùng khi đề hỏi: *"với mỗi phần tử, tìm phần tử **lớn hơn/nhỏ hơn** đầu tiên ở bên phải/trái"*.
+
+\`\`\`python
+st = []                                # lưu CHỈ SỐ, giữ giá trị giảm dần
+for i in range(n):
+    while st and a[i] > a[st[-1]]:
+        j = st.pop()
+        res[j] = i - j                 # a[i] chính là "phần tử lớn hơn kế tiếp" của a[j]
+    st.append(i)
+\`\`\`
+
+Bất biến: **các phần tử trong stack luôn giảm dần và đều là những phần tử "chưa tìm được đáp án"**.
+Khi gặp phần tử lớn hơn, nó giải quyết một loạt phần tử đang chờ.
+
+Vì sao O(n)? Mỗi chỉ số vào stack đúng 1 lần và ra đúng 1 lần. Lại là phân tích khấu hao.
+
+## 4. Nhận dạng
+
+| Dấu hiệu trong đề | Kỹ thuật |
+|---|---|
+| Ngoặc, thẻ, biểu thức lồng nhau | stack ghép cặp |
+| "phần tử lớn hơn tiếp theo", "số ngày phải chờ" | monotonic stack |
+| "biểu thức hậu tố (RPN)", máy tính bỏ túi | stack toán hạng |
+| "hoàn tác (undo)", "quay lại trang trước" | stack lịch sử |
+| Cần \`getMin()\` trong O(1) | stack phụ chứa min |
+| Duyệt cây/đồ thị không đệ quy | stack (list) thay call stack |
+
+## 5. Bẫy thường gặp
+
+- Quên kiểm tra stack rỗng trước khi \`pop()\` → \`IndexError: pop from empty list\`.
+- Quên kiểm tra stack rỗng **ở cuối** trong bài ngoặc: \`"((("\` phải trả về False.
+- Trong monotonic stack: lưu **chỉ số** chứ đừng lưu giá trị, vì bạn thường cần khoảng cách \`i - j\`.
+- Nhầm \`>\` với \`>=\` khi có phần tử bằng nhau — quyết định này thay đổi kết quả bài toán.
+- \`list.pop()\` (không tham số) là O(1) — xoá ở **cuối**. \`list.pop(0)\` là O(n) vì phải dịch chuyển
+  cả list. Nếu cần xoá ở đầu hiệu quả, dùng \`collections.deque\`, không dùng \`list\`.
+
+## 6. Ứng dụng thực tế
+
+- **Trình biên dịch/parser**: kiểm tra cân bằng ngoặc, phân tích cú pháp đệ quy xuống — bản thân
+  trình thông dịch Python cũng làm việc này khi parse code của bạn.
+- **Undo/Redo** trong mọi trình soạn thảo; **back button** của trình duyệt.
+- **Call stack** — hiểu stack là hiểu traceback và lỗi *RecursionError* / *stack overflow*.
+- **Máy ảo dựa trên stack**: CPython bytecode, JVM, WebAssembly đều là stack machine.
+- **Backtracking** (chủ đề sau) chính là đệ quy + stack ngầm.
+`,
   quiz: [
     {
       q: 'Vì sao ngăn xếp đơn điệu (monotonic stack) chạy trong O(n) dù có vòng while lồng trong for?',
@@ -129,6 +209,47 @@ Vì sao O(n)? Mỗi chỉ số vào stack đúng 1 lần và ra đúng 1 lần. 
       why: 'Đề hỏi "phần tử lớn hơn đầu tiên ở bên phải" — đúng chữ ký của monotonic stack. Stack giữ các ngày đang CHỜ một ngày ấm hơn, theo thứ tự nhiệt độ giảm dần.',
     },
   ],
+  quizPy: [
+    {
+      q: 'Vì sao ngăn xếp đơn điệu (monotonic stack) chạy trong O(n) dù có vòng while lồng trong for?',
+      options: [
+        'Vì vòng while chạy tối đa 2 lần',
+        'Vì mỗi phần tử được push (append) đúng một lần và pop tối đa một lần trong toàn bộ chương trình',
+        'Vì stack luôn có kích thước hằng số',
+        'Vì list đã được sắp xếp',
+      ],
+      answer: 1,
+      why: 'Tổng số thao tác append + pop ≤ 2n. Đây lại là phân tích khấu hao — cùng nguyên lý với cửa sổ trượt. Nhận ra mẫu này giúp bạn tự tin trả lời độ phức tạp trong phỏng vấn.',
+    },
+    {
+      q: 'Kiểm tra chuỗi ngoặc "([)]" — điều gì làm nó KHÔNG hợp lệ trong khi "()[]" hợp lệ?',
+      options: [
+        'Vì số ký tự lẻ',
+        'Vì cấu trúc lồng nhau bị chéo: ngoặc mở gần nhất chưa đóng là "[" nhưng lại gặp ")"',
+        'Vì có ngoặc vuông',
+        'Vì stack bị tràn',
+      ],
+      answer: 1,
+      why: 'Tính hợp lệ không chỉ là "đếm đủ số lượng" mà là "đúng thứ tự lồng". Stack nắm bắt điều đó: phần tử đỉnh luôn là ngoặc mở gần nhất chưa được đóng.',
+    },
+    {
+      q: 'Để MinStack hỗ trợ getMin() trong O(1), cách làm chuẩn là gì?',
+      options: [
+        'Duyệt toàn bộ stack mỗi lần gọi getMin',
+        'Sắp xếp stack sau mỗi lần push',
+        'Giữ một stack (list) phụ song song, mỗi phần tử là min tính tới thời điểm đó',
+        'Dùng một biến min duy nhất',
+      ],
+      answer: 2,
+      why: 'Một biến min là không đủ: khi pop đúng phần tử min, ta không biết min mới. Stack phụ lưu "lịch sử min" giải quyết trọn vẹn — đây là ý tưởng "mang theo thông tin tổng hợp cùng với dữ liệu".',
+    },
+    {
+      q: 'Bài "Daily Temperatures" (số ngày phải chờ tới ngày ấm hơn) thuộc mẫu nào?',
+      options: ['Cửa sổ trượt', 'Ngăn xếp đơn điệu giảm dần', 'Tìm kiếm nhị phân', 'Quy hoạch động'],
+      answer: 1,
+      why: 'Đề hỏi "phần tử lớn hơn đầu tiên ở bên phải" — đúng chữ ký của monotonic stack. Stack giữ các ngày đang CHỜ một ngày ấm hơn, theo thứ tự nhiệt độ giảm dần.',
+    },
+  ],
   problems: [
     {
       id: 'valid-parentheses',
@@ -148,6 +269,7 @@ Hợp lệ khi: mỗi ngoặc mở được đóng bằng đúng loại tương 
 - \`"{[]}"\` → \`true\`
 `,
       starter: `function isValid(s) {\n  \n}`,
+      starterPy: `def isValid(s):\n    \n`,
       tests: [
         { args: ['()'], expected: true, name: 'Cơ bản' },
         { args: ['()[]{}'], expected: true, name: 'Nối tiếp' },
@@ -161,11 +283,20 @@ Hợp lệ khi: mỗi ngoặc mở được đóng bằng đúng loại tương 
       hints: [
         'Khi gặp ngoặc mở, bạn chưa biết nó đúng hay sai — hãy **ghi nhớ** nó. Khi gặp ngoặc đóng, nó phải khớp với ngoặc mở **gần nhất chưa được đóng**.',
         'Cấu trúc trả lời "phần tử gần nhất chưa xử lý" chính là stack. Dùng một object ánh xạ `{")":"(", "]":"[", "}":"{"}` để tra cặp.',
-        'Hai kiểm tra dễ quên: (1) gặp ngoặc đóng khi stack rỗng → false ngay; (2) hết chuỗi mà stack **chưa rỗng** → false (còn ngoặc mở chưa đóng).',
+        'Hai kiểm tra dễ quên: (1) gặp ngoặc đóng khi stack rỗng → False ngay; (2) hết chuỗi mà stack **chưa rỗng** → False (còn ngoặc mở chưa đóng).',
+      ],
+      hintsPy: [
+        'Khi gặp ngoặc mở, bạn chưa biết nó đúng hay sai — hãy **ghi nhớ** nó. Khi gặp ngoặc đóng, nó phải khớp với ngoặc mở **gần nhất chưa được đóng**.',
+        'Cấu trúc trả lời "phần tử gần nhất chưa xử lý" chính là stack (`list`). Dùng một `dict` ánh xạ `{")":"(", "]":"[", "}":"{"}` để tra cặp.',
+        'Hai kiểm tra dễ quên: (1) gặp ngoặc đóng khi stack rỗng → False ngay (đừng gọi `st.pop()` trên list rỗng, sẽ dấy `IndexError`); (2) hết chuỗi mà stack **chưa rỗng** → False (còn ngoặc mở chưa đóng).',
       ],
       diagnostics: [
         { test: 'replace\\s*\\(', message: 'Cách "xoá dần cặp ngoặc bằng replace trong vòng lặp" chạy đúng nhưng là O(n²). Stack cho O(n) và thể hiện bạn hiểu cấu trúc lồng.' },
         { test: 'count|counter', message: 'Chỉ đếm số lượng ngoặc là không đủ: "([)]" có số lượng cân bằng nhưng vẫn sai. Thứ tự lồng mới là điều quan trọng.' },
+      ],
+      diagnosticsPy: [
+        { test: '\\.replace\\s*\\(', message: 'Cách "xoá dần cặp ngoặc bằng replace trong vòng lặp" chạy đúng nhưng là O(n²). Stack cho O(n) và thể hiện bạn hiểu cấu trúc lồng.' },
+        { test: 'count\\s*\\(|Counter', message: 'Chỉ đếm số lượng ngoặc là không đủ: "([)]" có số lượng cân bằng nhưng vẫn sai. Thứ tự lồng mới là điều quan trọng.' },
       ],
       approach: `
 Bài này là "hello world" của ngăn xếp, nhưng hãy rút ra bài học đúng:
@@ -235,6 +366,7 @@ getMin();  // -2
 > Bài chấm bằng cách gọi một chuỗi thao tác và so sánh mảng kết quả (\`null\` cho các lệnh không trả về).
 `,
       starter: `class MinStack {\n  constructor() {\n    \n  }\n\n  push(val) {\n    \n  }\n\n  pop() {\n    \n  }\n\n  top() {\n    \n  }\n\n  getMin() {\n    \n  }\n}`,
+      starterPy: `class MinStack:\n    def __init__(self):\n        pass\n\n    def push(self, val):\n        pass\n\n    def pop(self):\n        pass\n\n    def top(self):\n        pass\n\n    def getMin(self):\n        pass\n`,
       harnessSrc: `(Cls, args) => {
         const [ops, vals] = args;
         const out = [];
@@ -249,6 +381,19 @@ getMin();  // -2
         }
         return out;
       }`,
+      harnessSrcPy: `def harness(Cls, args, t):
+    ops, vals = args
+    out = []
+    obj = None
+    for i in range(len(ops)):
+        if ops[i] == 'MinStack':
+            obj = Cls()
+            out.append(None)
+        else:
+            v = vals[i] if vals[i] else []
+            r = getattr(obj, ops[i])(*v)
+            out.append(None if ops[i] == 'pop' or r is None else r)
+    return out`,
       tests: [
         {
           args: [['MinStack', 'push', 'push', 'push', 'getMin', 'pop', 'top', 'getMin'], [[], [-2], [0], [-3], [], [], [], []]],
@@ -276,9 +421,18 @@ getMin();  // -2
         'Ý tưởng: mỗi phần tử "mang theo" thông tin min tại thời điểm nó được push. Dùng stack thứ hai `mins`, trong đó `mins[i]` = min của toàn bộ phần tử từ đáy tới i.',
         '`push(v)`: `mins.push(Math.min(v, mins.at(-1) ?? Infinity))`. `pop()`: pop cả hai stack. Chú ý bẫy giá trị trùng: nếu chỉ push vào `mins` khi `v < min` thì bài test [2,2] sẽ sai — hãy dùng `<=` hoặc luôn push.',
       ],
+      hintsPy: [
+        'Một biến `min` duy nhất là **không đủ**. Hãy tự hỏi: khi pop đúng phần tử đang là min, làm sao biết min mới mà không duyệt lại?',
+        'Ý tưởng: mỗi phần tử "mang theo" thông tin min tại thời điểm nó được push. Dùng `list` thứ hai `self.mins`, trong đó `self.mins[i]` = min của toàn bộ phần tử từ đáy tới i.',
+        '`push(v)`: `self.mins.append(min(v, self.mins[-1]) if self.mins else v)`. `pop()`: pop cả hai list. Chú ý bẫy giá trị trùng: nếu chỉ push vào `mins` khi `v < min` thì bài test [2,2] sẽ sai — hãy dùng `<=` hoặc luôn push (như trong `min(v, self.mins[-1])`).',
+      ],
       diagnostics: [
         { test: 'Math\\.min\\s*\\(\\s*\\.\\.\\.', message: '`Math.min(...stack)` là O(n) mỗi lần gọi — vi phạm yêu cầu O(1). Hãy lưu sẵn lịch sử min.' },
         { test: 'sort\\s*\\(', message: 'Sắp xếp phá vỡ thứ tự LIFO và tốn O(n log n). Không phải hướng đi của bài này.' },
+      ],
+      diagnosticsPy: [
+        { test: 'min\\s*\\(\\s*self\\.st\\s*\\)', message: '`min(self.st)` là O(n) mỗi lần gọi — vi phạm yêu cầu O(1). Hãy lưu sẵn lịch sử min trong một list phụ.' },
+        { test: '\\.sort\\s*\\(\\)|sorted\\s*\\(', message: 'Sắp xếp phá vỡ thứ tự LIFO và tốn O(n log n). Không phải hướng đi của bài này.' },
       ],
       approach: `
 **Bài học lớn hơn bản thân bài toán: "tăng cường dữ liệu" (data augmentation).**
@@ -362,6 +516,7 @@ Toán tử: \`+ - * /\`. Phép chia **lấy phần nguyên hướng về 0** (\`
 - \`["4","13","5","/","+"]\` → \`6\`  (4 + 13/5 = 4+2)
 `,
       starter: `function evalRPN(tokens) {\n  \n}`,
+      starterPy: `def evalRPN(tokens):\n    \n`,
       tests: [
         { args: [['2', '1', '+', '3', '*']], expected: 9, name: 'Ví dụ 1' },
         { args: [['4', '13', '5', '/', '+']], expected: 6, name: 'Chia lấy nguyên' },
@@ -376,10 +531,19 @@ Toán tử: \`+ - * /\`. Phép chia **lấy phần nguyên hướng về 0** (\`
         'Thứ tự toán hạng rất quan trọng với `-` và `/`: phần tử pop ra **đầu tiên** là số bên **phải**. `const b = st.pop(), a = st.pop();` rồi tính `a - b`, `a / b`.',
         'Chia trong JS cho số thực. Làm tròn về 0 phải dùng `Math.trunc(a/b)` chứ **không** phải `Math.floor` — với -7/2, floor cho -4 (sai), trunc cho -3 (đúng).',
       ],
+      hintsPy: [
+        'RPN được thiết kế để tính bằng stack: gặp **số** thì push; gặp **toán tử** thì pop hai số, tính, rồi push kết quả trở lại.',
+        'Thứ tự toán hạng rất quan trọng với `-` và `/`: phần tử pop ra **đầu tiên** là số bên **phải**. `b, a = st.pop(), st.pop()` rồi tính `a - b`, `a / b`.',
+        'Bẫy lớn nhất trong Python: toán tử `/` trả về `float`, và \`//\` (floor division) làm tròn về **âm vô cực**, không phải về 0 — với -7//2 cho -4 (sai). Đề yêu cầu làm tròn về 0, dùng `int(a / b)` chứ không phải `a // b`.',
+      ],
       diagnostics: [
         { test: 'Math\\.floor\\s*\\(', message: '`Math.floor(-3.5)` = -4, nhưng đề yêu cầu làm tròn **về phía 0** → -3. Dùng `Math.trunc` (hoặc `~~` với số nhỏ).' },
         { test: 'eval\\s*\\(', message: 'Dùng `eval` là né tránh bài toán (và là lỗ hổng bảo mật trong thực tế). Hãy cài đặt bằng stack.' },
         { test: 'parseInt\\s*\\(\\s*[a-z]+\\s*\\)\\s*[^,)]*\\bNaN', message: 'Nhớ rằng `Number("-11")` hoạt động tốt với số âm; kiểm tra toán tử bằng danh sách chứ đừng dựa vào isNaN của dấu trừ.' },
+      ],
+      diagnosticsPy: [
+        { test: '\\/\\/', message: '`//` là floor division — làm tròn về ÂM VÔ CỰC, không phải về 0. Với -7//2 = -4 (sai). Đề yêu cầu làm tròn về 0: dùng `int(a / b)`.' },
+        { test: '\\beval\\s*\\(', message: 'Dùng `eval` là né tránh bài toán (và là lỗ hổng bảo mật trong thực tế). Hãy cài đặt bằng stack.' },
       ],
       approach: `
 **Vì sao RPN tồn tại?** Vì nó **không cần ngoặc** và tính được bằng một lượt duyệt với stack duy nhất.
@@ -456,6 +620,7 @@ Nếu không có ngày nào ấm hơn, giá trị là \`0\`.
 - \`[30,40,50,60]\` → \`[1,1,1,0]\`
 `,
       starter: `function dailyTemperatures(temperatures) {\n  \n}`,
+      starterPy: `def dailyTemperatures(temperatures):\n    \n`,
       tests: [
         { args: [[73, 74, 75, 71, 69, 72, 76, 73]], expected: [1, 1, 4, 2, 1, 1, 0, 0], name: 'Ví dụ chuẩn' },
         { args: [[30, 40, 50, 60]], expected: [1, 1, 1, 0], name: 'Tăng dần' },
@@ -470,9 +635,18 @@ Nếu không có ngày nào ấm hơn, giá trị là \`0\`.
         'Giữ một stack các **chỉ số** ngày đang "chờ" một ngày ấm hơn. Vì các ngày trong stack chưa tìm được ngày ấm hơn nên nhiệt độ của chúng **giảm dần** từ đáy lên đỉnh.',
         'Với mỗi i: `while (st.length && t[i] > t[st.at(-1)]) { const j = st.pop(); res[j] = i - j; }` rồi `st.push(i)`. Chú ý dùng `>` chứ không `>=` vì "bằng nhau" không phải "ấm hơn".',
       ],
+      hintsPy: [
+        'Bản O(n²) là "với mỗi i, quét sang phải tìm ngày ấm hơn". Hãy đảo ngược câu hỏi: khi đứng ở ngày `i`, ngày này **giải quyết** được cho những ngày nào trong quá khứ?',
+        'Giữ một stack (`list`) các **chỉ số** ngày đang "chờ" một ngày ấm hơn. Vì các ngày trong stack chưa tìm được ngày ấm hơn nên nhiệt độ của chúng **giảm dần** từ đáy lên đỉnh.',
+        'Với mỗi i: `while st and t[i] > t[st[-1]]: j = st.pop(); res[j] = i - j` rồi `st.append(i)`. Chú ý dùng `>` chứ không `>=` vì "bằng nhau" không phải "ấm hơn".',
+      ],
       diagnostics: [
         { test: 'for[\\s\\S]{0,200}for', message: 'Hai vòng lồng nhau → O(n²), trượt test 100.000 phần tử. Hãy dùng ngăn xếp đơn điệu để mỗi phần tử chỉ được xử lý một lần.' },
         { test: '>=\\s*temperatures\\[|temperatures\\[[a-z]+\\]\\s*>=', message: 'Cẩn thận: "ấm hơn" là lớn hơn thực sự (`>`), nhiệt độ bằng nhau không tính.' },
+      ],
+      diagnosticsPy: [
+        { test: 'for[\\s\\S]{0,200}for', message: 'Hai vòng lồng nhau → O(n²), trượt test 100.000 phần tử. Hãy dùng ngăn xếp đơn điệu để mỗi phần tử chỉ được xử lý một lần.' },
+        { test: '>=\\s*temperatures\\[|temperatures\\[\\w+\\]\\s*>=', message: 'Cẩn thận: "ấm hơn" là lớn hơn thực sự (`>`), nhiệt độ bằng nhau không tính.' },
       ],
       approach: `
 **Đảo ngược góc nhìn** — đây là kỹ thuật tư duy quan trọng nhất của bài này.
@@ -618,6 +792,88 @@ Ba bước luôn giống nhau:
 - **Điều chỉnh tham số hệ thống**: tìm mức tải tối đa mà độ trễ vẫn dưới ngưỡng (đúng mẫu "search on answer").
 - **Tìm phiên bản lỗi đầu tiên** trong CI; **rate limit tuning**; **tìm ngưỡng nhị phân** trong xử lý ảnh.
 `,
+  lessonPy: `
+## 1. Vấn đề gốc
+
+Tìm một giá trị trong n phần tử cần O(n). Nhưng nếu dữ liệu có **thứ tự**, mỗi phép so sánh
+cho ta biết đáp án nằm ở **nửa nào** — thông tin đó đáng giá gấp bội.
+
+log₂(1.000.000) ≈ 20. Từ một triệu bước xuống 20 bước.
+
+## 2. Ý tưởng cốt lõi
+
+> Tìm kiếm nhị phân **không phải** về "list đã sắp xếp".
+> Nó là về **tính đơn điệu của một vị từ (predicate)**: tồn tại một điểm cắt mà trước đó
+> điều kiện luôn sai, sau đó luôn đúng — dạng \`F F F F T T T T\`.
+
+Nếu bạn tìm được một hàm \`check(x)\` có dạng đó, bạn tìm nhị phân được — kể cả khi
+"mảng" là **tập mọi đáp án có thể**. Đó là kỹ thuật **binary search on answer**, thứ phân biệt
+người mới với người có kinh nghiệm.
+
+## 3. Mẫu code chống lỗi off-by-one
+
+Hãy dùng **một khuôn duy nhất** cho mọi bài (nửa mở \`[lo, hi)\`), đừng nhớ nhiều biến thể:
+
+\`\`\`python
+# Tìm chỉ số NHỎ NHẤT thoả check(x) là True, với check có dạng F...F T...T
+lo, hi = 0, n                    # hi nằm NGOÀI phạm vi
+while lo < hi:
+    mid = lo + (hi - lo) // 2     # // là floor division, không tràn số trong Python
+    if check(mid):
+        hi = mid                 # mid có thể là đáp án -> giữ lại
+    else:
+        lo = mid + 1              # mid chắc chắn không phải -> bỏ
+return lo                          # lo == hi == điểm chuyển F->T
+\`\`\`
+
+Với bài tìm giá trị chính xác:
+\`\`\`python
+lo, hi = 0, n - 1
+while lo <= hi:
+    mid = lo + (hi - lo) // 2
+    if a[mid] == target:
+        return mid
+    if a[mid] < target:
+        lo = mid + 1
+    else:
+        hi = mid - 1
+return -1
+\`\`\`
+
+Python cũng có \`bisect_left\`/\`bisect_right\` trong module \`bisect\` — hữu ích để tra cứu nhanh
+trên list đã sắp, nhưng trong phỏng vấn bạn vẫn nên biết tự viết vòng lặp này từ trí nhớ.
+
+## 4. Binary search on answer — mở khoá cả một lớp bài
+
+Dấu hiệu: đề hỏi **"giá trị nhỏ nhất/lớn nhất sao cho ... khả thi"**, và bạn kiểm tra được tính khả thi dễ dàng.
+
+Ví dụ *Koko ăn chuối*: "tốc độ ăn nhỏ nhất k để ăn xong trong h giờ".
+- Không gian đáp án: k ∈ [1, max(piles)].
+- \`check(k)\` = "ăn với tốc độ k có kịp trong h giờ không?" — tính trong O(n) (dùng \`math.ceil\`).
+- **Đơn điệu**: k càng lớn thì càng dễ kịp → F F F T T T. ✔ Tìm nhị phân được.
+
+Ba bước luôn giống nhau:
+1. Xác định **khoảng đáp án** [lo, hi].
+2. Viết hàm \`check(x)\` (thường là mô phỏng tham lam O(n)).
+3. Chứng minh \`check\` **đơn điệu** — nếu không đơn điệu thì không được dùng!
+
+## 5. Bẫy thường gặp
+
+- Python số nguyên không tràn (không như số 32-bit ở Java/C++), nhưng vẫn nên viết
+  \`lo + (hi-lo)//2\` thay vì \`(lo+hi)//2\` như một thói quen tốt cho phỏng vấn đa ngôn ngữ.
+- Vòng lặp vô hạn khi \`lo = mid\` mà mid không tiến. Quy tắc: nếu gán \`lo = mid\` thì phải làm tròn lên.
+- \`//\` là floor division — với số âm nó làm tròn về âm vô cực chứ không phải về 0
+  (khác với việc bạn quen \`Math.trunc\` ở JS). Cẩn thận nếu công thức tính \`mid\`/\`check\` liên quan số âm.
+- Quên rằng list xoay vòng vẫn dùng được binary search: **luôn có ít nhất một nửa đã sắp xếp**.
+- Áp binary search lên hàm không đơn điệu → kết quả sai một cách khó phát hiện.
+
+## 6. Ứng dụng thực tế
+
+- **Chỉ mục B-tree** trong database: mỗi lần truy vấn theo khoá là tìm nhị phân trên đĩa.
+- **git bisect**: tìm commit gây lỗi trong lịch sử — tìm nhị phân trên trục thời gian!
+- **Điều chỉnh tham số hệ thống**: tìm mức tải tối đa mà độ trễ vẫn dưới ngưỡng (đúng mẫu "search on answer").
+- **Tìm phiên bản lỗi đầu tiên** trong CI; **rate limit tuning**; **tìm ngưỡng nhị phân** trong xử lý ảnh.
+`,
   quiz: [
     {
       q: 'Điều kiện THỰC SỰ để dùng được tìm kiếm nhị phân là gì?',
@@ -664,6 +920,52 @@ Ba bước luôn giống nhau:
       why: 'Lỗi này từng tồn tại 9 năm trong thư viện chuẩn Java (java.util.Arrays.binarySearch). Trong JS số là 64-bit float nên ít rủi ro hơn, nhưng đây là thói quen tốt cần có khi phỏng vấn C++/Java.',
     },
   ],
+  quizPy: [
+    {
+      q: 'Điều kiện THỰC SỰ để dùng được tìm kiếm nhị phân là gì?',
+      options: [
+        'List phải được sắp xếp tăng dần',
+        'Tồn tại một vị từ đơn điệu: sai với mọi giá trị nhỏ và đúng với mọi giá trị lớn (hoặc ngược lại)',
+        'Dữ liệu phải nằm trong bộ nhớ liên tục',
+        'Số phần tử phải là luỹ thừa của 2',
+      ],
+      answer: 1,
+      why: 'List đã sắp xếp chỉ là MỘT trường hợp của tính đơn điệu. Hiểu đúng bản chất mở khoá kỹ thuật "binary search on answer" — nơi không hề có list nào cả.',
+    },
+    {
+      q: 'Trong list đã sắp bị xoay như [4,5,6,7,0,1,2], vì sao vẫn tìm nhị phân được?',
+      options: [
+        'Vì list vẫn được sắp xếp',
+        'Vì với mọi mid, luôn có ít nhất một nửa [lo..mid] hoặc [mid..hi] được sắp xếp hoàn chỉnh',
+        'Vì ta có thể sắp xếp lại list trong O(1)',
+        'Vì phần tử giữa luôn là phần tử nhỏ nhất',
+      ],
+      answer: 1,
+      why: 'Điểm xoay chỉ nằm ở MỘT nửa. Nửa còn lại sắp xếp hoàn chỉnh nên ta kiểm tra được target có nằm trong nửa đó không, rồi loại nửa kia. Vẫn O(log n).',
+    },
+    {
+      q: 'Bài "tốc độ ăn chuối nhỏ nhất để kịp h giờ" (Koko) — điều gì cho phép dùng binary search?',
+      options: [
+        'List piles đã được sắp xếp',
+        'Hàm check(k) = "ăn kịp với tốc độ k" là đơn điệu: k tăng thì từ sai chuyển sang đúng và không đảo lại',
+        'Vì h luôn lớn hơn số đống chuối',
+        'Vì piles chứa số nguyên',
+      ],
+      answer: 1,
+      why: 'Ta tìm nhị phân trên KHÔNG GIAN ĐÁP ÁN [1, max(piles)], không phải trên list piles. Điều kiện duy nhất là check đơn điệu (dùng math.ceil để tính giờ). Đây là mẫu hình đáng giá nhất của chủ đề này.',
+    },
+    {
+      q: 'Vì sao nên viết `mid = lo + (hi - lo) // 2` thay vì `mid = (lo + hi) // 2`?',
+      options: [
+        'Vì nhanh hơn nhiều trong Python',
+        'Vì tránh tràn số nguyên khi lo + hi vượt giới hạn kiểu dữ liệu (thói quen tốt dù Python không tràn số)',
+        'Vì kết quả khác nhau về mặt toán học',
+        'Vì bắt buộc trong Python',
+      ],
+      answer: 1,
+      why: 'Lỗi này từng tồn tại 9 năm trong thư viện chuẩn Java (java.util.Arrays.binarySearch). Python có số nguyên lớn tuỳ ý nên không tràn, nhưng đây là thói quen tốt cần có khi phỏng vấn đa ngôn ngữ.',
+    },
+  ],
   problems: [
     {
       id: 'binary-search-basic',
@@ -681,6 +983,7 @@ Trả về chỉ số của target, hoặc \`-1\` nếu không tồn tại. Yêu
 - \`nums = [-1,0,3,5,9,12], target = 2\` → \`-1\`
 `,
       starter: `function search(nums, target) {\n  \n}`,
+      starterPy: `def search(nums, target):\n    \n`,
       tests: [
         { args: [[-1, 0, 3, 5, 9, 12], 9], expected: 4, name: 'Tìm thấy' },
         { args: [[-1, 0, 3, 5, 9, 12], 2], expected: -1, name: 'Không tồn tại' },
@@ -693,11 +996,20 @@ Trả về chỉ số của target, hoặc \`-1\` nếu không tồn tại. Yêu
       hints: [
         'Khuôn mẫu: `lo = 0, hi = n - 1`, lặp khi `lo <= hi`. Tính mid, so sánh với target, rồi thu hẹp phạm vi.',
         'Ba nhánh: `nums[mid] === target` → trả về mid; `nums[mid] < target` → đáp án ở nửa phải (`lo = mid + 1`); ngược lại `hi = mid - 1`.',
-        'Bẫy vòng lặp vô hạn: phải là `mid + 1` và `mid - 1`, không được để `lo = mid` hoặc `hi = mid` với `while (lo <= hi)`. Test [1,2] tìm 2 sẽ phát hiện lỗi này ngay.',
+        'Bẫy vòng lặp vô hạn: phải là `mid + 1` và `mid - 1`, không được để `lo = mid` hoặc `hi = mid` với `while lo <= hi`. Test [1,2] tìm 2 sẽ phát hiện lỗi này ngay.',
+      ],
+      hintsPy: [
+        'Khuôn mẫu: `lo, hi = 0, len(nums) - 1`, lặp khi `lo <= hi`. Tính mid, so sánh với target, rồi thu hẹp phạm vi.',
+        'Ba nhánh: `nums[mid] == target` → trả về mid; `nums[mid] < target` → đáp án ở nửa phải (`lo = mid + 1`); ngược lại `hi = mid - 1`.',
+        'Bẫy vòng lặp vô hạn: phải là `mid + 1` và `mid - 1`, không được để `lo = mid` hoặc `hi = mid` với `while lo <= hi`. Test [1,2] tìm 2 sẽ phát hiện lỗi này ngay.',
       ],
       diagnostics: [
         { test: 'indexOf\\s*\\(|\\.find\\s*\\(|includes\\s*\\(', message: 'Dùng hàm dựng sẵn là O(n) và né tránh mục tiêu bài học. Hãy tự cài đặt vòng lặp nhị phân.' },
         { test: 'lo\\s*=\\s*mid\\s*;|hi\\s*=\\s*mid\\s*;', message: 'Gán `lo = mid` hoặc `hi = mid` với vòng `while (lo <= hi)` sẽ gây lặp vô hạn. Dùng `mid + 1` / `mid - 1`.' },
+      ],
+      diagnosticsPy: [
+        { test: '\\.index\\s*\\(|\\bin\\s+nums\\b', message: 'Dùng `nums.index(...)`/`in nums` là O(n) và né tránh mục tiêu bài học. Hãy tự cài đặt vòng lặp nhị phân.' },
+        { test: 'lo\\s*=\\s*mid\\s*\\n|hi\\s*=\\s*mid\\s*\\n', message: 'Gán `lo = mid` hoặc `hi = mid` với vòng `while lo <= hi` sẽ gây lặp vô hạn. Dùng `mid + 1` / `mid - 1`.' },
       ],
       approach: `
 Bài này đơn giản nhưng **phải viết đúng từ trí nhớ, không cần thử-sai**. Người phỏng vấn để ý điều đó.
@@ -758,6 +1070,7 @@ Cho \`nums\` và \`target\`, trả về chỉ số của target hoặc \`-1\`. Y
 - \`nums = [4,5,6,7,0,1,2], target = 3\` → \`-1\`
 `,
       starter: `function searchRotated(nums, target) {\n  \n}`,
+      starterPy: `def searchRotated(nums, target):\n    \n`,
       tests: [
         { args: [[4, 5, 6, 7, 0, 1, 2], 0], expected: 4, name: 'Ở nửa sau' },
         { args: [[4, 5, 6, 7, 0, 1, 2], 3], expected: -1, name: 'Không tồn tại' },
@@ -773,9 +1086,18 @@ Cho \`nums\` và \`target\`, trả về chỉ số của target hoặc \`-1\`. Y
         'Cách nhận biết nửa trái đã sắp xếp: `nums[lo] <= nums[mid]`. Khi đó nếu `nums[lo] <= target < nums[mid]` thì target nằm trong nửa trái → `hi = mid - 1`; ngược lại `lo = mid + 1`.',
         'Nếu nửa trái KHÔNG sắp xếp thì nửa phải chắc chắn sắp xếp: kiểm tra `nums[mid] < target <= nums[hi]` → `lo = mid + 1`; ngược lại `hi = mid - 1`. Vẽ ra giấy 2 trường hợp này, đừng học vẹt.',
       ],
+      hintsPy: [
+        'Quan sát mấu chốt: với bất kỳ `mid` nào, **ít nhất một trong hai nửa** `[lo..mid]` và `[mid..hi]` là dãy tăng hoàn chỉnh (không chứa điểm xoay).',
+        'Cách nhận biết nửa trái đã sắp xếp: `nums[lo] <= nums[mid]`. Khi đó nếu `nums[lo] <= target < nums[mid]` thì target nằm trong nửa trái → `hi = mid - 1`; ngược lại `lo = mid + 1`.',
+        'Nếu nửa trái KHÔNG sắp xếp thì nửa phải chắc chắn sắp xếp: kiểm tra `nums[mid] < target <= nums[hi]` → `lo = mid + 1`; ngược lại `hi = mid - 1`. Python cho phép viết chuỗi so sánh `a <= x < b` trực tiếp, gọn hơn JS.',
+      ],
       diagnostics: [
         { test: 'indexOf\\s*\\(|for\\s*\\([^)]*\\)\\s*\\{?\\s*if\\s*\\([^)]*===\\s*target', message: 'Quét tuyến tính là O(n) — đề yêu cầu O(log n). Hãy khai thác việc luôn có một nửa đã sắp xếp.' },
         { test: 'sort\\s*\\(', message: 'Sắp xếp lại là O(n log n), tệ hơn cả quét tuyến tính về mặt mục tiêu bài học.' },
+      ],
+      diagnosticsPy: [
+        { test: '\\.index\\s*\\(|for\\s+\\w+.*:\\s*\\n\\s*if[\\s\\S]{0,40}==\\s*target', message: 'Quét tuyến tính là O(n) — đề yêu cầu O(log n). Hãy khai thác việc luôn có một nửa đã sắp xếp.' },
+        { test: '\\.sort\\s*\\(\\)|sorted\\s*\\(', message: 'Sắp xếp lại là O(n log n), tệ hơn cả quét tuyến tính về mặt mục tiêu bài học.' },
       ],
       approach: `
 **Ý tưởng:** mảng xoay = hai đoạn tăng dần nối nhau. Điểm xoay chỉ nằm ở **một** nửa.
@@ -858,6 +1180,7 @@ Mảng đã sắp tăng dần (phần tử phân biệt) bị xoay. Tìm **phầ
 - \`[11,13,15,17]\` → \`11\` (không xoay)
 `,
       starter: `function findMin(nums) {\n  \n}`,
+      starterPy: `def findMin(nums):\n    \n`,
       tests: [
         { args: [[3, 4, 5, 1, 2]], expected: 1, name: 'Xoay 3 bước' },
         { args: [[4, 5, 6, 7, 0, 1, 2]], expected: 0, name: 'Xoay 4 bước' },
@@ -872,9 +1195,18 @@ Mảng đã sắp tăng dần (phần tử phân biệt) bị xoay. Tìm **phầ
         'Nếu `nums[mid] > nums[hi]`: điểm xoay (và giá trị nhỏ nhất) nằm **bên phải** mid → `lo = mid + 1`. Ngược lại, min nằm ở mid hoặc bên trái → `hi = mid`.',
         'Dùng khuôn `while (lo < hi)` với `hi = mid` (không phải `mid - 1`, vì mid có thể chính là đáp án). Kết thúc khi `lo === hi` → trả về `nums[lo]`.',
       ],
+      hintsPy: [
+        'Đừng so `nums[mid]` với `nums[lo]`. Hãy so **`nums[mid]` với `nums[hi]`** — đây là mẹo khiến bài trở nên đơn giản bất ngờ.',
+        'Nếu `nums[mid] > nums[hi]`: điểm xoay (và giá trị nhỏ nhất) nằm **bên phải** mid → `lo = mid + 1`. Ngược lại, min nằm ở mid hoặc bên trái → `hi = mid`.',
+        'Dùng khuôn `while lo < hi` với `hi = mid` (không phải `mid - 1`, vì mid có thể chính là đáp án). Kết thúc khi `lo == hi` → trả về `nums[lo]`.',
+      ],
       diagnostics: [
         { test: 'Math\\.min\\s*\\(\\s*\\.\\.\\.|\\.sort\\s*\\(', message: '`Math.min(...nums)` hay sort là O(n) / O(n log n). Đề yêu cầu O(log n).' },
         { test: 'hi\\s*=\\s*mid\\s*-\\s*1', message: 'Cẩn thận: `hi = mid - 1` có thể làm mất chính phần tử nhỏ nhất (khi mid đang đứng đúng đáp án). Dùng `hi = mid` với vòng `while (lo < hi)`.' },
+      ],
+      diagnosticsPy: [
+        { test: 'min\\s*\\(\\s*nums\\s*\\)|\\.sort\\s*\\(\\)|sorted\\s*\\(', message: '`min(nums)` hay sort là O(n) / O(n log n). Đề yêu cầu O(log n).' },
+        { test: 'hi\\s*=\\s*mid\\s*-\\s*1', message: 'Cẩn thận: `hi = mid - 1` có thể làm mất chính phần tử nhỏ nhất (khi mid đang đứng đúng đáp án). Dùng `hi = mid` với vòng `while lo < hi`.' },
       ],
       approach: `
 **Vì sao so với \`nums[hi]\` mà không phải \`nums[lo]\`?**
@@ -952,6 +1284,7 @@ Tìm **tốc độ k nhỏ nhất** để ăn hết trong \`h\` giờ.
 - \`piles = [30,11,23,4,20], h = 6\` → \`23\`
 `,
       starter: `function minEatingSpeed(piles, h) {\n  \n}`,
+      starterPy: `def minEatingSpeed(piles, h):\n    \n`,
       tests: [
         { args: [[3, 6, 7, 11], 8], expected: 4, name: 'Ví dụ 1' },
         { args: [[30, 11, 23, 4, 20], 5], expected: 30, name: 'h = số đống → phải ăn nhanh nhất' },
@@ -965,9 +1298,18 @@ Tìm **tốc độ k nhỏ nhất** để ăn hết trong \`h\` giờ.
         'Viết hàm `hours(k)` = tổng `Math.ceil(p / k)` cho mọi đống. Nhận xét then chốt: k càng lớn thì `hours(k)` càng nhỏ → vị từ `hours(k) <= h` có dạng F F F **T T T**.',
         'Áp khuôn "tìm chỉ số nhỏ nhất thoả điều kiện": `lo=1, hi=max(piles)`; `while (lo < hi) { mid; if (hours(mid) <= h) hi = mid; else lo = mid + 1; }` → trả về `lo`. Test `[1000000000], h=2` sẽ đánh trượt mọi lời giải duyệt k từ 1.',
       ],
+      hintsPy: [
+        'Đây KHÔNG phải bài tìm kiếm trên list `piles`. Hãy tìm nhị phân trên **không gian đáp án**: k nằm trong khoảng [1, max(piles)].',
+        'Viết hàm `hours(k)` = tổng `math.ceil(p / k)` cho mọi đống (`import math`). Nhận xét then chốt: k càng lớn thì `hours(k)` càng nhỏ → vị từ `hours(k) <= h` có dạng F F F **T T T**.',
+        'Áp khuôn "tìm chỉ số nhỏ nhất thoả điều kiện": `lo, hi = 1, max(piles)`; `while lo < hi: mid = ...; if hours(mid) <= h: hi = mid; else: lo = mid + 1` → trả về `lo`. Test `[1000000000], h=2` sẽ đánh trượt mọi lời giải duyệt k từ 1.',
+      ],
       diagnostics: [
         { test: 'for\\s*\\(\\s*(let|var)\\s+k\\s*=\\s*1', message: 'Duyệt k từ 1 tăng dần là O(max(piles) · n) — test với đống 1 tỷ quả sẽ hết giờ. Hãy tìm nhị phân trên k.' },
         { test: 'Math\\.floor\\s*\\([^)]*\\/', message: 'Số giờ cho một đống là `Math.ceil(p / k)` chứ không phải floor — ăn dư một phần giờ vẫn tính trọn giờ.' },
+      ],
+      diagnosticsPy: [
+        { test: 'for\\s+k\\s+in\\s+range\\s*\\(\\s*1', message: 'Duyệt k từ 1 tăng dần là O(max(piles) · n) — test với đống 1 tỷ quả sẽ hết giờ. Hãy tìm nhị phân trên k.' },
+        { test: '\\/\\/', message: 'Số giờ cho một đống là `math.ceil(p / k)` chứ không phải floor division `//` — ăn dư một phần giờ vẫn tính trọn giờ.' },
       ],
       approach: `
 **Đây là bài quan trọng nhất của chủ đề.** Nó dạy bạn rằng binary search không cần mảng.
@@ -1111,6 +1453,89 @@ Mỗi bước, khoảng cách giữa chúng trong vòng giảm đúng 1 → ch�
 - **Blockchain** là một danh sách liên kết mà mỗi nút trỏ ngược bằng hash.
 - **Xử lý va chạm hash** bằng chaining: mỗi bucket là một linked list.
 `,
+  lessonPy: `
+## 1. Vấn đề gốc
+
+List (array) có nhược điểm chí mạng: **chèn/xoá ở giữa tốn O(n)** vì phải dịch chuyển toàn bộ phần đuôi.
+Danh sách liên kết đổi lại: chèn/xoá tại một nút đã biết chỉ tốn **O(1)** — chỉ cần đổi vài con trỏ \`.next\`.
+Cái giá phải trả: mất truy cập ngẫu nhiên (muốn tới phần tử thứ k phải đi từ đầu).
+
+| | List (array) | Linked List |
+|---|---|---|
+| Truy cập phần tử thứ k | O(1) | O(k) |
+| Chèn/xoá tại vị trí đã biết | O(n) | **O(1)** |
+| Bộ nhớ | liên tục, cache-friendly | rời rạc, mỗi nút tốn thêm con trỏ |
+
+## 2. Ý tưởng cốt lõi
+
+> Làm việc với linked list = **duy trì bất biến trên vài con trỏ**.
+> Luôn vẽ sơ đồ trước khi viết code. Người giỏi nhất cũng vẽ.
+
+Trong Python, một nút thường là một class đơn giản:
+\`\`\`python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val = val
+        self.next = next
+\`\`\`
+(Trong bài tập, lớp \`ListNode\` đã có sẵn — không cần tự định nghĩa lại.)
+
+Ba kỹ thuật giải quyết ~90% bài:
+
+**(a) Nút giả (dummy node)** — xoá bỏ mọi trường hợp đặc biệt ở đầu danh sách:
+\`\`\`python
+dummy = ListNode(0, head)
+# ...thao tác...
+return dummy.next      # không cần if head is None rải rác
+\`\`\`
+
+**(b) Hai con trỏ nhanh/chậm** — tìm giữa, phát hiện chu trình, lấy nút thứ k từ cuối:
+\`\`\`python
+slow = fast = head
+while fast and fast.next:
+    slow = slow.next
+    fast = fast.next.next
+# slow đang ở giữa danh sách
+\`\`\`
+
+**(c) Đảo con trỏ** — mẫu ba biến kinh điển:
+\`\`\`python
+prev, cur = None, head
+while cur:
+    nxt = cur.next     # 1. NHỚ trước khi phá
+    cur.next = prev    # 2. đảo mũi tên
+    prev = cur         # 3. tiến prev
+    cur = nxt          # 4. tiến cur
+return prev             # prev là đầu mới
+\`\`\`
+
+## 3. Vì sao rùa & thỏ phát hiện được chu trình?
+
+Nếu có vòng lặp, con trỏ nhanh (2 bước) sẽ vào vòng và **đuổi kịp** con chậm (1 bước).
+Mỗi bước, khoảng cách giữa chúng trong vòng giảm đúng 1 → chắc chắn gặp nhau sau tối đa
+(độ dài vòng) bước. Nếu không có vòng, con nhanh chạm \`None\` trước. Đây là thuật toán
+**Floyd cycle detection** — O(n) thời gian, **O(1) bộ nhớ**, đẹp hơn hẳn cách dùng \`set\` O(n) bộ nhớ.
+
+## 4. Bẫy thường gặp
+
+- **Mất con trỏ**: gán \`cur.next = prev\` trước khi lưu \`nxt\` → mất phần đuôi vĩnh viễn.
+- **Truy cập None**: luôn kiểm tra \`fast and fast.next\` trước khi \`fast.next.next\`.
+- **Quên cập nhật head** khi xoá nút đầu → dùng dummy node là hết lo.
+- **Tạo vòng lặp vô tình** khi nối sai thứ tự → chương trình treo (và trong Pyodide sẽ bị timeout).
+- **So sánh bằng \`is\` chứ không \`==\`** khi kiểm tra hai nút có phải cùng một đối tượng
+  (ví dụ phát hiện chu trình: \`slow is fast\`, không phải \`slow == fast\` — vì \`ListNode\` không định nghĩa \`__eq__\`
+  nên \`==\` mặc định cũng hoạt động như \`is\`, nhưng dùng \`is\` cho rõ ý định).
+
+## 5. Ứng dụng thực tế
+
+- **LRU Cache** = dict (hash map) + doubly linked list (bài phỏng vấn hệ thống kinh điển,
+  cũng chính là cách \`functools.lru_cache\` của Python được cài đặt bên trong CPython).
+- **Quản lý bộ nhớ**: free list của bộ cấp phát; danh sách tiến trình trong kernel.
+- **Undo/redo, lịch sử duyệt web**: danh sách liên kết đôi.
+- **Blockchain** là một danh sách liên kết mà mỗi nút trỏ ngược bằng hash.
+- **Xử lý va chạm hash** bằng chaining: mỗi bucket là một linked list (bên trong \`dict\` của CPython
+  không dùng chaining mà dùng open addressing, nhưng nhiều cài đặt hash table khác thì có).
+`,
   quiz: [
     {
       q: 'Vì sao dùng "nút giả" (dummy node) lại giúp code ngắn và ít lỗi hơn?',
@@ -1157,6 +1582,52 @@ Mỗi bước, khoảng cách giữa chúng trong vòng giảm đúng 1 → ch�
       why: 'HashMap cho tra cứu O(1); danh sách liên kết đôi cho phép tách và chuyển một nút lên đầu trong O(1). Không cấu trúc đơn lẻ nào làm được cả hai — đây là bài học về kết hợp cấu trúc dữ liệu.',
     },
   ],
+  quizPy: [
+    {
+      q: 'Vì sao dùng "nút giả" (dummy node) lại giúp code ngắn và ít lỗi hơn?',
+      options: [
+        'Vì tiết kiệm bộ nhớ',
+        'Vì nó loại bỏ trường hợp đặc biệt "thao tác trên nút đầu" — mọi nút thật đều có nút đứng trước',
+        'Vì làm thuật toán chạy nhanh hơn',
+        'Vì bắt buộc trong Python',
+      ],
+      answer: 1,
+      why: 'Phần lớn lỗi trong bài linked list nằm ở việc xử lý head. Dummy node biến head thành một nút bình thường → không cần rẽ nhánh đặc biệt.',
+    },
+    {
+      q: 'Trong thuật toán rùa-thỏ, vì sao thỏ (2 bước) chắc chắn gặp rùa (1 bước) nếu có chu trình?',
+      options: [
+        'Vì thỏ nhanh gấp đôi nên luôn về đích trước',
+        'Vì khi cả hai đã vào vòng, khoảng cách giữa chúng giảm đúng 1 sau mỗi bước nên sẽ về 0',
+        'Vì chu trình luôn có độ dài chẵn',
+        'Vì thỏ đi qua tất cả các nút',
+      ],
+      answer: 1,
+      why: 'Đây là lập luận cốt lõi. Vận tốc tương đối = 2-1 = 1, nên khoảng cách trong vòng giảm dần đều và không thể "nhảy qua" nhau.',
+    },
+    {
+      q: 'Trong mẫu đảo danh sách, vì sao BẮT BUỘC lưu `nxt = cur.next` trước khi gán `cur.next = prev`?',
+      options: [
+        'Để code dễ đọc hơn',
+        'Vì sau khi gán, con trỏ tới phần đuôi danh sách bị mất vĩnh viễn',
+        'Vì Python không cho phép gán trực tiếp',
+        'Để tránh rò rỉ bộ nhớ',
+      ],
+      answer: 1,
+      why: 'Thuộc tính `cur.next` là ĐƯỜNG DUY NHẤT tới phần còn lại. Ghi đè nó mà chưa lưu = mất dữ liệu. Đây là lỗi phổ biến nhất khi làm linked list.',
+    },
+    {
+      q: 'Cấu trúc nào phù hợp nhất để cài LRU Cache với get/put trong O(1)?',
+      options: [
+        'List + tìm kiếm nhị phân',
+        'dict kết hợp danh sách liên kết đôi',
+        'Cây tìm kiếm nhị phân cân bằng',
+        'Hai ngăn xếp',
+      ],
+      answer: 1,
+      why: 'dict cho tra cứu O(1); danh sách liên kết đôi cho phép tách và chuyển một nút lên đầu trong O(1). Không cấu trúc đơn lẻ nào làm được cả hai — bản thân `functools.lru_cache` trong CPython dùng đúng tổ hợp này.',
+    },
+  ],
   problems: [
     {
       id: 'reverse-linked-list',
@@ -1176,7 +1647,9 @@ Lớp \`ListNode\` đã có sẵn: \`new ListNode(val, next)\` với thuộc tí
 Hệ thống chấm sẽ tự chuyển mảng thành danh sách và ngược lại.
 `,
       starter: `function reverseList(head) {\n  // head là một ListNode (hoặc null)\n  \n}`,
+      starterPy: `def reverseList(head):\n    # head la mot ListNode (hoac None)\n    \n`,
       harnessSrc: `(fn, args) => listToArray(fn(buildList(args[0])))`,
+      harnessSrcPy: `lambda fn, args, t: listToArray(fn(buildList(args[0])))`,
       tests: [
         { args: [[1, 2, 3, 4, 5]], expected: [5, 4, 3, 2, 1], name: 'Năm phần tử' },
         { args: [[1, 2]], expected: [2, 1], name: 'Hai phần tử' },
@@ -1189,9 +1662,18 @@ Hệ thống chấm sẽ tự chuyển mảng thành danh sách và ngược l�
         'Thứ tự bốn dòng lệnh là bất di bất dịch: (1) `next = cur.next`; (2) `cur.next = prev`; (3) `prev = cur`; (4) `cur = next`.',
         'Khi vòng lặp kết thúc, `cur === null` và `prev` chính là đầu danh sách mới. Đừng trả về `head` — nó đã trở thành đuôi rồi!',
       ],
+      hintsPy: [
+        'Vẽ ra giấy: `None <- 1 <- 2  3 -> 4 -> 5`. Bạn cần ba con trỏ: `prev` (phần đã đảo), `cur` (đang xử lý), `nxt` (phần chưa đụng tới).',
+        'Thứ tự bốn dòng lệnh là bất di bất dịch: (1) `nxt = cur.next`; (2) `cur.next = prev`; (3) `prev = cur`; (4) `cur = nxt`.',
+        'Khi vòng lặp kết thúc, `cur is None` và `prev` chính là đầu danh sách mới. Đừng trả về `head` — nó đã trở thành đuôi rồi!',
+      ],
       diagnostics: [
         { test: 'return\\s+head\\s*;?\\s*\\}?\\s*$', message: 'Sau khi đảo, `head` trở thành nút CUỐI. Bạn cần trả về `prev`.' },
         { test: 'push|\\[\\]|Array', message: 'Chép giá trị ra mảng rồi tạo danh sách mới thì chạy đúng nhưng tốn O(n) bộ nhớ và né tránh mục tiêu bài học. Hãy đảo con trỏ tại chỗ với O(1) bộ nhớ.' },
+      ],
+      diagnosticsPy: [
+        { test: 'return\\s+head\\s*$', message: 'Sau khi đảo, `head` trở thành nút CUỐI. Bạn cần trả về `prev`.' },
+        { test: '\\.append\\s*\\(|^\\s*\\[\\]', message: 'Chép giá trị ra list rồi tạo danh sách mới thì chạy đúng nhưng tốn O(n) bộ nhớ và né tránh mục tiêu bài học. Hãy đảo con trỏ tại chỗ với O(1) bộ nhớ.' },
       ],
       approach: `
 **Bất biến (viết ra trước khi code):**
@@ -1265,7 +1747,9 @@ bằng cách **nối lại các nút có sẵn** (không tạo nút mới).
 - \`[]\` và \`[0]\` → \`[0]\`
 `,
       starter: `function mergeTwoLists(list1, list2) {\n  \n}`,
+      starterPy: `def mergeTwoLists(list1, list2):\n    \n`,
       harnessSrc: `(fn, args) => listToArray(fn(buildList(args[0]), buildList(args[1])))`,
+      harnessSrcPy: `lambda fn, args, t: listToArray(fn(buildList(args[0]), buildList(args[1])))`,
       tests: [
         { args: [[1, 2, 4], [1, 3, 4]], expected: [1, 1, 2, 3, 4, 4], name: 'Ví dụ chuẩn' },
         { args: [[], []], expected: [], name: 'Cả hai rỗng' },
@@ -1277,11 +1761,20 @@ bằng cách **nối lại các nút có sẵn** (không tạo nút mới).
       hints: [
         'Dùng **nút giả**: `const dummy = new ListNode(0); let tail = dummy;`. Nhờ đó bạn không cần xử lý riêng trường hợp chọn phần tử đầu tiên.',
         'Vòng lặp khi cả hai danh sách còn nút: so `list1.val` với `list2.val`, nối nút nhỏ hơn vào `tail.next`, rồi dịch con trỏ tương ứng và dịch `tail`.',
-        'Khi một danh sách hết, phần còn lại của danh sách kia **đã sắp xếp sẵn** → chỉ cần `tail.next = list1 || list2`. Cuối cùng trả về `dummy.next`.',
+        'Khi một danh sách hết, phần còn lại của danh sách kia **đã sắp xếp sẵn** → chỉ cần `tail.next = list1 or list2`. Cuối cùng trả về `dummy.next`.',
+      ],
+      hintsPy: [
+        'Dùng **nút giả**: `dummy = ListNode(0); tail = dummy`. Nhờ đó bạn không cần xử lý riêng trường hợp chọn phần tử đầu tiên.',
+        'Vòng lặp khi cả hai danh sách còn nút: so `list1.val` với `list2.val`, nối nút nhỏ hơn vào `tail.next`, rồi dịch con trỏ tương ứng và dịch `tail`.',
+        'Khi một danh sách hết, phần còn lại của danh sách kia **đã sắp xếp sẵn** → chỉ cần `tail.next = list1 or list2`. Cuối cùng trả về `dummy.next`.',
       ],
       diagnostics: [
         { test: 'sort\\s*\\(', message: 'Đổ ra mảng rồi sort là O((n+m) log(n+m)) và tốn bộ nhớ. Hai danh sách đã sắp xếp — chỉ cần trộn tuyến tính O(n+m).' },
         { test: 'new ListNode\\([\\s\\S]{0,40}\\.val', message: 'Đề yêu cầu nối lại các nút CÓ SẴN. Tạo nút mới cho từng giá trị làm tăng bộ nhớ không cần thiết (dù vẫn qua test).' },
+      ],
+      diagnosticsPy: [
+        { test: '\\.sort\\s*\\(\\)|sorted\\s*\\(', message: 'Đổ ra list rồi sort là O((n+m) log(n+m)) và tốn bộ nhớ. Hai danh sách đã sắp xếp — chỉ cần trộn tuyến tính O(n+m).' },
+        { test: 'ListNode\\([\\s\\S]{0,40}\\.val', message: 'Đề yêu cầu nối lại các nút CÓ SẴN. Tạo nút mới cho từng giá trị làm tăng bộ nhớ không cần thiết (dù vẫn qua test).' },
       ],
       approach: `
 Đây chính là bước "merge" trong **merge sort** — thuật toán nền tảng của việc sắp xếp dữ liệu lớn hơn RAM.
@@ -1356,6 +1849,7 @@ Hệ thống chấm nhận tham số \`(mảng_giá_trị, pos)\`: \`pos\` là c
 - \`[1,2], pos = -1\` → \`false\`
 `,
       starter: `function hasCycle(head) {\n  \n}`,
+      starterPy: `def hasCycle(head):\n    \n`,
       harnessSrc: `(fn, args) => {
         const [arr, pos] = args;
         const head = buildList(arr);
@@ -1368,6 +1862,7 @@ Hệ thống chấm nhận tham số \`(mảng_giá_trị, pos)\`: \`pos\` là c
         }
         return fn(head) === true;
       }`,
+      harnessSrcPy: `lambda fn, args, t: fn(buildCycleList(args[0], args[1])) is True`,
       tests: [
         { args: [[3, 2, 0, -4], 1], expected: true, name: 'Có chu trình' },
         { args: [[1, 2], 0], expected: true, name: 'Chu trình về đầu' },
@@ -1382,9 +1877,18 @@ Hệ thống chấm nhận tham số \`(mảng_giá_trị, pos)\`: \`pos\` là c
         'Ý tưởng rùa & thỏ: cho `slow` đi 1 bước, `fast` đi 2 bước. Nếu có vòng, thỏ sẽ đuổi kịp rùa. Nếu không có vòng, thỏ chạm `null` trước.',
         'Điều kiện vòng lặp phải là `while (fast && fast.next)` — kiểm tra CẢ HAI trước khi làm `fast.next.next`, nếu không sẽ lỗi truy cập null. Kiểm tra `slow === fast` **sau** khi dịch chuyển, nếu không thì ngay bước đầu chúng đã bằng nhau.',
       ],
+      hintsPy: [
+        'Cách dễ: dùng `set` lưu các nút đã thăm, gặp lại nút cũ → có chu trình. Đúng, nhưng tốn O(n) bộ nhớ. Đề thách thức O(1).',
+        'Ý tưởng rùa & thỏ: cho `slow` đi 1 bước, `fast` đi 2 bước. Nếu có vòng, thỏ sẽ đuổi kịp rùa. Nếu không có vòng, thỏ chạm `None` trước.',
+        'Điều kiện vòng lặp phải là `while fast and fast.next` — kiểm tra CẢ HAI trước khi làm `fast.next.next`, nếu không sẽ lỗi `AttributeError: NoneType has no attribute next`. Kiểm tra `slow is fast` **sau** khi dịch chuyển, nếu không thì ngay bước đầu chúng đã bằng nhau.',
+      ],
       diagnostics: [
         { test: 'new Set|new Map', message: 'Cách dùng Set chạy đúng nhưng tốn O(n) bộ nhớ. Hãy thử lại bằng rùa & thỏ để đạt O(1) — đây là điều người phỏng vấn muốn thấy.' },
         { test: 'fast\\.next\\.next[\\s\\S]{0,80}while\\s*\\(\\s*fast\\s*\\)', message: 'Điều kiện `while (fast)` chưa đủ: `fast.next` có thể là null khi bạn gọi `fast.next.next`. Dùng `while (fast && fast.next)`.' },
+      ],
+      diagnosticsPy: [
+        { test: '\\bset\\s*\\(\\)|=\\s*set\\s*\\(\\)', message: 'Cách dùng set chạy đúng nhưng tốn O(n) bộ nhớ. Hãy thử lại bằng rùa & thỏ để đạt O(1) — đây là điều người phỏng vấn muốn thấy.' },
+        { test: 'while\\s+fast\\s*:', message: 'Điều kiện `while fast:` chưa đủ: `fast.next` có thể là `None` khi bạn gọi `fast.next.next`. Dùng `while fast and fast.next:`.' },
       ],
       approach: `
 **Thuật toán Floyd (rùa & thỏ)** — một trong những thuật toán đẹp nhất của khoa học máy tính.
@@ -1453,7 +1957,9 @@ Cho \`head\` và số \`n\`, xoá nút thứ \`n\` **tính từ cuối** danh s�
 - \`[1,2], n = 2\` → \`[2]\` (xoá nút đầu)
 `,
       starter: `function removeNthFromEnd(head, n) {\n  \n}`,
+      starterPy: `def removeNthFromEnd(head, n):\n    \n`,
       harnessSrc: `(fn, args) => listToArray(fn(buildList(args[0]), args[1]))`,
+      harnessSrcPy: `lambda fn, args, t: listToArray(fn(buildList(args[0]), args[1]))`,
       tests: [
         { args: [[1, 2, 3, 4, 5], 2], expected: [1, 2, 3, 5], name: 'Ví dụ chuẩn' },
         { args: [[1], 1], expected: [], name: 'Xoá nút duy nhất' },
@@ -1467,9 +1973,18 @@ Cho \`head\` và số \`n\`, xoá nút thứ \`n\` **tính từ cuối** danh s�
         'Mẹo **khoảng cách cố định**: cho con trỏ `fast` đi trước `n` bước. Sau đó cho cả `fast` và `slow` đi cùng nhau. Khi `fast` chạm cuối, `slow` cách cuối đúng n bước.',
         'Bẫy lớn nhất là xoá **nút đầu** (n = độ dài). Dùng dummy node: `const dummy = new ListNode(0, head); let slow = dummy;` — khi đó `slow` luôn dừng ở nút TRƯỚC nút cần xoá, và bạn trả về `dummy.next`.',
       ],
+      hintsPy: [
+        'Vấn đề: bạn không biết độ dài. Cách 2 lượt (đếm rồi xoá) là hợp lệ, nhưng hãy thử làm trong 1 lượt.',
+        'Mẹo **khoảng cách cố định**: cho con trỏ `fast` đi trước `n` bước. Sau đó cho cả `fast` và `slow` đi cùng nhau. Khi `fast` chạm cuối, `slow` cách cuối đúng n bước.',
+        'Bẫy lớn nhất là xoá **nút đầu** (n = độ dài). Dùng dummy node: `dummy = ListNode(0, head); slow = dummy` — khi đó `slow` luôn dừng ở nút TRƯỚC nút cần xoá, và bạn trả về `dummy.next`.',
+      ],
       diagnostics: [
         { test: 'length|count\\+\\+[\\s\\S]{0,200}for', message: 'Cách hai lượt (đếm độ dài rồi duyệt lại) chạy đúng. Hãy thử phiên bản một lượt bằng hai con trỏ cách nhau n bước.' },
         { test: 'return\\s+head', message: 'Nếu xoá chính nút đầu, `head` cũ không còn hợp lệ. Dùng dummy node và trả về `dummy.next`.' },
+      ],
+      diagnosticsPy: [
+        { test: 'len\\s*\\(|count\\s*\\+=\\s*1[\\s\\S]{0,200}for', message: 'Cách hai lượt (đếm độ dài rồi duyệt lại) chạy đúng. Hãy thử phiên bản một lượt bằng hai con trỏ cách nhau n bước.' },
+        { test: 'return\\s+head\\s*$', message: 'Nếu xoá chính nút đầu, `head` cũ không còn hợp lệ. Dùng dummy node và trả về `dummy.next`.' },
       ],
       approach: `
 **Kỹ thuật: hai con trỏ cách nhau một khoảng cố định.**

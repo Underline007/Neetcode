@@ -16,6 +16,7 @@ const EMPTY = () => ({
   days: {},                 // dayNumber -> { doneAt }
   log: [],                  // { at, type, ref, points }
   theme: 'dark',
+  lang: 'javascript',       // ngôn ngữ đang chọn để duyệt/học: 'javascript' | 'python'
 });
 
 let state = load();
@@ -132,4 +133,5 @@ export const store = {
   },
 
   setTheme(t) { state.theme = t; persist(); },
+  setLang(l) { state.lang = l; persist(); },
 };

@@ -1,26 +1,32 @@
-import { topicById } from '../data/index.js';
+import { topicById as jsTopicById } from '../data/index.js';
 import { store } from '../store.js';
 import { $, $$, esc, toast } from '../ui.js';
 import { md } from '../markdown.js';
+import { pick } from '../lang.js';
 
-export function renderQuiz(topicId) {
+const JS_DOMAIN = { topicById: jsTopicById, basePath: '' };
+const curLang = () => store.get().lang || 'javascript';
+
+export function renderQuiz(topicId, domain = JS_DOMAIN) {
+  const { topicById, basePath } = domain;
   const t = topicById.get(topicId);
   if (!t) return '<h1>Không tìm thấy quiz</h1>';
   const rec = store.quiz(t.id);
+  const quizQs = pick(t, 'quiz', curLang());
 
   return `
     <div class="row">
-      <a class="btn ghost small" href="#/topic/${t.id}">← ${t.icon} ${esc(t.name)}</a>
+      <a class="btn ghost small" href="#${basePath}/topic/${t.id}">← ${t.icon} ${esc(t.name)}</a>
       ${rec.attempts ? `<span class="badge${rec.best >= 75 ? ' ok' : ''}">Điểm cao nhất: ${rec.best}%</span>` : ''}
       <span class="spacer"></span>
-      <span class="muted small">${t.quiz.length} câu</span>
+      <span class="muted small">${quizQs.length} câu</span>
     </div>
 
     <h1 style="margin-top:12px">🧠 Kiểm tra hiểu bản chất</h1>
     <p class="sub">Các câu hỏi này không kiểm tra bạn có nhớ code hay không, mà kiểm tra bạn có hiểu <strong>vì sao</strong> thuật toán đúng. Đạt ≥ 75% mới tính là nắm được chủ đề.</p>
 
     <div id="quiz">
-      ${t.quiz.map((q, i) => `
+      ${quizQs.map((q, i) => `
         <div class="quiz-q" data-q="${i}">
           <strong>Câu ${i + 1}. ${esc(q.q).replace(/\n/g, '<br>')}</strong>
           <div style="margin-top:8px">
@@ -38,10 +44,12 @@ export function renderQuiz(topicId) {
   `;
 }
 
-export function mountQuiz(topicId) {
+export function mountQuiz(topicId, domain = JS_DOMAIN) {
+  const { topicById, basePath } = domain;
   const t = topicById.get(topicId);
   if (!t) return;
-  const answers = new Array(t.quiz.length).fill(null);
+  const quizQs = pick(t, 'quiz', curLang());
+  const answers = new Array(quizQs.length).fill(null);
 
   $$('.quiz-q').forEach((qEl) => {
     const qi = Number(qEl.dataset.q);
@@ -61,7 +69,7 @@ export function mountQuiz(topicId) {
     let correct = 0;
     $$('.quiz-q').forEach((qEl) => {
       const qi = Number(qEl.dataset.q);
-      const q = t.quiz[qi];
+      const q = quizQs[qi];
       qEl.dataset.done = '1';
       $$('.opt', qEl).forEach((o, j) => {
         o.classList.remove('selected');
@@ -73,7 +81,7 @@ export function mountQuiz(topicId) {
         `<div class="hint"><strong>${answers[qi] === q.answer ? '✅ Đúng.' : '❌ Chưa đúng.'}</strong> ${md(q.why).replace(/^<p>|<\/p>$/g, '')}</div>`;
     });
 
-    const pct = Math.round((correct / t.quiz.length) * 100);
+    const pct = Math.round((correct / quizQs.length) * 100);
     const rec = store.quiz(t.id);
     rec.attempts++;
     rec.lastAt = Date.now();
@@ -89,11 +97,11 @@ export function mountQuiz(topicId) {
 
     $('#quiz-result').innerHTML = `
       <div class="card" style="border-color:${pct >= 75 ? 'var(--ok)' : 'var(--warn)'}">
-        <h3 style="margin-top:0">Kết quả: ${correct}/${t.quiz.length} câu đúng (${pct}%)</h3>
+        <h3 style="margin-top:0">Kết quả: ${correct}/${quizQs.length} câu đúng (${pct}%)</h3>
         <p style="margin:0">${verdict}</p>
         ${gained > 0 ? `<p class="muted small" style="margin:8px 0 0">+${Math.round(gained * 0.6)} điểm</p>` : ''}
         <div class="row" style="margin-top:12px">
-          <a class="btn ghost small" href="#/topic/${t.id}">Đọc lại bài giảng</a>
+          <a class="btn ghost small" href="#${basePath}/topic/${t.id}">Đọc lại bài giảng</a>
           <button class="btn ghost small" onclick="location.reload()">Làm lại</button>
         </div>
       </div>`;

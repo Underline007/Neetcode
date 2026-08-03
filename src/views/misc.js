@@ -1,14 +1,20 @@
-import { TOPICS, PROBLEMS, problemById } from '../data/index.js';
+import { TOPICS, PROBLEMS } from '../data/index.js';
+import { PY_TOPICS, PY_PROBLEMS } from '../data/python/index.js';
 import { store } from '../store.js';
 import { topicMastery, BASE_POINTS, grade } from '../scoring.js';
 import { dueItems, nextDueLabel } from '../srs.js';
 import { bar, esc, diffClass, diffLabel, fmtDate, toast } from '../ui.js';
 
+/** Ôn tập & thống kê gộp chung CẢ HAI lộ trình (JS + Python) — cùng một hệ thống điểm/SRS.
+ *  Link dùng đường dẫn phẳng #/topic|problem/:id — router tự nhận domain theo id. */
+const ALL_TOPICS = [...TOPICS, ...PY_TOPICS];
+const ALL_PROBLEMS = [...PROBLEMS, ...PY_PROBLEMS];
+
 /* ------------------------------ ÔN TẬP ------------------------------ */
 export function renderReview() {
   const st = store.get();
-  const due = dueItems(st, PROBLEMS);
-  const upcoming = PROBLEMS
+  const due = dueItems(st, ALL_PROBLEMS);
+  const upcoming = ALL_PROBLEMS
     .map((p) => ({ p, rec: st.problems[p.id] }))
     .filter(({ rec }) => rec?.solved && rec.srs?.due && rec.srs.due > Date.now())
     .sort((a, b) => a.rec.srs.due - b.rec.srs.due)
@@ -55,25 +61,25 @@ export function renderReview() {
 /* ------------------------------ THỐNG KÊ ------------------------------ */
 export function renderStats() {
   const st = store.get();
-  const solved = PROBLEMS.filter((p) => st.problems[p.id]?.solved);
-  const totalPossible = PROBLEMS.reduce((s, p) => s + BASE_POINTS[p.difficulty], 0);
-  const earned = PROBLEMS.reduce((s, p) => s + (st.problems[p.id]?.best || 0), 0);
+  const solved = ALL_PROBLEMS.filter((p) => st.problems[p.id]?.solved);
+  const totalPossible = ALL_PROBLEMS.reduce((s, p) => s + BASE_POINTS[p.difficulty], 0);
+  const earned = ALL_PROBLEMS.reduce((s, p) => s + (st.problems[p.id]?.best || 0), 0);
 
-  const weakest = PROBLEMS
+  const weakest = ALL_PROBLEMS
     .filter((p) => st.problems[p.id]?.solved)
     .map((p) => ({ p, rec: st.problems[p.id], pct: st.problems[p.id].best / BASE_POINTS[p.difficulty] }))
     .sort((a, b) => a.pct - b.pct)
     .slice(0, 8);
 
   const byDiff = ['Easy', 'Medium', 'Hard'].map((d) => {
-    const list = PROBLEMS.filter((p) => p.difficulty === d);
+    const list = ALL_PROBLEMS.filter((p) => p.difficulty === d);
     const done = list.filter((p) => st.problems[p.id]?.solved).length;
     return { d, done, total: list.length };
   });
 
-  const hintTotal = PROBLEMS.reduce((s, p) => s + (st.problems[p.id]?.hintsUsed || 0), 0);
-  const revealed = PROBLEMS.filter((p) => st.problems[p.id]?.revealed).length;
-  const firstTry = PROBLEMS.filter((p) => st.problems[p.id]?.firstTry).length;
+  const hintTotal = ALL_PROBLEMS.reduce((s, p) => s + (st.problems[p.id]?.hintsUsed || 0), 0);
+  const revealed = ALL_PROBLEMS.filter((p) => st.problems[p.id]?.revealed).length;
+  const firstTry = ALL_PROBLEMS.filter((p) => st.problems[p.id]?.firstTry).length;
 
   return `
     <h1>📈 Thống kê &amp; điểm</h1>
@@ -97,8 +103,8 @@ export function renderStats() {
 
     <h2>Mức thành thạo từng chủ đề</h2>
     <div class="card">
-      ${TOPICS.map((t) => {
-        const m = topicMastery(t, PROBLEMS, st);
+      ${ALL_TOPICS.map((t) => {
+        const m = topicMastery(t, ALL_PROBLEMS, st);
         return `<div style="margin:10px 0">
           <div class="row small"><a href="#/topic/${t.id}" style="text-decoration:none">${t.icon} ${esc(t.name)}</a>
           <span class="spacer"></span><span class="muted">${m}%</span></div>

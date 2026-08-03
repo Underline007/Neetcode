@@ -118,6 +118,125 @@ for (const x of arr) pre.push(pre.at(-1) + x);
 | Thêm/xoá giữa | O(n) | O(1) |
 | Bộ nhớ | thấp | cao hơn ~2-3 lần |
 `,
+  lessonPy: `
+## 1. Vấn đề gốc
+
+Mảng (\`list\`) cho bạn **truy cập theo chỉ số** cực nhanh: \`a[7]\` là O(1). Nhưng khi câu hỏi đổi thành
+**"giá trị 42 nằm ở đâu?"** thì \`list\` bó tay — bạn phải quét từng phần tử, O(n).
+
+Hầu hết bài toán "chậm" ở mức người mới đều có chung một hình dạng:
+
+\`\`\`python
+for i in range(n):
+    for j in range(n):          # <-- vòng lặp thứ hai chỉ để ĐI TÌM một thứ
+        if a[j] == something_about(a[i]):
+            ...
+\`\`\`
+
+Vòng lặp bên trong không hề "tính toán" gì — nó chỉ **đi tìm**. Nếu xoá được nó, O(n²) tụt xuống O(n).
+Bẫy này còn tinh vi hơn trong Python vì cú pháp \`x in b\` trông rất "vô hại" — nhưng nếu \`b\` là \`list\`,
+đây vẫn là O(n) mỗi lần gọi.
+
+## 2. Ý tưởng cốt lõi
+
+> **\`dict\`/\`set\` = đánh đổi bộ nhớ để mua thời gian.**
+> Thay vì đi tìm, ta ghi sẵn "vật ở đâu" vào một cuốn sổ tra cứu (bảng băm).
+
+Hàm băm biến một khoá bất kỳ (chuỗi, số, tuple) thành một vị trí trong bảng. Nhờ vậy \`d[key]\`
+cũng chỉ là một phép truy cập theo vị trí — O(1) trung bình. \`dict\` trong Python (từ 3.7+) còn giữ
+**thứ tự chèn**, nhưng đó là hiệu ứng phụ — không nên dựa vào đó để suy luận thuật toán.
+
+Mental model: **danh bạ điện thoại**. Tìm số của "Minh" trong danh sách 10.000 người chưa sắp xếp
+mất 10.000 bước. Có danh bạ sắp theo tên: mở đúng trang, 1 bước.
+
+## 3. Dấu hiệu nhận biết (rất quan trọng)
+
+Thấy một trong các câu này trong đề bài → nghĩ ngay tới \`set\`/\`dict\`:
+
+| Câu hỏi trong đề | Cấu trúc nên dùng |
+|---|---|
+| "Có phần tử nào lặp lại không?" | \`set\` |
+| "Đếm số lần xuất hiện" | \`dict\` hoặc \`collections.Counter\` |
+| "Tôi cần tìm phần bù \`target - x\`" | \`dict\` (value = index) |
+| "Nhóm các phần tử *giống nhau theo một tiêu chí*" | \`dict\` (key = chữ ký/signature) |
+| "Tổng của đoạn con \`[i..j]\`" | Mảng tổng tiền tố (prefix sum) |
+
+Mẹo tổng quát: **hãy hỏi "khoá là gì?"**. Nghĩ ra đúng khoá thì bài toán tự giải.
+Với "nhóm các từ đảo chữ", khoá là *chuỗi đã sắp xếp ký tự* (hoặc tốt hơn: \`tuple\` đếm 26 chữ cái) —
+đó là toàn bộ lời giải.
+
+## 4. Mẫu code cần thuộc lòng
+
+\`\`\`python
+# (a) Đếm tần suất
+from collections import Counter
+count = Counter(arr)                 # cách nhanh nhất, 1 dòng
+# hoặc tự tay:
+count = {}
+for x in arr:
+    count[x] = count.get(x, 0) + 1
+
+# (b) Kiểm tra đã gặp chưa
+seen = set()
+for x in arr:
+    if x in seen:
+        return True
+    seen.add(x)
+
+# (c) Tra phần bù (two-sum pattern)
+pos = {}                             # giá trị -> chỉ số
+for i, x in enumerate(arr):
+    need = target - x
+    if need in pos:
+        return [pos[need], i]
+    pos[x] = i                       # LƯU SAU khi kiểm tra -> tránh dùng lại chính nó
+
+# (d) Nhóm theo chữ ký
+from collections import defaultdict
+groups = defaultdict(list)
+for w in words:
+    key = signature(w)
+    groups[key].append(w)            # defaultdict tự tạo list rỗng nếu khoá chưa có
+
+# (e) Tổng tiền tố: sum(i..j) = pre[j+1] - pre[i]
+pre = [0]
+for x in arr:
+    pre.append(pre[-1] + x)
+\`\`\`
+
+## 5. Bẫy thường gặp
+
+- **Dùng \`list\` làm khoá \`dict\`/phần tử \`set\`**: \`TypeError: unhashable type: 'list'\`. List là
+  mutable nên không hashable. Cần khoá là tập hợp bất biến thì dùng \`tuple\`.
+- **\`x in arr\` với \`arr\` là \`list\` bên trong vòng lặp**: trông gọn (\`in\` là cú pháp Python "sạch")
+  nhưng chính là O(n) ẩn → tổng O(n²). Đây là lỗi làm rớt phỏng vấn nhiều nhất — kiểm tra thành viên
+  (\`in\`) chỉ O(1) khi vế phải là \`set\`/\`dict\`, còn với \`list\`/\`tuple\` vẫn là O(n).
+- **\`d[key]\` khi khoá chưa tồn tại** → \`KeyError\`. Dùng \`d.get(key, default)\` để tránh, hoặc
+  \`collections.defaultdict\` khi bạn luôn muốn một giá trị mặc định.
+- **Ghi vào dict trước khi kiểm tra** ở mẫu (c) → tự khớp với chính mình.
+- **Trung bình O(1), không phải LUÔN LUÔN O(1)**: băm là O(1) *trung bình*. Kẻ tấn công có thể tạo hash
+  collision (hashDoS — CPython có random hash seed để giảm rủi ro này). Trong phỏng vấn cứ nói O(n)
+  trung bình, nhưng biết có worst case sẽ ghi điểm.
+
+## 6. Ứng dụng thực tế
+
+- **Chống trùng lặp**: khử trùng log/sự kiện bằng \`set\` các \`event_id\` (idempotency key trong thanh toán).
+- **Cache / memoization**: \`functools.lru_cache\`, hay Redis ở quy mô lớn — về bản chất đều là bảng băm.
+- **Chỉ mục database**: hash index cho truy vấn \`WHERE id = ?\`.
+- **Phát hiện file trùng**: băm nội dung (\`hashlib.sha256\`) rồi so khoá thay vì so từng byte.
+- **Đếm sự kiện analytics**: \`Counter\` chính là mẫu (a) đóng gói sẵn.
+- **Prefix sum** là nền tảng của mọi bảng thống kê tích luỹ (doanh thu luỹ kế, biểu đồ đường).
+
+## 7. Bảng độ phức tạp
+
+| Thao tác | list | set/dict (băm) |
+|---|---|---|
+| Truy cập theo chỉ số | O(1) | — |
+| Tìm theo giá trị (\`in\`) | O(n) | O(1) trung bình |
+| Thêm/xoá cuối | O(1) khấu hao | O(1) |
+| Thêm/xoá giữa | O(n) | O(1) |
+| Bộ nhớ | thấp | cao hơn ~2-3 lần |
+`,
   quiz: [
     {
       q: 'Vì sao bảng băm giúp giảm O(n²) xuống O(n) trong bài Two Sum?',
@@ -159,6 +278,47 @@ for (const x of arr) pre.push(pre.at(-1) + x);
       why: 'sum(i..j) = pre[j+1] - pre[i]. Tiền xử lý O(n), sau đó mỗi truy vấn O(1). Max của đoạn cần cấu trúc khác (sparse table / segment tree).',
     },
   ],
+  quizPy: [
+    {
+      q: 'Vì sao dict giúp giảm O(n²) xuống O(n) trong bài Two Sum?',
+      options: [
+        'Vì dict được cài đặt bằng cây cân bằng nên tìm kiếm nhanh hơn',
+        'Vì nó thay vòng lặp "đi tìm phần bù" bằng một phép tra cứu O(1)',
+        'Vì dict tự động sắp xếp dữ liệu giúp bỏ qua nhiều phần tử',
+        'Vì dict dùng ít bộ nhớ hơn list nên chạy nhanh hơn',
+      ],
+      answer: 1,
+      why: 'Vòng lặp trong của bản O(n²) không tính toán gì, nó chỉ ĐI TÌM `target - a[i]`. dict biến việc đi tìm đó thành tra cứu O(1). Đây là bản chất — không liên quan tới sắp xếp hay bộ nhớ.',
+    },
+    {
+      q: 'Đoạn code sau có độ phức tạp thực sự là bao nhiêu?\n\nfor x in a:\n    if x in b:\n        out.append(x)',
+      options: ['O(n) nếu b là list', 'O(n log n)', 'O(n · m) với m = độ dài b, NẾU b là list (nếu b là set thì O(n))', 'O(1)'],
+      answer: 2,
+      why: '`x in b` quét tuyến tính nếu b là list/tuple — mỗi lần gọi O(m). Đổi b thành set(b) đưa độ phức tạp về O(n + m). Hãy tập phản xạ: `in` chỉ nhanh (O(1)) khi vế phải là set/dict.',
+    },
+    {
+      q: 'Với bài "nhóm các từ đảo chữ" (anagrams), điều quan trọng nhất cần nghĩ ra là gì?',
+      options: [
+        'Thuật toán sắp xếp nhanh nhất',
+        'Chọn đúng KHOÁ (chữ ký) sao cho các từ cùng nhóm có chung khoá',
+        'Dùng đệ quy để sinh mọi hoán vị rồi so sánh',
+        'Nén chuỗi trước khi so sánh để tiết kiệm bộ nhớ',
+      ],
+      answer: 1,
+      why: 'Cả lớp bài "gom nhóm" quy về một câu hỏi: khoá là gì? Chọn khoá = chuỗi đã sắp xếp, hoặc tuple đếm 26 chữ cái (tuple hashable, dùng làm khoá dict được). Khi khoá đúng, phần còn lại chỉ là mẫu (d).',
+    },
+    {
+      q: 'Prefix sum `pre[i+1] = pre[i] + a[i]` cho phép làm gì trong O(1)?',
+      options: [
+        'Tìm phần tử lớn nhất trong đoạn [i..j]',
+        'Tính tổng của đoạn con bất kỳ [i..j]',
+        'Sắp xếp mảng con [i..j]',
+        'Đếm số phần tử phân biệt trong [i..j]',
+      ],
+      answer: 1,
+      why: 'sum(i..j) = pre[j+1] - pre[i]. Tiền xử lý O(n), sau đó mỗi truy vấn O(1). Max của đoạn cần cấu trúc khác (sparse table / segment tree).',
+    },
+  ],
   problems: [
     {
       id: 'contains-duplicate',
@@ -180,6 +340,7 @@ ngược lại trả về \`false\`.
 > Bài khởi động, nhưng hãy đạt O(n). Test cuối có 100.000 phần tử — bản O(n²) sẽ hết giờ.
 `,
       starter: `function hasDuplicate(nums) {\n  // Gợi ý: bạn cần trả lời câu hỏi "đã gặp giá trị này chưa?"\n  \n}`,
+      starterPy: `def hasDuplicate(nums):\n    # Goi y: ban can tra loi cau hoi "da gap gia tri nay chua?"\n    \n`,
       tests: [
         { args: [[1, 2, 3, 1]], expected: true, name: 'Có trùng' },
         { args: [[1, 2, 3, 4]], expected: false, name: 'Không trùng' },
@@ -194,9 +355,18 @@ ngược lại trả về \`false\`.
         'Cấu trúc trả lời câu hỏi "đã có chưa?" trong O(1) là `Set`. Duyệt mảng, nếu `seen.has(x)` thì trả về true, ngược lại `seen.add(x)`.',
         'Cách ngắn nhất: `return new Set(nums).size !== nums.length`. Nhưng cách duyệt + Set thoát sớm tốt hơn khi phần tử trùng nằm ở đầu mảng (không phải duyệt hết).',
       ],
+      hintsPy: [
+        'Đừng so từng cặp. Hãy đi một lượt qua mảng và tự hỏi ở mỗi phần tử: "giá trị này đã xuất hiện trước đó chưa?"',
+        'Cấu trúc trả lời câu hỏi "đã có chưa?" trong O(1) là `set`. Duyệt mảng, nếu `x in seen` thì trả về True, ngược lại `seen.add(x)`.',
+        'Cách ngắn nhất: `return len(set(nums)) != len(nums)`. Nhưng cách duyệt + set thoát sớm tốt hơn khi phần tử trùng nằm ở đầu mảng (không phải duyệt hết).',
+      ],
       diagnostics: [
         { test: 'includes\\s*\\(|indexOf\\s*\\(', message: 'Bạn đang dùng `includes`/`indexOf` — mỗi lời gọi là O(n), lồng trong vòng lặp thành O(n²). Đổi sang `Set`.' },
         { test: 'sort\\s*\\(', message: 'Sắp xếp rồi so hàng xóm là lời giải đúng nhưng O(n log n). Có cách O(n) — hãy nghĩ tới `Set`.' },
+      ],
+      diagnosticsPy: [
+        { test: '\\bx in nums\\b|\\bnums\\.count\\s*\\(', message: 'Kiểm tra thành viên trên `list` (`in nums`, `nums.count(...)`) là O(n) mỗi lần, lồng trong vòng lặp thành O(n²). Đổi sang `set`.' },
+        { test: '\\.sort\\s*\\(\\)|sorted\\s*\\(', message: 'Sắp xếp rồi so hàng xóm là lời giải đúng nhưng O(n log n). Có cách O(n) — hãy nghĩ tới `set`.' },
       ],
       approach: `
 **Bản ngây thơ (O(n²))**: hai vòng lặp so mọi cặp. Vòng trong chỉ để "đi tìm" — dấu hiệu kinh điển.
@@ -250,6 +420,7 @@ Thứ tự hai chỉ số trong kết quả không quan trọng.
 > Đây là bài "mẹ" của cả lớp kỹ thuật băm. Hiểu nó = hiểu 30% các bài Medium sau này.
 `,
       starter: `function twoSum(nums, target) {\n  // Trả về mảng 2 chỉ số, ví dụ [0, 1]\n  \n}`,
+      starterPy: `def twoSum(nums, target):\n    # Tra ve list 2 chi so, vi du [0, 1]\n    \n`,
       tests: [
         { args: [[2, 7, 11, 15], 9], expected: [0, 1], name: 'Ví dụ 1' },
         { args: [[3, 2, 4], 6], expected: [1, 2], name: 'Không phải hai phần tử đầu' },
@@ -261,14 +432,26 @@ Thứ tự hai chỉ số trong kết quả không quan trọng.
       checkerSrc: `(got, exp, args) => Array.isArray(got) && got.length === 2
         && Number.isInteger(got[0]) && Number.isInteger(got[1]) && got[0] !== got[1]
         && args[0][got[0]] + args[0][got[1]] === args[1]`,
+      checkerSrcPy: `lambda got, exp, args: isinstance(got, (list, tuple)) and len(got) == 2 \\
+        and isinstance(got[0], int) and isinstance(got[1], int) and got[0] != got[1] \\
+        and args[0][got[0]] + args[0][got[1]] == args[1]`,
       hints: [
         'Cố định một phần tử `nums[i]`. Bạn đang đi tìm chính xác một giá trị: `target - nums[i]`. Vấn đề chỉ còn là "tìm nhanh".',
         'Dùng `Map` ánh xạ giá_trị → chỉ_số. Duyệt i từ trái sang: nếu `map.has(target - nums[i])` thì đã có đáp án; nếu chưa, lưu `map.set(nums[i], i)`.',
         'Thứ tự rất quan trọng: **kiểm tra trước, lưu sau**. Nếu lưu trước, với `nums=[3,3]` và target=6 bạn sẽ khớp phần tử với chính nó. Chỉ cần một vòng lặp duy nhất — không cần vòng thứ hai.',
       ],
+      hintsPy: [
+        'Cố định một phần tử `nums[i]`. Bạn đang đi tìm chính xác một giá trị: `target - nums[i]`. Vấn đề chỉ còn là "tìm nhanh".',
+        'Dùng `dict` ánh xạ giá_trị → chỉ_số. Duyệt bằng `enumerate(nums)`: nếu `target - x in pos` thì đã có đáp án; nếu chưa, lưu `pos[x] = i`.',
+        'Thứ tự rất quan trọng: **kiểm tra trước, lưu sau**. Nếu lưu trước, với `nums=[3,3]` và target=6 bạn sẽ khớp phần tử với chính nó. Chỉ cần một vòng lặp duy nhất — không cần vòng thứ hai.',
+      ],
       diagnostics: [
         { test: 'for[\\s\\S]{0,200}for', message: 'Đang có hai vòng lặp lồng nhau → O(n²). Test hiệu năng sẽ đánh trượt. Hãy thay vòng trong bằng một `Map`.' },
         { test: 'sort\\s*\\(', message: 'Cẩn thận: sắp xếp làm mất chỉ số gốc. Nếu vẫn muốn dùng hai con trỏ, bạn phải lưu cặp (giá trị, chỉ số) trước khi sắp.' },
+      ],
+      diagnosticsPy: [
+        { test: 'for[\\s\\S]{0,200}for', message: 'Đang có hai vòng lặp lồng nhau → O(n²). Test hiệu năng sẽ đánh trượt. Hãy thay vòng trong bằng một `dict`.' },
+        { test: '\\.sort\\s*\\(\\)|sorted\\s*\\(', message: 'Cẩn thận: sắp xếp làm mất chỉ số gốc. Nếu vẫn muốn dùng hai con trỏ, bạn phải lưu cặp (giá trị, chỉ số) trước khi sắp.' },
       ],
       approach: `
 **Bước 1 — Viết lại đề bằng ngôn ngữ của mình.** "Với mỗi x, tồn tại \`target - x\` trong phần còn lại không?"
@@ -332,6 +515,7 @@ Thứ tự các nhóm và thứ tự trong mỗi nhóm **không quan trọng**.
 **Ràng buộc:** chỉ chữ thường a-z, \`0 <= strs[i].length <= 100\`
 `,
       starter: `function groupAnagrams(strs) {\n  // Trả về mảng các nhóm, ví dụ [["eat","tea"],["bat"]]\n  \n}`,
+      starterPy: `def groupAnagrams(strs):\n    # Tra ve list cac nhom, vi du [["eat","tea"],["bat"]]\n    \n`,
       tests: [
         { args: [['eat', 'tea', 'tan', 'ate', 'nat', 'bat']], expected: [['eat', 'tea', 'ate'], ['tan', 'nat'], ['bat']], name: 'Ví dụ chuẩn' },
         { args: [['']], expected: [['']], name: 'Chuỗi rỗng' },
@@ -344,13 +528,23 @@ Thứ tự các nhóm và thứ tự trong mỗi nhóm **không quan trọng**.
         const norm = (g) => g.map(x => [...x].sort().join('|')).sort().join(' ## ');
         return norm(got) === norm(exp);
       }`,
+      checkerSrcPy: `lambda got, exp, args: isinstance(got, list) \\
+        and sorted(tuple(sorted(g)) for g in got) == sorted(tuple(sorted(g)) for g in exp)`,
       hints: [
         'Mọi bài "gom nhóm" đều quy về một câu hỏi duy nhất: **khoá của nhóm là gì?** Hãy tìm một hàm f(từ) sao cho hai từ đảo chữ luôn cho cùng giá trị.',
         'Cách 1: sắp xếp các ký tự trong từ — "eat" và "tea" đều thành "aet". Cách 2 (nhanh hơn): đếm 26 chữ cái rồi ghép thành chuỗi "1#0#0#...".',
         'Dùng `Map<string, string[]>`. Với mỗi từ: tính khoá, nếu Map chưa có khoá thì tạo mảng rỗng, rồi push từ vào. Cuối cùng trả về `[...map.values()]`.',
       ],
+      hintsPy: [
+        'Mọi bài "gom nhóm" đều quy về một câu hỏi duy nhất: **khoá của nhóm là gì?** Hãy tìm một hàm f(từ) sao cho hai từ đảo chữ luôn cho cùng giá trị.',
+        'Cách 1: sắp xếp các ký tự trong từ — "eat" và "tea" đều thành "aet". Cách 2 (nhanh hơn): đếm 26 chữ cái rồi tạo tuple đếm.',
+        'Dùng `collections.defaultdict(list)`. Với mỗi từ: tính khoá (ví dụ `tuple` đếm 26 chữ cái — tuple hashable, dùng làm khoá dict được), rồi `groups[key].append(w)`. Cuối cùng trả về `list(groups.values())`.',
+      ],
       diagnostics: [
         { test: 'permut|for[\\s\\S]{0,300}for[\\s\\S]{0,300}for', message: 'Bạn đang so từng cặp hoặc sinh hoán vị. Không cần — chỉ cần chuẩn hoá mỗi từ thành một khoá rồi gom bằng Map (một lượt duyệt).' },
+      ],
+      diagnosticsPy: [
+        { test: 'permutations|for[\\s\\S]{0,300}for[\\s\\S]{0,300}for', message: 'Bạn đang so từng cặp hoặc sinh hoán vị. Không cần — chỉ cần chuẩn hoá mỗi từ thành một khoá rồi gom bằng dict (một lượt duyệt).' },
       ],
       approach: `
 **Ý tưởng cốt lõi: chuẩn hoá (canonicalization).**
@@ -413,6 +607,7 @@ Thứ tự trong kết quả không quan trọng. Đề bài đảm bảo đáp 
 > Thử thách: giải trong **O(n)** — tốt hơn cả O(n log n) của sắp xếp.
 `,
       starter: `function topKFrequent(nums, k) {\n  \n}`,
+      starterPy: `def topKFrequent(nums, k):\n    \n`,
       tests: [
         { args: [[1, 1, 1, 2, 2, 3], 2], expected: [1, 2], name: 'Ví dụ 1' },
         { args: [[7, 7], 1], expected: [7], name: 'Một phần tử' },
@@ -422,13 +617,22 @@ Thứ tự trong kết quả không quan trọng. Đề bài đảm bảo đáp 
       ],
       checkerSrc: `(got, exp) => Array.isArray(got) && got.length === exp.length
         && [...got].sort((a,b)=>a-b).join(',') === [...exp].sort((a,b)=>a-b).join(',')`,
+      checkerSrcPy: `lambda got, exp, args: isinstance(got, list) and len(got) == len(exp) and sorted(got) == sorted(exp)`,
       hints: [
         'Chia thành hai giai đoạn rõ ràng: (1) đếm tần suất bằng Map; (2) chọn ra k khoá có tần suất lớn nhất. Đừng trộn hai việc này.',
         'Giai đoạn (2) đơn giản nhất là sắp xếp theo tần suất giảm dần rồi lấy k đầu → O(n log n). Đúng, nhưng chưa tối ưu.',
         'Mẹo **bucket sort**: tần suất luôn nằm trong [1..n]. Tạo mảng `buckets` độ dài n+1, `buckets[f]` = danh sách các giá trị có tần suất f. Duyệt buckets từ cuối về đầu, gom đủ k phần tử → O(n).',
       ],
+      hintsPy: [
+        'Chia thành hai giai đoạn rõ ràng: (1) đếm tần suất bằng `collections.Counter`; (2) chọn ra k khoá có tần suất lớn nhất. Đừng trộn hai việc này.',
+        'Giai đoạn (2) đơn giản nhất là `Counter(nums).most_common(k)` — nhưng đó vẫn là O(n log n) bên trong. Thử thách của bài là đạt O(n).',
+        'Mẹo **bucket sort**: tần suất luôn nằm trong [1..n]. Tạo `buckets = [[] for _ in range(len(nums)+1)]`, `buckets[f]` = danh sách các giá trị có tần suất f. Duyệt buckets từ cuối về đầu (`range(len(buckets)-1, 0, -1)`), gom đủ k phần tử → O(n).',
+      ],
       diagnostics: [
         { test: 'sort\\s*\\(', message: 'Bản dùng sort là O(n log n) — vẫn được chấp nhận, nhưng hãy thử đạt O(n) bằng bucket sort (tần suất bị chặn bởi n).' },
+      ],
+      diagnosticsPy: [
+        { test: '\\.sort\\s*\\(\\)|sorted\\s*\\(|most_common', message: 'Bản dùng sort/most_common là O(n log n) — vẫn được chấp nhận, nhưng hãy thử đạt O(n) bằng bucket sort (tần suất bị chặn bởi n).' },
       ],
       approach: `
 **Giai đoạn 1 — Đếm.** \`Map<value, freq>\`, O(n).
@@ -506,6 +710,7 @@ Cho mảng \`nums\`, trả về mảng \`out\` với \`out[i]\` = tích của **
 - \`nums = [-1,1,0,-3,3]\` → \`[0,0,9,0,0]\`
 `,
       starter: `function productExceptSelf(nums) {\n  \n}`,
+      starterPy: `def productExceptSelf(nums):\n    \n`,
       tests: [
         { args: [[1, 2, 3, 4]], expected: [24, 12, 8, 6], name: 'Ví dụ 1' },
         { args: [[-1, 1, 0, -3, 3]], expected: [0, 0, 9, 0, 0], name: 'Có số 0' },
@@ -519,8 +724,17 @@ Cho mảng \`nums\`, trả về mảng \`out\` với \`out[i]\` = tích của **
         'Duyệt trái→phải để tính prefix[i] = tích các phần tử trước i. Duyệt phải→trái để tính suffix[i]. Kết quả out[i] = prefix[i] * suffix[i].',
         'Tối ưu bộ nhớ về O(1) (không tính mảng output): dùng chính mảng `out` để lưu prefix ở lượt đi, rồi nhân dần với một biến `right` chạy ngược ở lượt về.',
       ],
+      hintsPy: [
+        'Tích "trừ chính nó" = (tích mọi thứ **bên trái** i) × (tích mọi thứ **bên phải** i). Hãy tách bài toán thành hai nửa độc lập.',
+        'Duyệt trái→phải để tính prefix[i] = tích các phần tử trước i. Duyệt phải→trái để tính suffix[i]. Kết quả out[i] = prefix[i] * suffix[i].',
+        'Tối ưu bộ nhớ về O(1) (không tính mảng output): dùng chính list `out` để lưu prefix ở lượt đi, rồi nhân dần với một biến `right` chạy ngược ở lượt về (`for i in range(n-1, -1, -1)`).',
+      ],
       diagnostics: [
         { test: '\\/(?![\\/*])|\\bMath\\.floor\\s*\\([^)]*\\/', message: 'Đề bài cấm phép chia (vì mảng có thể chứa số 0 làm hỏng cách chia tổng tích). Hãy dùng tích tiền tố và tích hậu tố.' },
+        { test: 'for[\\s\\S]{0,200}for', message: 'Hai vòng lặp lồng nhau là O(n²). Bạn cần đúng 2 lượt duyệt *tuần tự* (không lồng nhau).' },
+      ],
+      diagnosticsPy: [
+        { test: '(?<!/)/(?!/)', message: 'Đề bài cấm phép chia (vì mảng có thể chứa số 0 làm hỏng cách chia tổng tích). Hãy dùng tích tiền tố và tích hậu tố.' },
         { test: 'for[\\s\\S]{0,200}for', message: 'Hai vòng lặp lồng nhau là O(n²). Bạn cần đúng 2 lượt duyệt *tuần tự* (không lồng nhau).' },
       ],
       approach: `
@@ -670,6 +884,84 @@ while (l < r && a[l] === a[l + 1]) l++;
 - **Nén mảng tại chỗ**: mẫu nhanh/chậm chính là cách các thư viện cài đặt \`filter\` không cấp phát bộ nhớ mới.
 - **Kiểm tra chuỗi đối xứng / so khớp hai đầu** trong xử lý văn bản.
 `,
+  lessonPy: `
+## 1. Vấn đề gốc
+
+Bạn cần xét **mọi cặp** (i, j) — đó là O(n²) cặp. Nhưng nếu dữ liệu có **cấu trúc** (đã sắp xếp,
+hoặc đối xứng), bạn không cần xét hết: mỗi bước có thể **loại bỏ hàng loạt** ứng viên cùng lúc.
+
+## 2. Ý tưởng cốt lõi
+
+> Hai con trỏ hoạt động được khi ta chứng minh được: *"phần tử này không thể là đáp án với bất kỳ ai
+> còn lại"* — nhờ đó ta an tâm bỏ nó đi và thu hẹp phạm vi.
+
+Ví dụ list đã sắp tăng, tìm cặp có tổng \`target\`:
+
+\`\`\`
+l ->                      <- r
+[1, 3, 5, 7, 9, 11]   target = 12
+sum = 1 + 11 = 12  -> tìm thấy
+\`\`\`
+Nếu \`sum > target\`: \`nums[r]\` quá lớn. Nhưng nó đã ghép với **phần tử nhỏ nhất còn lại** rồi mà vẫn dư
+→ nó không thể ghép với bất kỳ ai khác → **loại r** (\`r -= 1\`). Một bước loại được cả một cột của ma trận cặp.
+Đó chính là lý do O(n²) → O(n).
+
+Câu thần chú: **"mỗi lần dịch chuyển phải loại bỏ vĩnh viễn một ứng viên"**. Nếu không chứng minh được
+điều đó, hai con trỏ sẽ cho kết quả sai.
+
+## 3. Ba biến thể phải biết
+
+| Biến thể | Hình dạng | Bài tiêu biểu |
+|---|---|---|
+| Hai đầu hội tụ | \`l = 0, r = n-1\`, tiến vào giữa | Two Sum II, Container With Most Water, kiểm tra palindrome |
+| Cùng chiều (nhanh/chậm) | \`slow\` giữ vị trí ghi, \`fast\` quét | Xoá phần tử trùng tại chỗ, dời số 0 |
+| Hai list | mỗi con trỏ trên một list | Trộn hai list đã sắp, giao/hợp |
+
+## 4. Mẫu code
+
+\`\`\`python
+# (a) Hai đầu hội tụ trên list đã sắp
+l, r = 0, n - 1
+while l < r:
+    total = a[l] + a[r]
+    if total == target:
+        return [l, r]
+    if total < target:
+        l += 1              # cần lớn hơn -> bỏ phần tử nhỏ nhất
+    else:
+        r -= 1              # cần nhỏ hơn -> bỏ phần tử lớn nhất
+
+# (b) Nhanh/chậm — ghi đè tại chỗ
+slow = 0
+for fast in range(n):
+    if giu_lai(a[fast]):
+        a[slow] = a[fast]
+        slow += 1
+# slow chính là độ dài mới
+
+# (c) Bỏ qua phần tử trùng (dùng nhiều trong 3Sum)
+while l < r and a[l] == a[l + 1]:
+    l += 1
+\`\`\`
+
+## 5. Bẫy thường gặp
+
+- **Quên sắp xếp**: đa số bài hai con trỏ yêu cầu list đã sắp. Sắp xếp trước là hoàn toàn hợp lệ
+  (\`sorted(a)\`, O(n log n)) *trừ khi* đề yêu cầu giữ chỉ số gốc.
+- **\`a.sort()\` (tại chỗ) vs \`sorted(a)\` (tạo bản sao)**: nếu cần giữ mảng gốc để trả lại chỉ số ban đầu,
+  đừng dùng \`sort()\` trực tiếp trên nó — hãy sort trên bản sao hoặc trên danh sách cặp (giá trị, chỉ số).
+- **Vòng lặp vô hạn**: mọi nhánh của \`if\` đều phải dịch chuyển ít nhất một con trỏ.
+- **Điều kiện \`l < r\` hay \`l <= r\`**: nếu i và j phải khác nhau thì dùng \`l < r\`.
+- **Bỏ sót trùng lặp**: bài 3Sum yêu cầu bộ ba *không trùng* — phải bỏ qua giá trị lặp ở cả 3 vị trí.
+
+## 6. Ứng dụng thực tế
+
+- **Merge trong merge sort / external sort**: trộn hai file đã sắp xếp bằng hai con trỏ — nền tảng của
+  việc sắp xếp dữ liệu lớn hơn RAM (\`heapq.merge\` trong Python dùng chính ý tưởng này).
+- **Trộn danh sách đã sắp** trong database (merge join): nhanh hơn nhiều so với nested-loop join.
+- **Nén mảng tại chỗ**: mẫu nhanh/chậm chính là cách nhiều thư viện cài đặt "lọc tại chỗ" không cấp phát bộ nhớ mới.
+- **Kiểm tra chuỗi đối xứng / so khớp hai đầu** trong xử lý văn bản.
+`,
   quiz: [
     {
       q: 'Điều kiện tiên quyết để kỹ thuật hai con trỏ "hai đầu hội tụ" cho kết quả đúng là gì?',
@@ -711,6 +1003,47 @@ while (l < r && a[l] === a[l + 1]) l++;
       why: 'Sắp xếp O(n log n) + với mỗi i (n lần) chạy hai con trỏ O(n) → O(n²). Bản ngây thơ ba vòng lặp là O(n³).',
     },
   ],
+  quizPy: [
+    {
+      q: 'Điều kiện tiên quyết để kỹ thuật hai con trỏ "hai đầu hội tụ" cho kết quả đúng là gì?',
+      options: [
+        'List phải có số phần tử chẵn',
+        'Mỗi lần dịch con trỏ, ta phải chắc chắn loại bỏ ứng viên đó khỏi mọi lời giải khả dĩ',
+        'List phải chứa toàn số dương',
+        'Phải có sẵn một dict đi kèm',
+      ],
+      answer: 1,
+      why: 'Đây là bản chất. Nếu không chứng minh được "bỏ đi không mất nghiệm", thuật toán sai. Với list đã sắp, `sum > target` cho phép kết luận a[r] quá lớn với MỌI đối tác còn lại.',
+    },
+    {
+      q: 'Trong bài Container With Most Water, vì sao ta luôn dịch con trỏ ở phía có cột THẤP hơn?',
+      options: [
+        'Vì cột thấp dễ tính toán hơn',
+        'Vì diện tích bị giới hạn bởi cột thấp; giữ nó lại thì mọi lựa chọn sau đều hẹp hơn và không cao hơn',
+        'Vì cột cao có thể là đáp án cuối cùng nên phải giữ',
+        'Vì làm vậy giúp list vẫn được sắp xếp',
+      ],
+      answer: 1,
+      why: 'Diện tích = min(h[l],h[r]) × (r-l). Nếu giữ cột thấp, chiều rộng chắc chắn giảm còn chiều cao không thể vượt quá cột thấp đó → mọi phương án còn lại với nó đều tệ hơn. Vậy nên loại nó.',
+    },
+    {
+      q: 'Mẫu "nhanh/chậm" (slow/fast) trên cùng một list thường dùng để làm gì?',
+      options: [
+        'Sắp xếp list tại chỗ',
+        'Ghi đè/nén list tại chỗ với O(1) bộ nhớ phụ',
+        'Tìm phần tử lớn thứ k',
+        'Chia list thành hai nửa bằng nhau',
+      ],
+      answer: 1,
+      why: '`slow` là con trỏ ghi, `fast` là con trỏ đọc. Đây là cách `remove duplicates`, `move zeroes`, và cả `filter` tại chỗ hoạt động — O(n) thời gian, O(1) bộ nhớ.',
+    },
+    {
+      q: 'Bài 3Sum sắp xếp list rồi cố định phần tử i và chạy hai con trỏ. Tổng độ phức tạp?',
+      options: ['O(n)', 'O(n log n)', 'O(n²)', 'O(n³)'],
+      answer: 2,
+      why: 'Sắp xếp (`sorted()`) O(n log n) + với mỗi i (n lần) chạy hai con trỏ O(n) → O(n²). Bản ngây thơ ba vòng lặp là O(n³).',
+    },
+  ],
   problems: [
     {
       id: 'valid-palindrome',
@@ -729,6 +1062,7 @@ khoảng trắng) và **không phân biệt hoa thường**.
 - \`" "\` → \`true\` (chuỗi rỗng sau khi lọc)
 `,
       starter: `function isPalindrome(s) {\n  \n}`,
+      starterPy: `def isPalindrome(s):\n    \n`,
       tests: [
         { args: ['A man, a plan, a canal: Panama'], expected: true, name: 'Ví dụ kinh điển' },
         { args: ['race a car'], expected: false, name: 'Không đối xứng' },
@@ -742,6 +1076,11 @@ khoảng trắng) và **không phân biệt hoa thường**.
         'Đặt `l = 0`, `r = s.length - 1`. Trong khi `l < r`: nếu ký tự ở l không phải chữ/số thì `l++`; tương tự với r; nếu cả hai đều hợp lệ thì so sánh.',
         'Kiểm tra "chữ hoặc số" bằng regex `/[a-z0-9]/i` hoặc so sánh mã ký tự. Đừng quên `toLowerCase()` trước khi so sánh.',
         'Bẫy `"0P"`: nếu bạn so sánh mã ký tự mà không chuẩn hoá hoa/thường, `0`(48) và `P`(80) chênh nhau đúng 32 giống như quan hệ hoa-thường → dễ ra kết quả sai. Luôn chuẩn hoá trước.',
+      ],
+      hintsPy: [
+        'Đặt `l = 0`, `r = len(s) - 1`. Trong khi `l < r`: nếu ký tự ở l không phải chữ/số thì `l += 1`; tương tự với r; nếu cả hai đều hợp lệ thì so sánh.',
+        'Kiểm tra "chữ hoặc số" bằng phương thức có sẵn `str.isalnum()` — không cần regex. Đừng quên `.lower()` trước khi so sánh.',
+        'Bẫy `"0P"`: nếu bạn so sánh mã ký tự (`ord(...)`) mà không chuẩn hoá hoa/thường, `\'0\'`(48) và `\'P\'`(80) chênh nhau đúng 32 giống như quan hệ hoa-thường → dễ ra kết quả sai. Luôn `.lower()` trước.',
       ],
       approach: `
 Có hai cách và cả hai đều nên biết:
@@ -802,6 +1141,7 @@ Bắt buộc dùng **O(1) bộ nhớ phụ** (nên không được dùng Map!).
 - \`numbers = [2,3,4], target = 6\` → \`[1,3]\`
 `,
       starter: `function twoSumSorted(numbers, target) {\n  \n}`,
+      starterPy: `def twoSumSorted(numbers, target):\n    \n`,
       tests: [
         { args: [[2, 7, 11, 15], 9], expected: [1, 2], name: 'Ví dụ 1' },
         { args: [[2, 3, 4], 6], expected: [1, 3], name: 'Hai đầu' },
@@ -814,9 +1154,18 @@ Bắt buộc dùng **O(1) bộ nhớ phụ** (nên không được dùng Map!).
         'Đặt `l` ở đầu, `r` ở cuối. Tổng hiện tại quá nhỏ → cần số lớn hơn → `l++`. Quá lớn → `r--`.',
         'Vì sao đúng? Khi `a[l] + a[r] > target`, thì a[r] cộng với phần tử NHỎ NHẤT còn lại đã dư → a[r] không thể thuộc lời giải nào → loại bỏ an toàn. Đừng quên +1 vào chỉ số khi trả về.',
       ],
+      hintsPy: [
+        'Ràng buộc "O(1) bộ nhớ" là lời nhắc rằng bạn không được dùng dict. Vậy phải khai thác tính chất nào của list? — nó **đã được sắp xếp**.',
+        'Đặt `l` ở đầu, `r` ở cuối. Tổng hiện tại quá nhỏ → cần số lớn hơn → `l += 1`. Quá lớn → `r -= 1`.',
+        'Vì sao đúng? Khi `a[l] + a[r] > target`, thì a[r] cộng với phần tử NHỎ NHẤT còn lại đã dư → a[r] không thể thuộc lời giải nào → loại bỏ an toàn. Đừng quên +1 vào chỉ số khi trả về.',
+      ],
       diagnostics: [
         { test: 'new Map|new Set|\\{\\s*\\}\\s*;?\\s*\\n[\\s\\S]*\\[[a-z]+\\]\\s*=', message: 'Đề yêu cầu O(1) bộ nhớ phụ — dùng Map là vi phạm. Hãy khai thác việc mảng đã sắp xếp.' },
         { test: 'for[\\s\\S]{0,200}for', message: 'Hai vòng lặp lồng nhau là O(n²). Với mảng đã sắp, chỉ cần MỘT vòng while với hai con trỏ.' },
+      ],
+      diagnosticsPy: [
+        { test: '\\{\\s*\\}|\\bdict\\s*\\(', message: 'Đề yêu cầu O(1) bộ nhớ phụ — dùng dict là vi phạm. Hãy khai thác việc list đã sắp xếp.' },
+        { test: 'for[\\s\\S]{0,200}for', message: 'Hai vòng lặp lồng nhau là O(n²). Với list đã sắp, chỉ cần MỘT vòng while với hai con trỏ.' },
       ],
       approach: `
 Đây là bài giúp bạn cảm nhận rõ nhất "vì sao hai con trỏ đúng".
@@ -878,6 +1227,7 @@ Diện tích = \`min(height[l], height[r]) × (r - l)\`.
 - \`height = [1,1]\` → \`1\`
 `,
       starter: `function maxArea(height) {\n  \n}`,
+      starterPy: `def maxArea(height):\n    \n`,
       tests: [
         { args: [[1, 8, 6, 2, 5, 4, 8, 3, 7]], expected: 49, name: 'Ví dụ chuẩn' },
         { args: [[1, 1]], expected: 1, name: 'Hai cột bằng nhau' },
@@ -892,9 +1242,18 @@ Diện tích = \`min(height[l], height[r]) × (r - l)\`.
         'Ở mỗi bước, dịch con trỏ đứng ở cột **thấp hơn**. Vì sao? Nếu giữ cột thấp lại, chiều rộng chỉ giảm mà chiều cao không bao giờ vượt quá cột thấp đó.',
         'Chứng minh chặt: giả sử h[l] < h[r]. Với mọi k nằm giữa l và r, diện tích (l, k) = min(h[l], h[k]) × (k - l) ≤ h[l] × (r - l) = diện tích hiện tại. Vậy cột l không thể tham gia lời giải tốt hơn → loại nó an toàn.',
       ],
+      hintsPy: [
+        'Bản O(n²) xét mọi cặp. Để giảm xuống O(n), hãy bắt đầu từ cặp **rộng nhất** (l=0, r=n-1) và tìm cách loại bớt ứng viên.',
+        'Ở mỗi bước, dịch con trỏ đứng ở cột **thấp hơn**. Vì sao? Nếu giữ cột thấp lại, chiều rộng chỉ giảm mà chiều cao không bao giờ vượt quá cột thấp đó.',
+        'Chứng minh chặt: giả sử h[l] < h[r]. Với mọi k nằm giữa l và r, diện tích (l, k) = min(h[l], h[k]) × (k - l) ≤ h[l] × (r - l) = diện tích hiện tại. Vậy cột l không thể tham gia lời giải tốt hơn → loại nó an toàn.',
+      ],
       diagnostics: [
         { test: 'for[\\s\\S]{0,250}for', message: 'Hai vòng lồng nhau → O(n²), sẽ trượt test hiệu năng 60.000 phần tử. Hãy dùng hai con trỏ từ hai đầu.' },
         { test: 'Math\\.max\\s*\\(\\s*height', message: 'Cẩn thận: diện tích bị chặn bởi cột THẤP hơn (`Math.min`), không phải cột cao.' },
+      ],
+      diagnosticsPy: [
+        { test: 'for[\\s\\S]{0,250}for', message: 'Hai vòng lồng nhau → O(n²), sẽ trượt test hiệu năng 60.000 phần tử. Hãy dùng hai con trỏ từ hai đầu.' },
+        { test: 'max\\s*\\(\\s*height', message: 'Cẩn thận: diện tích bị chặn bởi cột THẤP hơn (`min(...)`), không phải cột cao.' },
       ],
       approach: `
 **Vì sao tham lam "dịch cột thấp" lại đúng?** Đây là điểm khiến bài này đáng giá.
@@ -960,6 +1319,7 @@ Không được có bộ ba trùng lặp trong kết quả. Thứ tự các bộ
 - \`nums = [0,0,0]\` → \`[[0,0,0]]\`
 `,
       starter: `function threeSum(nums) {\n  \n}`,
+      starterPy: `def threeSum(nums):\n    \n`,
       tests: [
         { args: [[-1, 0, 1, 2, -1, -4]], expected: [[-1, -1, 2], [-1, 0, 1]], name: 'Ví dụ chuẩn' },
         { args: [[0, 1, 1]], expected: [], name: 'Không có nghiệm' },
@@ -973,14 +1333,25 @@ Không được có bộ ba trùng lặp trong kết quả. Thứ tự các bộ
         const norm = (g) => g.map(t => [...t].sort((a,b)=>a-b).join(',')).sort().join(' | ');
         return norm(got) === norm(exp);
       }`,
+      checkerSrcPy: `lambda got, exp, args: isinstance(got, list) \\
+        and sorted(','.join(str(x) for x in sorted(t)) for t in got) == sorted(','.join(str(x) for x in sorted(t)) for t in exp)`,
       hints: [
         'Giảm bài toán: cố định phần tử đầu tiên `nums[i]`, phần còn lại trở thành **Two Sum II** với target = `-nums[i]` trên đoạn `[i+1, n-1]`.',
         'Sắp xếp mảng trước. Sắp xếp cho bạn hai thứ: dùng được hai con trỏ, và các giá trị trùng nhau nằm cạnh nhau nên dễ bỏ qua.',
         'Xử lý trùng ở **cả ba vị trí**: (1) bỏ qua i nếu `nums[i] === nums[i-1]`; (2) sau khi tìm được nghiệm, tăng l cho tới khi giá trị đổi; (3) tương tự giảm r. Tối ưu thoát sớm: nếu `nums[i] > 0` thì dừng (mảng đã sắp, tổng ba số dương không thể bằng 0).',
       ],
+      hintsPy: [
+        'Giảm bài toán: cố định phần tử đầu tiên `nums[i]`, phần còn lại trở thành **Two Sum II** với target = `-nums[i]` trên đoạn `[i+1, n-1]`.',
+        'Sắp xếp list trước bằng `sorted(nums)` (không dùng `.sort()` nếu còn cần thứ tự gốc ở nơi khác). Sắp xếp cho bạn hai thứ: dùng được hai con trỏ, và các giá trị trùng nhau nằm cạnh nhau nên dễ bỏ qua.',
+        'Xử lý trùng ở **cả ba vị trí**: (1) bỏ qua i nếu `a[i] == a[i-1]`; (2) sau khi tìm được nghiệm, tăng l cho tới khi giá trị đổi; (3) tương tự giảm r. Tối ưu thoát sớm: nếu `a[i] > 0` thì dừng (list đã sắp, tổng ba số dương không thể bằng 0).',
+      ],
       diagnostics: [
         { test: 'for[\\s\\S]{0,300}for[\\s\\S]{0,300}for', message: 'Ba vòng lặp lồng nhau → O(n³). Hãy cố định 1 phần tử rồi dùng hai con trỏ cho phần còn lại → O(n²).' },
         { test: 'JSON\\.stringify', message: 'Dùng Set chuỗi JSON để khử trùng thì chạy đúng nhưng tốn bộ nhớ và chậm. Sau khi sắp xếp, bạn khử trùng được bằng cách so sánh phần tử kề nhau — gọn và nhanh hơn.' },
+      ],
+      diagnosticsPy: [
+        { test: 'for[\\s\\S]{0,300}for[\\s\\S]{0,300}for', message: 'Ba vòng lặp lồng nhau → O(n³). Hãy cố định 1 phần tử rồi dùng hai con trỏ cho phần còn lại → O(n²).' },
+        { test: 'itertools|permutations|combinations', message: 'Sinh tổ hợp/hoán vị bằng itertools để thử mọi bộ ba là quá chậm và không cần thiết. Sắp xếp rồi dùng hai con trỏ cho phần còn lại → O(n²).' },
       ],
       approach: `
 **Kỹ thuật quan trọng nhất ở đây: hạ bậc bài toán (reduction).**
@@ -1136,6 +1507,78 @@ Cảnh báo quan trọng: cửa sổ trượt yêu cầu tính **đơn điệu**
 - **Nén dữ liệu**: LZ77 dùng cửa sổ trượt để tìm chuỗi lặp gần nhất.
 - **Xử lý tín hiệu/video**: bộ lọc trên cửa sổ mẫu liên tiếp.
 `,
+  lessonPy: `
+## 1. Vấn đề gốc
+
+Bài toán dạng "tìm **đoạn con liên tiếp** (subarray/substring) thoả điều kiện X và tối ưu Y".
+Có O(n²) đoạn con. Duyệt hết là quá chậm.
+
+## 2. Ý tưởng cốt lõi
+
+> Khi cửa sổ dịch từ \`[i, j]\` sang \`[i, j+1]\`, ta **không tính lại từ đầu** —
+> chỉ cập nhật phần chênh lệch. Mỗi phần tử vào cửa sổ đúng 1 lần và ra đúng 1 lần → O(n).
+
+Điều kiện để dùng được: trạng thái của cửa sổ phải **cập nhật được theo kiểu tăng dần**
+(thêm 1 phần tử / bớt 1 phần tử) trong O(1) hoặc O(log n). Ví dụ: tổng, số lượng ký tự phân biệt,
+số lần xuất hiện. Ngược lại, "trung vị của cửa sổ" thì cần cấu trúc phức tạp hơn (2 heap).
+
+## 3. Hai kiểu cửa sổ
+
+**(a) Cửa sổ cố định (kích thước k)**
+\`\`\`python
+total = 0
+for i in range(n):
+    total += a[i]
+    if i >= k:
+        total -= a[i - k]       # phần tử rời khỏi cửa sổ
+    if i >= k - 1:
+        best = max(best, total)
+\`\`\`
+
+**(b) Cửa sổ co giãn (quan trọng hơn nhiều)**
+\`\`\`python
+l = 0
+for r in range(n):
+    them_a_r_vao_trang_thai()
+    while dieu_kien_bi_vi_pham():
+        bot_a_l_khoi_trang_thai()
+        l += 1
+    # ở đây [l, r] luôn là cửa sổ HỢP LỆ dài nhất kết thúc tại r
+    best = max(best, r - l + 1)
+\`\`\`
+
+**Học thuộc khung (b).** 70% bài sliding window chỉ khác nhau ở phần "trạng thái" và "điều kiện vi phạm".
+
+## 4. Nhận dạng bài toán
+
+| Đề bài nói | Hướng làm |
+|---|---|
+| "đoạn con **liên tiếp** dài nhất thoả..." | cửa sổ co giãn, tối đa hoá \`r-l+1\` |
+| "đoạn con ngắn nhất có tổng ≥ target" | cửa sổ co giãn, co lại khi *đã* thoả |
+| "cửa sổ kích thước k" | cửa sổ cố định |
+| "nhiều nhất k ký tự phân biệt" | cửa sổ + dict đếm |
+| Mảng có **số âm** và hỏi tổng | ⚠️ sliding window **không** dùng được → chuyển sang prefix sum + hash |
+
+Cảnh báo quan trọng: cửa sổ trượt yêu cầu tính **đơn điệu** — mở rộng cửa sổ làm đại lượng tăng
+(hoặc giảm) một chiều. Có số âm thì "tổng tăng khi thêm phần tử" không còn đúng → thuật toán sai.
+
+## 5. Bẫy thường gặp
+
+- Dùng \`if\` thay vì \`while\` khi co cửa sổ (có thể phải co nhiều bước).
+- Cập nhật đáp án sai thời điểm: với bài "dài nhất" cập nhật *sau* khi đã sửa cửa sổ hợp lệ;
+  với bài "ngắn nhất" cập nhật *bên trong* vòng co.
+- Quên xoá khoá khỏi dict khi số đếm về 0 (làm sai phép kiểm tra \`len(count)\`).
+- \`collections.Counter\` rất tiện cho đếm, nhưng nhớ rằng \`counter[key] -= 1\` không tự xoá khoá khi về 0 —
+  phải \`del counter[key]\` thủ công nếu logic dựa vào số lượng khoá còn lại.
+
+## 6. Ứng dụng thực tế
+
+- **Rate limiting** (giới hạn tần suất API): "tối đa 100 request trong 60 giây trượt" — chính xác là cửa sổ trượt.
+- **Chỉ báo tài chính**: đường trung bình động (moving average) 20 phiên.
+- **Giám sát hệ thống**: tỉ lệ lỗi trong 5 phút gần nhất → cảnh báo.
+- **Nén dữ liệu**: LZ77 dùng cửa sổ trượt để tìm chuỗi lặp gần nhất.
+- **Xử lý tín hiệu/video**: bộ lọc trên cửa sổ mẫu liên tiếp.
+`,
   quiz: [
     {
       q: 'Vì sao cửa sổ trượt đạt O(n) dù có tới O(n²) đoạn con?',
@@ -1177,6 +1620,47 @@ Cảnh báo quan trọng: cửa sổ trượt yêu cầu tính **đơn điệu**
       why: 'Đây là cửa sổ trượt theo miền thời gian: mỗi request đẩy vào hàng đợi, đồng thời loại mọi mốc cũ hơn now-60s ở đầu hàng đợi. Chi phí khấu hao O(1) mỗi request.',
     },
   ],
+  quizPy: [
+    {
+      q: 'Vì sao cửa sổ trượt đạt O(n) dù có tới O(n²) đoạn con?',
+      options: [
+        'Vì nó chỉ xét các đoạn con có độ dài chẵn',
+        'Vì mỗi phần tử chỉ vào cửa sổ một lần và ra khỏi cửa sổ một lần (phân tích khấu hao)',
+        'Vì nó dùng dict để nhớ mọi đoạn con',
+        'Vì nó sắp xếp list trước',
+      ],
+      answer: 1,
+      why: 'Con trỏ l và r đều chỉ đi tiến, tổng số bước ≤ 2n. Dù vòng while lồng trong for, tổng chi phí vẫn tuyến tính — đây gọi là phân tích khấu hao (amortized analysis).',
+    },
+    {
+      q: 'Bài "đoạn con có tổng bằng k" với list CHỨA SỐ ÂM. Cửa sổ trượt có dùng được không?',
+      options: [
+        'Có, luôn dùng được cho mọi list',
+        'Không — mất tính đơn điệu, phải dùng prefix sum + dict',
+        'Có, nhưng phải sắp xếp list trước',
+        'Không, phải dùng quy hoạch động',
+      ],
+      answer: 1,
+      why: 'Cửa sổ trượt dựa vào: mở rộng thì tổng tăng, co lại thì tổng giảm. Số âm phá vỡ điều đó nên không biết nên dịch l hay r. Cách đúng: pre[j]-pre[i]=k, tra `pre[j]-k` trong dict.',
+    },
+    {
+      q: 'Trong khung cửa sổ co giãn, khi nào nên cập nhật đáp án cho bài "đoạn con NGẮN NHẤT thoả điều kiện"?',
+      options: [
+        'Ngay sau khi mở rộng r, trước vòng while',
+        'Bên trong vòng while co cửa sổ, trước khi tăng l',
+        'Sau khi kết thúc toàn bộ vòng for',
+        'Không cần cập nhật, kết quả là r - l + 1 cuối cùng',
+      ],
+      answer: 1,
+      why: 'Với bài "ngắn nhất", vòng while chạy khi cửa sổ ĐÃ thoả điều kiện và ta co để tìm bản ngắn hơn. Mỗi trạng thái bên trong while đều hợp lệ nên phải cập nhật ở đó. Ngược lại, bài "dài nhất" thì while chạy khi cửa sổ vi phạm, nên cập nhật sau while.',
+    },
+    {
+      q: 'Rate limiter "tối đa 100 request trong 60 giây" thuộc dạng nào?',
+      options: ['Cửa sổ cố định theo số phần tử', 'Cửa sổ co giãn theo thời gian (loại bỏ các mốc đã quá 60s)', 'Quy hoạch động', 'Chia để trị'],
+      answer: 1,
+      why: 'Đây là cửa sổ trượt theo miền thời gian: mỗi request đẩy vào hàng đợi (`collections.deque`), đồng thời loại mọi mốc cũ hơn now-60s ở đầu hàng đợi. Chi phí khấu hao O(1) mỗi request.',
+    },
+  ],
   problems: [
     {
       id: 'best-time-stock',
@@ -1194,6 +1678,7 @@ Mảng \`prices\` với \`prices[i]\` là giá cổ phiếu ngày thứ i. Bạn
 - \`prices = [7,6,4,3,1]\` → \`0\` (giá chỉ giảm)
 `,
       starter: `function maxProfit(prices) {\n  \n}`,
+      starterPy: `def maxProfit(prices):\n    \n`,
       tests: [
         { args: [[7, 1, 5, 3, 6, 4]], expected: 5, name: 'Ví dụ 1' },
         { args: [[7, 6, 4, 3, 1]], expected: 0, name: 'Giá chỉ giảm' },
@@ -1208,9 +1693,18 @@ Mảng \`prices\` với \`prices[i]\` là giá cổ phiếu ngày thứ i. Bạn
         'Nếu bán hôm nay tại giá `p`, lợi nhuận tốt nhất = `p - (giá thấp nhất từ đầu tới hôm qua)`. Vậy chỉ cần nhớ **một biến**: giá nhỏ nhất đã thấy.',
         'Vòng lặp: `minPrice = Math.min(minPrice, p)` và `best = Math.max(best, p - minPrice)`. Thứ tự hai dòng này không ảnh hưởng kết quả vì `p - p = 0` không làm tăng best.',
       ],
+      hintsPy: [
+        'Đừng xét mọi cặp (mua, bán) — đó là O(n²). Hãy duyệt một lượt và tự hỏi ở mỗi ngày: "nếu bán HÔM NAY, lợi nhuận tốt nhất là bao nhiêu?"',
+        'Nếu bán hôm nay tại giá `p`, lợi nhuận tốt nhất = `p - (giá thấp nhất từ đầu tới hôm qua)`. Vậy chỉ cần nhớ **một biến**: giá nhỏ nhất đã thấy.',
+        'Vòng lặp: `min_price = min(min_price, p)` và `best = max(best, p - min_price)`. Thứ tự hai dòng này không ảnh hưởng kết quả vì `p - p = 0` không làm tăng best.',
+      ],
       diagnostics: [
         { test: 'for[\\s\\S]{0,200}for', message: 'Hai vòng lồng nhau O(n²) sẽ trượt test 100.000 phần tử. Chỉ cần một lượt duyệt với biến "giá thấp nhất đã thấy".' },
         { test: 'Math\\.min\\s*\\(\\s*\\.\\.\\.|Math\\.max\\s*\\(\\s*\\.\\.\\.', message: 'Cẩn thận: `Math.min(...arr)` với mảng 100.000 phần tử có thể gây lỗi tràn stack, và nếu gọi trong vòng lặp thì thành O(n²).' },
+      ],
+      diagnosticsPy: [
+        { test: 'for[\\s\\S]{0,200}for', message: 'Hai vòng lồng nhau O(n²) sẽ trượt test 100.000 phần tử. Chỉ cần một lượt duyệt với biến "giá thấp nhất đã thấy".' },
+        { test: 'min\\s*\\(\\s*prices\\s*\\)|max\\s*\\(\\s*prices\\s*\\)', message: 'Gọi `min(prices)`/`max(prices)` lại trong vòng lặp biến bài toán thành O(n²). Chỉ cần một biến tích luỹ "giá thấp nhất đã thấy".' },
       ],
       approach: `
 Bài này là cửa sổ trượt ở dạng đơn giản nhất: cửa sổ \`[đáy_thấp_nhất, hôm_nay]\`.
@@ -1268,6 +1762,7 @@ Cho chuỗi \`s\`, tìm **độ dài** chuỗi con **liên tiếp** dài nhất 
 - \`"pwwkew"\` → \`3\` ("wke" — lưu ý "pwke" là *dãy con* chứ không liên tiếp)
 `,
       starter: `function lengthOfLongestSubstring(s) {\n  \n}`,
+      starterPy: `def lengthOfLongestSubstring(s):\n    \n`,
       tests: [
         { args: ['abcabcbb'], expected: 3, name: 'Ví dụ 1' },
         { args: ['bbbbb'], expected: 1, name: 'Toàn ký tự giống nhau' },
@@ -1283,9 +1778,18 @@ Cho chuỗi \`s\`, tìm **độ dài** chuỗi con **liên tiếp** dài nhất 
         'Trạng thái cửa sổ = tập ký tự đang có. Dùng `Set`: khi thêm `s[r]` mà đã tồn tại, hãy `while` xoá `s[l]` và `l++` cho tới khi xoá được ký tự trùng đó.',
         'Bản tối ưu dùng `Map<char, lastIndex>` để nhảy `l` thẳng tới `lastIndex + 1`. **Bẫy "abba"**: con trỏ l chỉ được TIẾN, nên phải viết `l = Math.max(l, lastIndex + 1)`, nếu không l sẽ lùi lại và cho kết quả sai.',
       ],
+      hintsPy: [
+        'Khung cửa sổ co giãn: mở rộng `r`, khi cửa sổ **vi phạm** (có ký tự lặp) thì co `l` cho tới khi hợp lệ trở lại.',
+        'Trạng thái cửa sổ = tập ký tự đang có. Dùng `set`: khi thêm `s[r]` mà đã tồn tại, hãy `while` xoá `s[l]` và `l += 1` cho tới khi xoá được ký tự trùng đó.',
+        'Bản tối ưu dùng `dict` ánh xạ ký tự → chỉ số xuất hiện gần nhất, để nhảy `l` thẳng tới `last[c] + 1`. **Bẫy "abba"**: con trỏ l chỉ được TIẾN, nên phải viết `l = max(l, last[c] + 1)`, nếu không l sẽ lùi lại và cho kết quả sai.',
+      ],
       diagnostics: [
         { test: 'for[\\s\\S]{0,250}for', message: 'Hai vòng lồng nhau (thử mọi chuỗi con) là O(n²)/O(n³). Hãy dùng một vòng for cho r và một vòng while co l — tổng vẫn là O(n).' },
         { test: 'if\\s*\\([^)]*has\\([^)]*\\)\\s*\\)\\s*\\{?\\s*l\\+\\+', message: 'Dùng `if` để co cửa sổ là chưa đủ — có thể phải co nhiều bước liên tiếp. Đổi thành `while`.' },
+      ],
+      diagnosticsPy: [
+        { test: 'for[\\s\\S]{0,250}for', message: 'Hai vòng lồng nhau (thử mọi chuỗi con) là O(n²)/O(n³). Hãy dùng một vòng for cho r và một vòng while co l — tổng vẫn là O(n).' },
+        { test: 'if\\s+\\w+\\s+in\\s+\\w+\\s*:\\s*\\n\\s*l\\s*\\+=\\s*1', message: 'Dùng `if` để co cửa sổ là chưa đủ — có thể phải co nhiều bước liên tiếp. Đổi thành `while`.' },
       ],
       approach: `
 **Khung chuẩn (Set):**
@@ -1357,6 +1861,7 @@ Trả về độ dài chuỗi con liên tiếp **dài nhất chỉ gồm một l
 - \`s = "AABABBA", k = 1\` → \`4\` ("AABA" → "AAAA")
 `,
       starter: `function characterReplacement(s, k) {\n  \n}`,
+      starterPy: `def characterReplacement(s, k):\n    \n`,
       tests: [
         { args: ['ABAB', 2], expected: 4, name: 'Ví dụ 1' },
         { args: ['AABABBA', 1], expected: 4, name: 'Ví dụ 2' },
@@ -1371,7 +1876,15 @@ Trả về độ dài chuỗi con liên tiếp **dài nhất chỉ gồm một l
         'Giữ mảng đếm 26 phần tử cho cửa sổ hiện tại và biến `maxCount` = tần suất lớn nhất. Khi vi phạm, co `l` và giảm bộ đếm tương ứng.',
         'Mẹo nâng cao: **không cần** tính lại `maxCount` khi co cửa sổ. Nếu maxCount hơi "cũ" (lớn hơn thực tế), cửa sổ chỉ đơn giản không nở thêm — đáp án vẫn đúng vì ta chỉ quan tâm cửa sổ lớn nhất từng đạt được.',
       ],
+      hintsPy: [
+        'Câu hỏi then chốt: **khi nào một cửa sổ là hợp lệ?** Cửa sổ `[l..r]` hợp lệ nếu số ký tự phải đổi ≤ k, tức là `(độ dài cửa sổ) - (số lần xuất hiện của ký tự nhiều nhất trong cửa sổ) <= k`.',
+        'Giữ một `dict` đếm cho cửa sổ hiện tại và biến `max_count` = tần suất lớn nhất. Khi vi phạm, co `l` và giảm bộ đếm tương ứng.',
+        'Mẹo nâng cao: **không cần** tính lại `max_count` khi co cửa sổ. Nếu max_count hơi "cũ" (lớn hơn thực tế), cửa sổ chỉ đơn giản không nở thêm — đáp án vẫn đúng vì ta chỉ quan tâm cửa sổ lớn nhất từng đạt được.',
+      ],
       diagnostics: [
+        { test: 'for[\\s\\S]{0,120}for[\\s\\S]{0,200}for', message: 'Ba vòng lặp lồng nhau quá chậm. Cửa sổ trượt chỉ cần một lượt duyệt r và một con trỏ l chạy tiến.' },
+      ],
+      diagnosticsPy: [
         { test: 'for[\\s\\S]{0,120}for[\\s\\S]{0,200}for', message: 'Ba vòng lặp lồng nhau quá chậm. Cửa sổ trượt chỉ cần một lượt duyệt r và một con trỏ l chạy tiến.' },
       ],
       approach: `
@@ -1452,6 +1965,7 @@ liên tiếp có tổng ≥ \`target\`. Nếu không tồn tại, trả về \`0
 - \`target = 11, nums = [1,1,1,1,1,1,1,1]\` → \`0\`
 `,
       starter: `function minSubArrayLen(target, nums) {\n  \n}`,
+      starterPy: `def minSubArrayLen(target, nums):\n    \n`,
       tests: [
         { args: [7, [2, 3, 1, 2, 4, 3]], expected: 2, name: 'Ví dụ 1' },
         { args: [4, [1, 4, 4]], expected: 1, name: 'Một phần tử là đủ' },
@@ -1465,7 +1979,15 @@ liên tiếp có tổng ≥ \`target\`. Nếu không tồn tại, trả về \`0
         'Khung: `sum += nums[r]; while (sum >= target) { best = Math.min(best, r-l+1); sum -= nums[l]; l++; }`. Chú ý cập nhật đáp án **bên trong** vòng while.',
         'Đề yêu cầu số nguyên dương — đó chính là điều kiện cho tính đơn điệu (thêm phần tử thì tổng chỉ tăng). Nếu có số âm, thuật toán này sai và phải dùng prefix sum + deque.',
       ],
+      hintsPy: [
+        'Đây là bài "NGẮN NHẤT" nên logic ngược với bài "dài nhất": mở rộng r cho tới khi cửa sổ **đã thoả** (tổng ≥ target), rồi co l để tìm bản ngắn hơn.',
+        'Khung: `total += nums[r]` rồi `while total >= target: best = min(best, r-l+1); total -= nums[l]; l += 1`. Chú ý cập nhật đáp án **bên trong** vòng while.',
+        'Đề yêu cầu số nguyên dương — đó chính là điều kiện cho tính đơn điệu (thêm phần tử thì tổng chỉ tăng). Nếu có số âm, thuật toán này sai và phải dùng prefix sum + `collections.deque`.',
+      ],
       diagnostics: [
+        { test: 'for[\\s\\S]{0,200}for', message: 'Hai vòng lồng nhau → O(n²). Chỉ cần một vòng for (r) và một vòng while (l) — hai con trỏ đều chỉ tiến.' },
+      ],
+      diagnosticsPy: [
         { test: 'for[\\s\\S]{0,200}for', message: 'Hai vòng lồng nhau → O(n²). Chỉ cần một vòng for (r) và một vòng while (l) — hai con trỏ đều chỉ tiến.' },
       ],
       approach: `
