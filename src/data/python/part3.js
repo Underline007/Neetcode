@@ -166,6 +166,30 @@ dq.appendleft(0)   # O(1) — list.insert(0, ...) là O(n), đây là lý do dù
       answer: 1,
       why: 'list được cài đặt bằng mảng liên tục trong bộ nhớ, nên thêm/xoá ở ĐẦU đòi hỏi dịch chuyển toàn bộ phần tử còn lại — O(n). deque tối ưu cho thao tác ở CẢ HAI ĐẦU, đạt O(1) — đúng cấu trúc cho BFS và sliding window.',
     },
+    {
+      q: 'Đoạn code sau in ra gì?\n\nd = {1: "a", True: "b", 1.0: "c"}\nprint(len(d), d[1])',
+      options: ['1 c', '3 a', '2 b', '1 a'],
+      answer: 0,
+      why: '`dict` xác định hai khoá là "một" khi chúng có cùng `hash()` **và** bằng nhau qua `==`. Trong Python `1 == True == 1.0` và cả ba có cùng hash, nên đây chỉ là MỘT khoá duy nhất: giá trị bị ghi đè lần lượt còn lại `"c"`, và `len(d) == 1`. (Chi tiết tinh tế: object khoá được giữ lại là cái ĐẦU TIÊN, tức số `1`.) Đây là bug thật khi trộn `bool` và `int` làm khoá — ví dụ đếm theo cờ `True/False` lẫn với đếm theo mã số 0/1.',
+    },
+    {
+      q: 'Đoạn code sau in ra gì?\n\na = [1, 2, 3, 4, 5]\na[1:4] = [9]\nprint(a)',
+      options: ['[1, 9, 5]', '[1, [9], 4, 5]', '[1, 9, 3, 4, 5]', 'ValueError vì số phần tử không khớp'],
+      answer: 0,
+      why: 'Gán vào **slice** thay thế cả đoạn `a[1:4]` (ba phần tử 2, 3, 4) bằng nội dung của vế phải — số phần tử hai bên KHÔNG cần bằng nhau, list tự co lại hoặc giãn ra. Khác hẳn `a[1] = [9]` (đặt một list lồng vào ô 1). Chính cơ chế này khiến `a[:] = [...]` trở thành cách chuẩn để ghi đè toàn bộ nội dung một list mà vẫn giữ nguyên object.',
+    },
+    {
+      q: 'Đoạn code sau in ra gì?\n\na = [1, 2, 3]\nb = a\na += [4]\nprint(b)',
+      options: ['[1, 2, 3]', '[1, 2, 3, 4]', '[[1, 2, 3], 4]', 'TypeError'],
+      answer: 1,
+      why: 'Với `list`, `a += x` KHÔNG tương đương `a = a + x`. Toán tử `+=` gọi `__iadd__`, hoạt động như `a.extend(x)` — sửa **tại chỗ** chính object đó, nên `b` (cùng trỏ tới object ấy) cũng thấy `4`. Ngược lại `a = a + [4]` tạo list MỚI và chỉ đổi hướng tên `a`, khi đó `b` vẫn là `[1, 2, 3]`. Với kiểu bất biến (`int`, `str`, `tuple`) thì `+=` luôn tạo object mới vì không thể sửa tại chỗ.',
+    },
+    {
+      q: 'Đoạn code sau in ra gì?\n\nd = {"a": 1, "b": 2}\nprint(1 in d, "a" in d)',
+      options: ['True True', 'False True', 'True False', 'False False'],
+      answer: 1,
+      why: 'Toán tử `in` trên `dict` kiểm tra **khoá**, không phải giá trị — đây là mặc định có chủ đích vì tra cứu khoá là O(1) nhờ bảng băm, còn tìm trong giá trị là O(n). Muốn kiểm tra giá trị phải viết rõ `1 in d.values()`. Bẫy liên quan hay gặp: `{}` là `dict` rỗng chứ không phải `set` rỗng — set rỗng bắt buộc phải viết `set()`.',
+    },
   ],
   problems: [
     {
@@ -361,6 +385,183 @@ duy nhất, gọn hơn).
         why: 'Có n/size nhóm, mỗi slice tốn O(size) để copy — tổng tất cả các slice cộng lại đúng bằng O(n) vì mỗi phần tử gốc chỉ được copy vào đúng một nhóm duy nhất. Bộ nhớ cũng O(n) vì toàn bộ dữ liệu được nhân bản sang cấu trúc mới.',
       },
       realWorld: 'Chia nhỏ dữ liệu để gửi theo lô (batch) tới API có giới hạn số lượng bản ghi mỗi request, phân trang (pagination) danh sách kết quả, chia công việc thành các batch xử lý song song.',
+    },
+    {
+      id: 'py-invert-mapping',
+      title: 'Đảo ngược dict mà không mất dữ liệu',
+      en: 'Invert a Mapping Safely',
+      difficulty: 'Medium',
+      targetMinutes: 12,
+      entry: 'invert_mapping',
+      lang: 'python',
+      statement: `
+Viết hàm \`invert_mapping(d)\` đảo ngược một dict: giá trị trở thành khoá, khoá trở thành **danh sách** các
+khoá cũ có cùng giá trị đó.
+
+- Thứ tự các khoá trong mỗi danh sách phải theo đúng **thứ tự xuất hiện** trong dict gốc.
+- Không được sửa dict gốc.
+
+**Ví dụ**
+- \`invert_mapping({"an": "sales", "binh": "sales", "cuong": "tech"})\`
+  → \`{"sales": ["an", "binh"], "tech": ["cuong"]}\`
+- \`invert_mapping({})\` → \`{}\`
+
+> Cách viết một dòng \`{v: k for k, v in d.items()}\` trông rất Pythonic — và làm **mất dữ liệu** ngay khi
+> có hai khoá trùng giá trị. Bài này bắt đúng chỗ đó.
+`,
+      starter: `def invert_mapping(d):\n    # Trả về dict: giá trị cũ -> danh sách các khoá cũ\n    \n`,
+      checkerSrc: 'lambda got, exp, args: isinstance(got, dict) and got == exp',
+      tests: [
+        { args: [{ an: 'sales', binh: 'sales', cuong: 'tech' }], expected: { sales: ['an', 'binh'], tech: ['cuong'] }, name: 'Hai khoá trùng giá trị' },
+        { args: [{}], expected: {}, name: 'Dict rỗng' },
+        { args: [{ a: 'x' }], expected: { x: ['a'] }, name: 'Một cặp duy nhất' },
+        { args: [{ k1: 'v', k2: 'v', k3: 'v' }], expected: { v: ['k1', 'k2', 'k3'] }, name: 'Ba khoá cùng một giá trị' },
+        { args: [{ a: 'p', b: 'q', c: 'p', d: 'q' }], expected: { p: ['a', 'c'], q: ['b', 'd'] }, name: 'Hai nhóm xen kẽ — kiểm tra thứ tự' },
+        { args: [{ x: 'x', y: 'y' }], expected: { x: ['x'], y: ['y'] }, name: 'Khoá và giá trị trùng tên nhau' },
+      ],
+      hints: [
+        'Vấn đề cốt lõi: một giá trị có thể ứng với NHIỀU khoá, nên đích đến không phải `value -> key` mà là `value -> danh sách key`. Cấu trúc kết quả quyết định cách viết vòng lặp.',
+        'Duyệt `for key, value in d.items()`. Với mỗi cặp: nếu `value` chưa có trong dict kết quả thì tạo danh sách rỗng, rồi `append(key)` vào danh sách đó.',
+        'Hai cách gọn: `out.setdefault(value, []).append(key)` (dict thường), hoặc `out = defaultdict(list)` rồi `out[value].append(key)` — nhớ `return dict(out)` để trả về dict thường. Dict giữ thứ tự chèn từ Python 3.7 nên thứ tự trong danh sách tự động đúng.',
+      ],
+      diagnostics: [
+        { test: '\\{\\s*v\\w*\\s*:\\s*k\\w*\\s+for', message: 'Dict comprehension đảo trực tiếp `{v: k for k, v in d.items()}` chỉ giữ lại khoá CUỐI CÙNG của mỗi giá trị trùng nhau — dữ liệu bị mất âm thầm. Kết quả cần là `value -> danh sách key`.' },
+        { test: '\\.append\\s*\\(\\s*value\\s*\\)|\\.append\\s*\\(\\s*v\\s*\\)', message: 'Bạn đang thêm GIÁ TRỊ vào danh sách, nhưng đề yêu cầu ngược lại: giá trị cũ làm khoá mới, còn danh sách chứa các KHOÁ cũ.' },
+      ],
+      approach: `
+Bài này dạy một phản xạ thiết kế quan trọng: **quan hệ 1-1 khi đảo chiều thường trở thành 1-nhiều.**
+Nhân viên → phòng ban là 1-1, nhưng phòng ban → nhân viên là 1-nhiều. Nếu bạn giữ nguyên kiểu dữ liệu khi
+đảo chiều, bạn sẽ mất dữ liệu.
+
+\`\`\`python
+d = {"an": "sales", "binh": "sales"}
+{v: k for k, v in d.items()}      # {'sales': 'binh'} — "an" biến mất, không báo lỗi
+\`\`\`
+
+**Lời giải với \`setdefault\`:**
+
+\`\`\`python
+def invert_mapping(d):
+    out = {}
+    for key, value in d.items():
+        out.setdefault(value, []).append(key)
+    return out
+\`\`\`
+
+\`setdefault(value, [])\` trả về danh sách đang có nếu khoá đã tồn tại, ngược lại chèn \`[]\` rồi trả về
+chính nó — nên \`.append\` luôn tác động đúng danh sách cần thiết.
+
+**Lời giải với \`defaultdict\`** (thường được ưa hơn khi vòng lặp dài):
+
+\`\`\`python
+from collections import defaultdict
+
+def invert_mapping(d):
+    out = defaultdict(list)
+    for key, value in d.items():
+        out[value].append(key)
+    return dict(out)
+\`\`\`
+
+Khác biệt tinh tế đáng nhớ: \`setdefault(value, [])\` **luôn tạo ra một list rỗng mới** ở mỗi vòng lặp
+(rồi vứt đi nếu khoá đã tồn tại), vì Python tính đối số trước khi gọi hàm. \`defaultdict\` chỉ gọi
+\`list()\` khi thật sự thiếu khoá — hiệu quả hơn khi giá trị mặc định tốn kém.
+`,
+      solution: `def invert_mapping(d):
+    out = {}
+    for key, value in d.items():
+        out.setdefault(value, []).append(key)
+    return out`,
+      complexity: {
+        question: 'Độ phức tạp thời gian của invert_mapping theo số cặp n trong dict?',
+        options: ['O(n) — mỗi cặp được xử lý một lần, tra cứu/chèn dict là O(1) trung bình', 'O(n²) vì phải kiểm tra khoá đã tồn tại chưa', 'O(n log n)', 'O(1)'],
+        answer: 0,
+        why: 'Vòng lặp chạy đúng n lần; `setdefault` và `append` đều là O(1) trung bình (bảng băm + thêm cuối list). Nếu thay `setdefault` bằng cách kiểm tra `if value in list(out.keys())` thì mới thành O(n²) — một lỗi hiệu năng hay gặp.',
+      },
+      realWorld: 'Xây "chỉ mục ngược" (inverted index): từ khoá → danh sách tài liệu chứa từ đó (nền tảng của mọi công cụ tìm kiếm), nhóm nhân viên theo phòng ban, nhóm đơn hàng theo trạng thái, dựng danh sách kề (adjacency list) cho đồ thị từ danh sách cạnh.',
+    },
+    {
+      id: 'py-rotate-left',
+      title: 'Xoay danh sách bằng slicing',
+      en: 'Rotate List Left',
+      difficulty: 'Easy',
+      targetMinutes: 10,
+      entry: 'rotate_left',
+      lang: 'python',
+      statement: `
+Viết hàm \`rotate_left(items, k)\` trả về **danh sách mới** là kết quả xoay \`items\` sang trái \`k\` bước.
+
+- \`k\` có thể lớn hơn độ dài danh sách, hoặc **âm** (xoay sang phải).
+- Danh sách rỗng thì trả về danh sách rỗng.
+- Không được sửa \`items\` gốc.
+
+**Ví dụ**
+- \`rotate_left([1, 2, 3, 4, 5], 2)\` → \`[3, 4, 5, 1, 2]\`
+- \`rotate_left([1, 2, 3, 4, 5], 7)\` → \`[3, 4, 5, 1, 2]\` (7 bước = 1 vòng + 2 bước)
+- \`rotate_left([1, 2, 3, 4, 5], -1)\` → \`[5, 1, 2, 3, 4]\`
+`,
+      starter: `def rotate_left(items, k):\n    # Trả về danh sách MỚI đã xoay trái k bước\n    \n`,
+      tests: [
+        { args: [[1, 2, 3, 4, 5], 2], expected: [3, 4, 5, 1, 2], name: 'Xoay trái 2 bước' },
+        { args: [[1, 2, 3, 4, 5], 0], expected: [1, 2, 3, 4, 5], name: 'Không xoay' },
+        { args: [[1, 2, 3, 4, 5], 5], expected: [1, 2, 3, 4, 5], name: 'Đúng một vòng' },
+        { args: [[1, 2, 3, 4, 5], 7], expected: [3, 4, 5, 1, 2], name: 'k lớn hơn độ dài' },
+        { args: [[1, 2, 3, 4, 5], -1], expected: [5, 1, 2, 3, 4], name: 'k âm — xoay phải' },
+        { args: [[1, 2], -3], expected: [2, 1], name: 'k âm và lớn hơn độ dài' },
+        { args: [[], 3], expected: [], name: 'Danh sách rỗng — cẩn thận chia cho 0' },
+        { args: [[9], 4], expected: [9], name: 'Một phần tử' },
+      ],
+      hints: [
+        'Xoay trái k bước nghĩa là: lấy phần từ vị trí k tới hết, ghép với phần từ đầu tới vị trí k. Bằng slicing: `items[k:] + items[:k]`.',
+        'Với k lớn hơn độ dài (hoặc âm), hãy quy k về khoảng hợp lệ trước bằng `k %= len(items)`. Nhờ quy tắc số dư của Python, phép này xử lý luôn cả k âm mà không cần thêm nhánh `if`.',
+        'Bẫy còn lại: `len(items)` bằng 0 sẽ khiến `%` raise `ZeroDivisionError`. Xử lý danh sách rỗng NGAY từ đầu bằng `if not items: return []`.',
+      ],
+      diagnostics: [
+        { test: '\\.pop\\s*\\(\\s*0\\s*\\)|\\.insert\\s*\\(\\s*0', message: 'Xoay bằng `pop(0)` / `insert(0, x)` lặp k lần là O(n × k) vì mỗi thao tác ở đầu list phải dịch chuyển toàn bộ phần còn lại. Slicing cho lời giải O(n) trong một dòng.' },
+        { test: 'items\\s*\\[\\s*:\\s*\\]\\s*=|\\.reverse\\s*\\(\\s*\\)', message: 'Đề yêu cầu trả về danh sách MỚI và không sửa `items` gốc. `items[:] = ...` và `items.reverse()` đều sửa tại chỗ object của người gọi.' },
+      ],
+      approach: `
+Slicing của Python mạnh hơn \`.slice()\` của JavaScript ở chỗ nó **luôn tạo bản sao mới** và ghép được
+trực tiếp bằng \`+\`, nên toàn bộ phép xoay gói gọn trong một biểu thức:
+
+\`\`\`python
+def rotate_left(items, k):
+    if not items:
+        return []
+    k %= len(items)
+    return items[k:] + items[:k]
+\`\`\`
+
+**Ba cái bẫy được cài sẵn trong bộ test:**
+
+1. **k lớn hơn độ dài.** Không normalize thì \`items[7:]\` cho \`[]\` — kết quả trả về nguyên danh sách cũ,
+   sai. \`k %= len(items)\` giải quyết gọn.
+2. **k âm.** Nhờ \`%\` của Python luôn trả kết quả không âm khi số chia dương, \`-1 % 5 == 4\` — xoay trái
+   4 bước đúng bằng xoay phải 1 bước. Không cần nhánh \`if k < 0\` nào cả.
+3. **Danh sách rỗng.** \`k % 0\` raise \`ZeroDivisionError\`. Phải chặn trước.
+
+**Vì sao trả về danh sách mới thay vì sửa tại chỗ?** Vì hàm này là một phép **biến đổi thuần**
+(pure transformation) — người gọi thường vẫn cần dữ liệu gốc. Đây là lựa chọn thiết kế ngược với bài
+"xoá số chẵn tại chỗ" ở module trước, và điều quan trọng là bạn **nói rõ trong tài liệu hàm** mình chọn
+kiểu nào; hàm vừa sửa tại chỗ vừa trả về giá trị mới là nguồn nhầm lẫn kinh điển.
+`,
+      solution: `def rotate_left(items, k):
+    if not items:
+        return []
+    k %= len(items)
+    return items[k:] + items[:k]`,
+      complexity: {
+        question: 'Độ phức tạp thời gian và bộ nhớ của lời giải dùng slicing, theo độ dài n?',
+        options: [
+          'Thời gian O(n), bộ nhớ O(n) — hai lát cắt cùng nhau copy đúng n phần tử vào danh sách mới',
+          'Thời gian O(1), bộ nhớ O(1) vì slicing chỉ tạo "view" chứ không copy',
+          'Thời gian O(k), bộ nhớ O(k)',
+          'Thời gian O(n log n)',
+        ],
+        answer: 0,
+        why: 'Khác với NumPy (slicing tạo view chia sẻ bộ nhớ), slicing trên `list` của Python LUÔN copy. Hai lát `items[k:]` và `items[:k]` cộng lại đúng n phần tử, và phép `+` tạo thêm một list chứa cả n phần tử đó → O(n) thời gian và O(n) bộ nhớ phụ.',
+      },
+      realWorld: 'Xoay vòng danh sách máy chủ trong load balancer round-robin, dịch chuyển cửa sổ dữ liệu theo thời gian trong biểu đồ, xoay bàn phím/mã Caesar, và luân phiên ca trực. Chi tiết chuẩn hoá `k % n` là thứ luôn bị quên khi tham số đến từ người dùng.',
     },
   ],
 },

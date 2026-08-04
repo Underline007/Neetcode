@@ -165,6 +165,40 @@ PATTERN.findall("Python và python và PYTHON")   # ['Python', 'python', 'PYTHON
       answer: 1,
       why: 'Quy tắc chọn công cụ: dấu phân tách CỐ ĐỊNH → phương thức chuỗi; dấu phân tách là KHUÔN MẪU (ví dụ "một hoặc nhiều khoảng trắng liên tiếp") → mới cần `re.split`. Dùng regex cho việc đơn giản làm code khó đọc hơn và chậm hơn không cần thiết.',
     },
+    {
+      q: 'Nối chuỗi trong vòng lặp:\n\ns = ""\nfor ch in danh_sach:\n    s += ch\n\nSo với "".join(danh_sach), cách trên sai ở bản chất nào?',
+      options: [
+        'Không có gì khác biệt, hai cách hoàn toàn tương đương',
+        'Vì `str` là bất biến, mỗi lần `+=` phải tạo chuỗi MỚI và copy lại toàn bộ nội dung cũ — tổng chi phí O(n²)',
+        'Cách dùng `+=` luôn gây MemoryError với chuỗi dài',
+        '`"".join` chậm hơn vì phải duyệt danh sách hai lần',
+      ],
+      answer: 1,
+      why: 'Chuỗi bất biến nên không thể "ghi thêm vào cuối" tại chỗ: mỗi `+=` cấp phát một chuỗi mới rồi copy cả phần cũ lẫn phần mới → 1 + 2 + 3 + ... + n phép copy, tức O(n²). `"".join(...)` duyệt một lượt để biết tổng độ dài, cấp phát **một lần**, rồi copy một lượt → O(n). (CPython có một tối ưu đặc biệt cho trường hợp chuỗi chỉ còn đúng một tham chiếu, nhưng nó không được ngôn ngữ đảm bảo và biến mất ngay khi có biến khác trỏ tới chuỗi đó.)',
+    },
+    {
+      q: 'Biểu thức `re.split(r"(\\d)", "a1b")` trả về gì?',
+      options: ["['a', 'b']", "['a', '1', 'b']", "['a1b']", "['a', '1b']"],
+      answer: 1,
+      why: 'Khi pattern chứa **group bắt** (dấu ngoặc tròn), `re.split` GIỮ LẠI phần đã khớp trong kết quả — rất tiện khi bạn cần cả dấu phân tách lẫn nội dung (ví dụ tách biểu thức toán học). Không muốn vậy thì dùng nhóm không bắt `(?:\\d)`. Đây là cùng một nguyên lý với `re.findall`: sự hiện diện của group bắt làm **thay đổi cấu trúc dữ liệu trả về**, chứ không chỉ đánh dấu vùng khớp.',
+    },
+    {
+      q: 'Kiểm tra một username chỉ gồm chữ thường: `re.match(r"[a-z]+$", "admin\\n")` (chuỗi có ký tự xuống dòng ở cuối) cho kết quả gì?',
+      options: [
+        'None — vì ký tự xuống dòng không thuộc [a-z]',
+        'Khớp thành công — vì `$` cũng khớp ngay TRƯỚC một ký tự xuống dòng ở cuối chuỗi',
+        'Lỗi cú pháp regex',
+        'Khớp, nhưng chỉ khi bật cờ re.MULTILINE',
+      ],
+      answer: 1,
+      why: '`$` không có nghĩa là "hết chuỗi" mà là "cuối chuỗi HOẶC ngay trước ký tự xuống dòng kết thúc chuỗi". Vì vậy `"admin\\n"` lọt qua bài kiểm tra — một lỗ hổng thật khi validate dữ liệu người dùng (kẻ tấn công chèn `\\n` để vượt qua bộ lọc rồi khai thác ở tầng sau). Hai cách an toàn: dùng `re.fullmatch(...)` (bắt buộc khớp toàn bộ), hoặc thay `$` bằng `\\Z` (đúng nghĩa "hết chuỗi, không ngoại lệ").',
+    },
+    {
+      q: 'Biểu thức `"test.txt".strip(".txt")` trả về gì?',
+      options: ["'test'", "'es'", "'test.txt'", "'test.'"],
+      answer: 1,
+      why: 'Tham số của `strip()` là một **TẬP KÝ TỰ** cần bóc, không phải một chuỗi con. Tập ở đây là `{".", "t", "x"}`. Bóc từ trái: `t` thuộc tập → bỏ, tới `e` thì dừng. Bóc từ phải: `t`, `x`, `t`, `.`, rồi cả `t` của "test" đều thuộc tập → bỏ hết, tới `s` mới dừng. Kết quả `"es"`. Muốn bỏ đúng phần đuôi, dùng `removesuffix(".txt")` (Python 3.9+) hoặc `os.path.splitext(...)`.',
+    },
   ],
   problems: [
     {
@@ -203,7 +237,7 @@ Quy ước "email hợp lệ" cho bài này: một chuỗi liên tục dạng \`
         'Ghép hai phần bằng `@` ở giữa, dùng `re.findall(pattern, text)` để lấy tất cả khớp theo đúng thứ tự xuất hiện.',
       ],
       diagnostics: [
-        { test: '\\.\\*|\\.\\+', message: 'Regex đang dùng `.` (khớp MỌI ký tự) thay vì lớp ký tự cụ thể như `[\\w.-]` hoặc `[A-Za-z0-9-]` — email thật không chứa khoảng trắng/dấu phẩy nên đừng dùng `.` quá rộng, sẽ "ăn" cả những ký tự không thuộc email.' },
+        { test: '["\'(|@)]\\.[*+]', message: 'Regex đang dùng `.` (khớp MỌI ký tự) thay vì lớp ký tự cụ thể như `[\\w.-]` hoặc `[A-Za-z0-9-]` — email thật không chứa khoảng trắng/dấu phẩy nên đừng dùng `.` quá rộng, sẽ "ăn" cả những ký tự không thuộc email.' },
       ],
       approach: `
 Bài này luyện đúng kỹ năng cốt lõi: **thiết kế char class đủ chặt** để không "ăn lấn" sang phần không phải
@@ -469,6 +503,193 @@ def is_valid_username(name):
         why: 'Về bản chất thuật toán, việc khớp regex tuyến tính theo độ dài chuỗi input (O(n)). Vì đề bài giới hạn cứng độ dài tối đa 16, chi phí thực tế bị chặn trên bởi một hằng số — nhưng bản chất thuật toán vẫn là O(n), không phải O(1) một cách nội tại.',
       },
       realWorld: 'Validate username/mã sản phẩm/mã khuyến mãi khi đăng ký tài khoản hoặc nhập liệu — validate chặt bằng `fullmatch` ngay tại backend là lớp phòng thủ cuối cùng, không nên chỉ tin vào validate phía frontend (có thể bị bỏ qua bởi request giả mạo trực tiếp tới API).',
+    },
+    {
+      id: 'py-mask-long-digits',
+      title: 'Che số thẻ, giữ 4 chữ số cuối',
+      en: 'Mask Long Digit Runs',
+      difficulty: 'Medium',
+      targetMinutes: 14,
+      entry: 'mask_digits',
+      lang: 'python',
+      statement: `
+Viết hàm \`mask_digits(text)\` che các dãy chữ số **dài từ 9 ký tự trở lên** trong văn bản:
+- Giữ nguyên **4 chữ số cuối** của dãy.
+- Thay toàn bộ phần còn lại bằng đúng số lượng dấu \`*\` tương ứng.
+- Các dãy số ngắn hơn 9 chữ số **giữ nguyên** (ngày tháng, số lượng, mã ngắn...).
+
+**Ví dụ**
+- \`"The 1234567890123456 card"\` → \`"The ************3456 card"\`
+- \`"Ma 12345 giu nguyen"\` → \`"Ma 12345 giu nguyen"\` (chỉ 5 chữ số)
+- \`"a123456789b"\` → \`"a*****6789b"\` (9 chữ số → 5 sao + 4 số cuối)
+
+> Phần thay thế **phụ thuộc vào chính đoạn đã khớp** (độ dài của nó). Đây là lúc \`re.sub\` nhận một
+> **hàm** thay vì một chuỗi.
+`,
+      starter: `import re\n\n\ndef mask_digits(text):\n    # Che các dãy >= 9 chữ số, giữ 4 số cuối\n    \n`,
+      tests: [
+        { args: ['The 1234567890123456 card'], expected: 'The ************3456 card', name: 'Số thẻ 16 chữ số' },
+        { args: ['Ma 12345 giu nguyen'], expected: 'Ma 12345 giu nguyen', name: 'Dãy ngắn — không đụng tới' },
+        { args: ['a123456789b'], expected: 'a*****6789b', name: 'Đúng 9 chữ số (ngưỡng)' },
+        { args: [''], expected: '', name: 'Chuỗi rỗng' },
+        { args: ['Khong co so nao'], expected: 'Khong co so nao', name: 'Không có chữ số' },
+        { args: ['1234567890 va 9876543210'], expected: '******7890 va ******3210', name: 'Hai dãy trong một câu' },
+        { args: ['12345678 chi 8 chu so'], expected: '12345678 chi 8 chu so', name: 'Đúng 8 chữ số — dưới ngưỡng' },
+        { args: ['x111122223333y 2024'], expected: 'x********3333y 2024', name: 'Dãy dài kèm năm 4 chữ số' },
+      ],
+      hints: [
+        'Mẫu cần khớp là "dãy từ 9 chữ số trở lên": `\\d{9,}` trong raw string. Đừng dùng `\\d+` — nó khớp cả những dãy ngắn mà đề yêu cầu giữ nguyên.',
+        'Chuỗi thay thế không cố định: nó phụ thuộc độ dài đoạn vừa khớp. May mắn là `re.sub(pattern, repl, text)` cho phép `repl` là một **hàm** nhận vào đối tượng match và trả về chuỗi thay thế.',
+        'Trong hàm thay thế, `m.group()` là đoạn đã khớp. Kết quả cần là `"*" * (len(m.group()) - 4) + m.group()[-4:]`. Toàn bộ lời giải: `return re.sub(r"\\d{9,}", lambda m: ..., text)`.',
+      ],
+      diagnostics: [
+        { test: '\\\\d\\+', message: '`\\d+` khớp MỌI dãy chữ số, kể cả những dãy ngắn (ngày tháng, số lượng) mà đề yêu cầu giữ nguyên. Bạn cần định lượng tối thiểu: `\\d{9,}`.' },
+        { test: 're\\.sub\\s*\\([^,]+,\\s*["\']', message: 'Bạn đang truyền một chuỗi CỐ ĐỊNH làm phần thay thế, nhưng số dấu `*` phải thay đổi theo độ dài từng dãy khớp được. `re.sub` chấp nhận một hàm (hoặc lambda) làm tham số thứ hai — hãy dùng nó.' },
+      ],
+      approach: `
+Bài này dạy hai thứ mà người dùng regex ở mức trung cấp hay bỏ lỡ.
+
+**1. Định lượng có ngưỡng.** \`\\d+\` nghĩa là "một hoặc nhiều", còn \`\\d{9,}\` là "chín trở lên". Yêu cầu
+"chỉ che dãy đủ dài" phải nằm **trong chính pattern**, không nên đẩy sang một lệnh \`if\` bên ngoài —
+regex mô tả *cái gì cần khớp*, đó là việc của nó.
+
+**2. \`re.sub\` nhận hàm làm phần thay thế.** Khi chuỗi thay thế phụ thuộc vào nội dung đã khớp, đây là
+công cụ đúng:
+
+\`\`\`python
+import re
+
+def mask_digits(text):
+    return re.sub(r"\\d{9,}", lambda m: "*" * (len(m.group()) - 4) + m.group()[-4:], text)
+\`\`\`
+
+Hàm được gọi **một lần cho mỗi lần khớp**, nhận đối tượng \`Match\` và trả về chuỗi sẽ thay vào chỗ đó.
+Nhờ vậy bạn viết được logic tuỳ ý (tra bảng, định dạng lại, gọi hàm băm) mà vẫn giữ được sức mạnh quét
+văn bản của regex.
+
+**Vì sao không tự tách chuỗi rồi ghép lại?** Vì bạn sẽ phải tự quản lý chỉ số bắt đầu/kết thúc, phần văn
+bản xen giữa các lần khớp, và trường hợp không khớp lần nào — đúng những thứ \`re.sub\` đã làm chuẩn xác.
+
+**Ghi chú thực tế:** che dữ liệu nhạy cảm (data masking) luôn phải **giữ nguyên độ dài** như ở đây, để
+số liệu vẫn dùng được cho việc đối soát/hiển thị mà không lộ giá trị gốc.
+`,
+      solution: `import re
+
+
+def mask_digits(text):
+    def repl(m):
+        digits = m.group()
+        return "*" * (len(digits) - 4) + digits[-4:]
+
+    return re.sub(r"\\d{9,}", repl, text)`,
+      complexity: {
+        question: 'Độ phức tạp thời gian của mask_digits theo độ dài n của text?',
+        options: [
+          'O(n) — mỗi ký tự được quét một lần, và tổng độ dài các đoạn thay thế cũng bị chặn bởi n',
+          'O(n²) vì mỗi lần thay thế phải dựng lại toàn bộ chuỗi',
+          'O(n log n)',
+          'O(1) vì regex được biên dịch sẵn',
+        ],
+        answer: 0,
+        why: 'Pattern `\\d{9,}` không có phần lồng nhau gây quay lui (backtracking) theo cấp số nhân, nên bộ máy regex quét tuyến tính. `re.sub` dựng chuỗi kết quả bằng cách nối các mảnh MỘT lần ở cuối (không phải nối dồn trong vòng lặp), nên tổng vẫn là O(n).',
+      },
+      realWorld: 'Che dữ liệu nhạy cảm trước khi ghi log hoặc gửi sang hệ thống phân tích: số thẻ ngân hàng, số CCCD, số điện thoại, token. Đây là yêu cầu bắt buộc của PCI-DSS và các quy định bảo vệ dữ liệu cá nhân — và luôn phải làm ở tầng ghi log, vì log là nơi dữ liệu nhạy cảm rò rỉ nhiều nhất trong thực tế.',
+    },
+    {
+      id: 'py-strict-product-code',
+      title: 'Validate mã sản phẩm thật sự chặt',
+      en: 'Strict Product Code Validation',
+      difficulty: 'Easy',
+      targetMinutes: 10,
+      entry: 'is_valid_code',
+      lang: 'python',
+      statement: `
+Viết hàm \`is_valid_code(s)\` trả về \`True\` khi và chỉ khi \`s\` là một mã sản phẩm hợp lệ:
+- Đúng **3 chữ cái in hoa** \`A-Z\`
+- Một dấu gạch ngang \`-\`
+- Đúng **4 chữ số**
+- **Không có gì khác**, kể cả khoảng trắng hay ký tự xuống dòng ở hai đầu.
+
+**Ví dụ**
+- \`"ABC-1234"\` → \`True\`
+- \`"abc-1234"\` → \`False\` (chữ thường)
+- \`"ABC-12345"\` → \`False\` (5 chữ số)
+- \`"ABC-1234\\n"\` → \`False\` ← **hầu hết lời giải sai đúng ở test này**
+`,
+      starter: `import re\n\n\ndef is_valid_code(s):\n    # True nếu s khớp CHÍNH XÁC mẫu 3 chữ hoa + '-' + 4 chữ số\n    \n`,
+      tests: [
+        { args: ['ABC-1234'], expected: true, name: 'Mã hợp lệ' },
+        { args: ['XYZ-0000'], expected: true, name: 'Toàn số 0' },
+        { args: ['abc-1234'], expected: false, name: 'Chữ thường' },
+        { args: ['AB-1234'], expected: false, name: 'Chỉ 2 chữ cái' },
+        { args: ['ABC-12345'], expected: false, name: '5 chữ số' },
+        { args: ['ABC-123'], expected: false, name: '3 chữ số' },
+        { args: ['XABC-1234'], expected: false, name: 'Thừa ký tự ở đầu' },
+        { args: ['ABC-1234\n'], expected: false, name: 'Ký tự xuống dòng ở cuối — bẫy của dấu $' },
+        { args: ['ABC-1234 '], expected: false, name: 'Khoảng trắng ở cuối' },
+        { args: [''], expected: false, name: 'Chuỗi rỗng' },
+        { args: ['ABC_1234'], expected: false, name: 'Sai dấu phân cách' },
+      ],
+      hints: [
+        'Mẫu cần khớp là `[A-Z]{3}-\\d{4}`. Phần khó không nằm ở mẫu mà ở **cách neo** nó vào chuỗi.',
+        '`re.match` chỉ neo ở ĐẦU chuỗi, nên `"ABC-1234abc"` vẫn khớp. Thêm `$` ở cuối cũng chưa đủ: `$` khớp cả ở vị trí ngay trước ký tự xuống dòng kết thúc chuỗi, nên `"ABC-1234\\n"` lọt lưới.',
+        'Hai cách đúng: `re.fullmatch(r"[A-Z]{3}-\\d{4}", s)` (bắt buộc khớp toàn bộ chuỗi), hoặc dùng `\\Z` thay cho `$`. Nhớ bọc `bool(...)` vì `re.fullmatch` trả về đối tượng Match hoặc None, không phải True/False.',
+      ],
+      diagnostics: [
+        { test: 're\\.match\\s*\\(|re\\.search\\s*\\(', message: '`re.match` chỉ neo ở đầu chuỗi và `re.search` không neo ở đâu cả — cả hai đều chấp nhận phần thừa phía sau. Với bài validate "khớp chính xác toàn bộ", công cụ đúng là `re.fullmatch`.' },
+        { test: '\\$["\\\']', message: 'Dấu `$` ở cuối pattern KHÔNG có nghĩa là "hết chuỗi": nó cũng khớp ngay trước một ký tự xuống dòng kết thúc chuỗi, nên `"ABC-1234\\n"` sẽ bị chấp nhận nhầm. Dùng `re.fullmatch` hoặc thay `$` bằng `\\Z`.' },
+      ],
+      approach: `
+Bài này chỉ có một ý, nhưng là ý phân biệt người viết regex "chạy được" với người viết regex **an toàn**.
+
+Ba mức neo trong Python:
+
+| Cách viết | Ý nghĩa | \`"ABC-1234xyz"\` | \`"ABC-1234\\n"\` |
+|---|---|---|---|
+| \`re.search(p, s)\` | khớp ở bất kỳ đâu | khớp | khớp |
+| \`re.match(p, s)\` | neo đầu chuỗi | khớp | khớp |
+| \`re.match(p + "$", s)\` | neo đầu + "cuối dòng" | không khớp | **vẫn khớp** |
+| \`re.fullmatch(p, s)\` | toàn bộ chuỗi | không khớp | không khớp |
+
+Lý do dòng thứ ba nguy hiểm: đặc tả của \`$\` là "cuối chuỗi **hoặc** ngay trước một \`\\n\` ở cuối chuỗi".
+Thiết kế này tiện khi xử lý văn bản theo dòng, nhưng biến thành lỗ hổng khi dùng để validate: kẻ tấn công
+gắn thêm \`\\n\` cùng dữ liệu độc hại phía sau, vượt qua bộ lọc, rồi khai thác ở tầng tiếp theo (chèn
+header HTTP, chèn dòng log giả). Đây là loại lỗi đã xuất hiện trong CVE thật của nhiều thư viện.
+
+\`\`\`python
+import re
+
+def is_valid_code(s):
+    return bool(re.fullmatch(r"[A-Z]{3}-\\d{4}", s))
+\`\`\`
+
+**Hai chi tiết nhỏ nhưng quan trọng:**
+- \`bool(...)\` — \`re.fullmatch\` trả về \`Match\` hoặc \`None\`, không phải \`True\`/\`False\`. Trả thẳng ra
+  ngoài thì "dùng được trong \`if\`" nhưng sai kiểu, và test so sánh \`== True\` sẽ trượt.
+- Raw string \`r"..."\` — để \`\\d\` đi tới bộ máy regex nguyên vẹn thay vì bị Python diễn giải trước.
+
+**Nguyên tắc mang đi:** với validate, hãy mặc định dùng \`fullmatch\`. Chỉ dùng \`search\`/\`match\` khi bạn
+thật sự muốn tìm một mẩu bên trong văn bản lớn hơn.
+`,
+      solution: `import re
+
+CODE_RE = re.compile(r"[A-Z]{3}-\\d{4}")
+
+
+def is_valid_code(s):
+    return bool(CODE_RE.fullmatch(s))`,
+      complexity: {
+        question: 'Độ phức tạp thời gian của is_valid_code theo độ dài n của s?',
+        options: [
+          'O(n) — nhưng thực tế còn nhanh hơn: mẫu có độ dài cố định nên fullmatch loại ngay chuỗi sai độ dài',
+          'O(n²) do quay lui (backtracking)',
+          'O(2^n) vì regex luôn có nguy cơ bùng nổ tổ hợp',
+          'O(log n)',
+        ],
+        answer: 0,
+        why: 'Mẫu này chỉ gồm các định lượng cố định (`{3}`, `{4}`) nên không có quay lui — bộ máy đi thẳng, tối đa 8 ký tự. Chỉ những mẫu có định lượng lồng nhau kiểu `(a+)+` mới gây bùng nổ tổ hợp (ReDoS); `re.compile` sẵn ở cấp module còn giúp tránh phải phân tích lại pattern ở mỗi lời gọi.',
+      },
+      realWorld: 'Validate mã đơn hàng, mã sản phẩm, biển số xe, mã OTP, định dạng username trước khi ghi vào database. Chọn `fullmatch` thay vì `match` + `$` là một trong những thói quen phòng thủ rẻ nhất mà hiệu quả nhất — đặc biệt với dữ liệu đến từ form web hoặc API bên ngoài.',
     },
   ],
 },

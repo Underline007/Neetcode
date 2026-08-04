@@ -170,6 +170,40 @@ with open("a.txt") as fa, open("b.txt") as fb:
       answer: 1,
       why: 'Cú pháp nhiều context manager cách nhau bằng dấu phẩy trên một dòng `with` là cách viết gọn của việc lồng nhiều khối `with` vào nhau — cả hai tài nguyên đều được đảm bảo dọn dẹp đúng cách (theo thứ tự ngược lại với lúc mở) khi thoát khỏi khối, dù có lỗi hay không.',
     },
+    {
+      q: 'Sau khối lệnh sau, `print(f.closed)` cho kết quả gì?\n\nwith open("data.txt") as f:\n    data = f.read()\nprint(f.closed)',
+      options: ['NameError — f chỉ tồn tại bên trong khối with', 'True — f vẫn tồn tại, chỉ là file đã được đóng', 'False', 'None'],
+      answer: 1,
+      why: '`with` **không tạo phạm vi biến mới** — khác hẳn với khối lệnh trong JavaScript hay C. Trong Python, chỉ hàm, class và module mới tạo scope; `if`, `for`, `while`, `with` thì không. Vì vậy `f` (và cả `data`) vẫn sống sau khối lệnh. Điều `with` đảm bảo không phải là "biến biến mất" mà là "**phương thức dọn dẹp đã chạy**": file đã đóng, nên `f.read()` lúc này sẽ raise `ValueError: I/O operation on closed file`.',
+    },
+    {
+      q: 'Nếu `__enter__` raise exception ngay khi vừa vào khối `with`, thì `__exit__` có được gọi không?',
+      options: [
+        'Có — `__exit__` luôn luôn được gọi',
+        'Không — `with` chưa "vào" được, nên chưa có gì để dọn dẹp',
+        'Có, nhưng với cả ba tham số đều là None',
+        'Tuỳ vào việc `__enter__` có `return self` hay không',
+      ],
+      answer: 1,
+      why: 'Lời hứa của `with` chính xác là: "**nếu** đã vào được khối lệnh thì chắc chắn `__exit__` sẽ chạy". Khi `__enter__` hỏng giữa chừng, hợp đồng chưa bắt đầu — exception lan thẳng ra ngoài và `__exit__` không được gọi. Hệ quả thực hành rất quan trọng: nếu `__enter__` của bạn chiếm **nhiều** tài nguyên (mở 3 file), nó phải tự dọn phần đã chiếm khi hỏng ở giữa; đừng trông cậy vào `__exit__`.',
+    },
+    {
+      q: 'Đoạn code sau in ra gì?\n\nclass T:\n    def __enter__(self):\n        pass\n    def __exit__(self, *args):\n        pass\n\nwith T() as t:\n    print(t)',
+      options: ['<T object at 0x...>', 'None', 'TypeError: __enter__ phải return self', 'T'],
+      answer: 1,
+      why: 'Biến sau `as` nhận **giá trị trả về của `__enter__`**, chứ không phải bản thân context manager. Ở đây `__enter__` không có `return` nên trả về `None`, và `t` là `None` — mọi lời gọi `t.something()` sau đó sẽ raise `AttributeError: NoneType object has no attribute ...`, một thông báo lỗi chẳng gợi ý gì về nguyên nhân thật. Đó là lý do `return self` gần như luôn là dòng cuối của `__enter__`. (Ngoại lệ có chủ đích: `open()` trả về file object, còn `lock` thì trả về `True`/`None` vì bạn không cần dùng tới nó.)',
+    },
+    {
+      q: 'Hàm decorate bằng `@contextmanager` có HAI lệnh `yield`. Điều gì xảy ra khi ra khỏi khối `with`?',
+      options: [
+        'Khối `with` chạy hai lần',
+        'RuntimeError: generator didn\'t stop',
+        'Lệnh `yield` thứ hai bị bỏ qua',
+        'Lỗi ngay khi định nghĩa hàm',
+      ],
+      answer: 1,
+      why: '`@contextmanager` dịch generator thành context manager theo đúng một khuôn: phần trước `yield` là `__enter__`, phần sau là `__exit__`. Vì vậy generator **bắt buộc phải dừng lại đúng một lần**. Khi ra khỏi khối, `contextlib` gọi `next()` và kỳ vọng nhận `StopIteration`; nếu generator lại yield tiếp, nó raise `RuntimeError: generator didn\'t stop`. Cùng logic đó, nếu bạn nuốt exception bằng `except: pass` quanh `yield` rồi yield thêm lần nữa, bạn sẽ nhận `RuntimeError: generator didn\'t stop after throw()`.',
+    },
   ],
   problems: [
     {
@@ -313,7 +347,7 @@ Dùng \`@contextmanager\` (từ \`contextlib\`), viết hàm \`temporary_value(d
         'Bọc phần code SAU `yield` trong `try/finally` (đặt `yield` bên trong `try`): trong `finally`, nếu `had_key` là `True` thì `d[key] = original` (khôi phục), ngược lại `del d[key]` (xoá key đã thêm tạm).',
       ],
       diagnostics: [
-        { test: 'yield(?!.*try)|(?<!try:\\n\\s{4})yield', message: 'Nhớ đặt `yield` bên trong khối `try`, với phần khôi phục giá trị nằm trong `finally` — nếu không, khi code bên trong `with` (của người gọi) gây lỗi, phần khôi phục giá trị gốc sẽ bị bỏ qua, để lại `d` ở trạng thái sai.' },
+        { test: '^(?![\\s\\S]*finally)[\\s\\S]*def\\s+temporary_value', message: 'Không thấy `finally` trong lời giải. Nhớ đặt `yield` bên trong khối `try`, với phần khôi phục giá trị nằm trong `finally` — nếu không, khi code bên trong `with` (của người gọi) gây lỗi, phần khôi phục giá trị gốc sẽ bị bỏ qua, để lại `d` ở trạng thái sai.' },
       ],
       approach: `
 Đây là ví dụ chuẩn cho \`@contextmanager\`: setup trước \`yield\`, cleanup sau \`yield\` — và cleanup PHẢI nằm
@@ -470,6 +504,280 @@ def run_with_lock(should_raise):
         why: 'Toàn bộ hàm chỉ có một số thao tác cố định (kiểm tra, gán, append vào list tối đa 3 lần) — không có vòng lặp hay đệ quy phụ thuộc kích thước input.',
       },
       realWorld: '`threading.Lock`, kết nối database dùng connection pool, hay bất kỳ tài nguyên "độc quyền" nào (chỉ một luồng/tiến trình được dùng tại một thời điểm) đều cần đảm bảo giải phóng đúng cách dù code sử dụng nó có lỗi hay không — nếu không, một lỗi ở nơi dùng tài nguyên có thể khiến toàn bộ phần còn lại của hệ thống bị "treo" chờ tài nguyên không bao giờ được giải phóng (deadlock).',
+    },
+    {
+      id: 'py-transaction-context',
+      title: 'Context manager kiểu transaction (commit / rollback)',
+      en: 'Transaction Context Manager',
+      difficulty: 'Medium',
+      targetMinutes: 18,
+      entry: 'run_transaction',
+      lang: 'python',
+      statement: `
+Viết class \`Transaction\` dùng được với câu lệnh \`with\`, mô phỏng một giao dịch database:
+
+- \`self.pending\` — danh sách thao tác đang chờ; \`self.log\` — nhật ký sự kiện.
+- \`add(op)\` — thêm một thao tác vào \`pending\`.
+- \`__enter__\` — ghi \`"begin"\` vào \`log\` và **trả về chính nó** (để dùng được với \`as\`).
+- \`__exit__\`:
+  - Nếu khối \`with\` kết thúc **bình thường**: ghi \`"commit:" + op\` cho **từng** thao tác trong \`pending\`
+    (theo đúng thứ tự đã thêm).
+  - Nếu có exception: ghi đúng một dòng \`"rollback"\`.
+  - Cả hai trường hợp: xoá sạch \`pending\`, và **KHÔNG nuốt exception** — nó phải lan tiếp ra ngoài.
+
+Hàm \`run_transaction\` đã được viết sẵn ở phần dưới khung code — **đừng sửa nó**, chỉ hoàn thiện class.
+
+**Ví dụ**
+- \`["a", "b"]\` → \`["begin", "commit:a", "commit:b"]\`
+- \`["a", "boom", "b"]\` → \`["begin", "rollback", "caught"]\`
+`,
+      starter: `class Transaction:\n    def __init__(self):\n        self.pending = []\n        self.log = []\n\n    def add(self, op):\n        self.pending.append(op)\n\n    # Bổ sung __enter__ và __exit__\n    \n\n\n# ----- KHÔNG SỬA PHẦN DƯỚI ĐÂY -----\ndef run_transaction(ops):\n    t = Transaction()\n    try:\n        with t as tx:\n            for op in ops:\n                if op == "boom":\n                    raise ValueError(op)\n                tx.add(op)\n    except ValueError:\n        t.log.append("caught")\n    return t.log\n`,
+      tests: [
+        { args: [['a', 'b']], expected: ['begin', 'commit:a', 'commit:b'], name: 'Giao dịch thành công' },
+        { args: [['a', 'boom', 'b']], expected: ['begin', 'rollback', 'caught'], name: 'Lỗi giữa chừng — rollback và KHÔNG nuốt lỗi' },
+        { args: [[]], expected: ['begin'], name: 'Giao dịch rỗng' },
+        { args: [['boom']], expected: ['begin', 'rollback', 'caught'], name: 'Lỗi ngay thao tác đầu tiên' },
+        { args: [['x']], expected: ['begin', 'commit:x'], name: 'Một thao tác' },
+        { args: [['a', 'b', 'c', 'boom']], expected: ['begin', 'rollback', 'caught'], name: 'Lỗi ở cuối — mọi thao tác trước đó đều bị huỷ' },
+        { args: [['p', 'q', 'r']], expected: ['begin', 'commit:p', 'commit:q', 'commit:r'], name: 'Ba thao tác, đúng thứ tự' },
+      ],
+      hints: [
+        '`__enter__(self)` chỉ cần ghi `"begin"` và `return self`. Thiếu `return self` thì biến sau `as` sẽ là `None` và `tx.add(op)` raise `AttributeError`.',
+        'Chữ ký bắt buộc: `__exit__(self, exc_type, exc_value, traceback)`. Phân biệt hai trường hợp bằng `if exc_type is None:` — không có exception thì commit, ngược lại thì rollback.',
+        'Chi tiết quyết định test "caught": giá trị trả về của `__exit__`. Trả `True` nghĩa là "tôi đã xử lý xong, nuốt exception này" — khi đó khối `except ValueError` bên ngoài sẽ không chạy và `"caught"` biến mất. Hãy `return False` (hoặc đơn giản là không viết `return` nào).',
+      ],
+      diagnostics: [
+        { test: 'def\\s+__exit__[\\s\\S]{0,400}?return\\s+True', message: '`__exit__` trả về `True` sẽ **nuốt** exception: nó không lan ra ngoài nữa, nên khối `except ValueError` của `run_transaction` không chạy và `"caught"` không được ghi. Một transaction phải rollback rồi vẫn để lỗi báo lên trên. Hãy `return False`.' },
+        { test: 'def\\s+__enter__(?![\\s\\S]{0,200}?return\\s+self)', message: 'Kiểm tra lại `__enter__`: nó cần `return self`. Nếu không, biến sau `as` nhận `None` và mọi lời gọi phương thức trên đó sẽ raise `AttributeError`.' },
+        { test: 'def\\s+__exit__\\s*\\(\\s*self\\s*\\)', message: '`__exit__` phải nhận đúng bốn tham số: `(self, exc_type, exc_value, traceback)`. Python luôn truyền đủ ba thông tin về exception (hoặc ba giá trị `None` nếu không có lỗi).' },
+      ],
+      approach: `
+Transaction là **ví dụ mẫu mực nhất** của context manager, vì nó cần cả hai vế mà \`with\` cung cấp: một
+điểm bắt đầu rõ ràng, và một điểm kết thúc **có phân biệt thành công/thất bại**.
+
+\`\`\`python
+class Transaction:
+    def __init__(self):
+        self.pending = []
+        self.log = []
+
+    def add(self, op):
+        self.pending.append(op)
+
+    def __enter__(self):
+        self.log.append("begin")
+        return self                      # biến sau 'as' nhận giá trị này
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type is None:
+            for op in self.pending:
+                self.log.append("commit:" + op)
+        else:
+            self.log.append("rollback")
+        self.pending.clear()
+        return False                     # KHÔNG nuốt exception
+\`\`\`
+
+**Ba tham số của \`__exit__\` chính là "kênh thông tin" về chuyện đã xảy ra:**
+
+| Tình huống | \`exc_type\` | Ý nghĩa |
+|---|---|---|
+| Khối \`with\` chạy xong bình thường | \`None\` | commit |
+| Có exception (kể cả từ \`return\`/\`break\` bên trong? không) | lớp exception | rollback |
+
+Nhờ vậy \`__exit__\` **quyết định được** hành vi dọn dẹp dựa trên kết quả — điều mà một khối \`finally\`
+đơn thuần không làm được nếu không tự bắt lỗi.
+
+**Giá trị trả về mới là phần dễ sai nhất.** Nó KHÔNG phải là "báo đã dọn dẹp xong":
+
+- \`return False\` / không \`return\` gì (\`None\`) → exception **tiếp tục lan ra ngoài**. Đây là mặc định
+  đúng cho hầu hết trường hợp.
+- \`return True\` → exception bị **nuốt hoàn toàn**, chương trình chạy tiếp như chưa có gì. Chỉ dùng khi
+  bạn cố ý làm việc đó (ví dụ \`contextlib.suppress\`).
+
+Với transaction, nuốt lỗi là sai nghiêm trọng: lớp gọi phía trên sẽ tưởng mọi thứ thành công, trong khi dữ
+liệu đã bị rollback. Đây đúng là loại bug làm hỏng tính toàn vẹn dữ liệu mà không ai phát hiện cho tới khi
+đối soát sổ sách.
+
+**Vì sao \`pending.clear()\` nằm ngoài cả hai nhánh?** Vì "dọn sạch trạng thái" phải xảy ra trong MỌI
+trường hợp — đúng tinh thần \`finally\`. Nếu chỉ xoá ở nhánh commit, một transaction thất bại sẽ để lại rác
+làm bẩn giao dịch tiếp theo.
+`,
+      solution: `class Transaction:
+    def __init__(self):
+        self.pending = []
+        self.log = []
+
+    def add(self, op):
+        self.pending.append(op)
+
+    def __enter__(self):
+        self.log.append("begin")
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type is None:
+            for op in self.pending:
+                self.log.append("commit:" + op)
+        else:
+            self.log.append("rollback")
+        self.pending.clear()
+        return False
+
+
+def run_transaction(ops):
+    t = Transaction()
+    try:
+        with t as tx:
+            for op in ops:
+                if op == "boom":
+                    raise ValueError(op)
+                tx.add(op)
+    except ValueError:
+        t.log.append("caught")
+    return t.log`,
+      complexity: {
+        question: 'Độ phức tạp thời gian của một giao dịch có n thao tác?',
+        options: [
+          'O(n) — mỗi thao tác được thêm một lần và ghi log tối đa một lần',
+          'O(n²) vì `__exit__` phải duyệt lại pending cho từng thao tác',
+          'O(1) vì `__exit__` chỉ chạy một lần',
+          'O(n log n)',
+        ],
+        answer: 0,
+        why: '`add` là O(1) khấu hao, và `__exit__` duyệt `pending` đúng một lượt → O(n) tổng cộng. Điểm đáng chú ý về bộ nhớ: mô hình này giữ TOÀN BỘ thao tác trong RAM cho tới lúc commit — chính là lý do transaction thật bị giới hạn kích thước, và là lý do người ta chia dữ liệu lớn thành nhiều lô nhỏ thay vì một transaction khổng lồ.',
+      },
+      realWorld: 'Đây chính là cách `sqlite3.Connection`, SQLAlchemy `session.begin()`, và các ORM khác hoạt động: `with conn:` tự commit khi thành công và rollback khi có exception. Cùng khuôn mẫu đó áp dụng cho ghi file theo kiểu "tất cả hoặc không gì" (ghi vào file tạm rồi đổi tên), gửi lô message lên queue, và cập nhật nhiều dịch vụ trong một thao tác nghiệp vụ.',
+    },
+    {
+      id: 'py-close-in-reverse',
+      title: 'Chiếm nhiều tài nguyên và dọn dẹp theo thứ tự ngược',
+      en: 'Acquire Many, Release in Reverse',
+      difficulty: 'Medium',
+      targetMinutes: 16,
+      entry: 'open_all',
+      lang: 'python',
+      statement: `
+Viết hàm \`open_all(names, fail_on)\` mô phỏng việc chiếm lần lượt nhiều tài nguyên và trả về nhật ký:
+
+Với mỗi tên trong \`names\`, theo thứ tự:
+- Nếu tên đó bằng \`fail_on\` → \`raise RuntimeError(tên)\` (tài nguyên này **không** được mở).
+- Ngược lại → ghi \`"open:" + tên\`.
+
+Nếu mở được **hết**, ghi \`"work"\`. Nếu có lỗi, bắt lại và ghi \`"error"\`.
+
+**Trong mọi trường hợp**, cuối cùng phải đóng những tài nguyên **đã thực sự mở được**, theo **thứ tự
+ngược** với lúc mở, ghi \`"close:" + tên\` cho từng cái.
+
+\`fail_on\` có thể là \`None\` (không có lỗi nào).
+
+**Ví dụ**
+- \`(["a", "b"], None)\` → \`["open:a", "open:b", "work", "close:b", "close:a"]\`
+- \`(["a", "b", "c"], "b")\` → \`["open:a", "error", "close:a"]\` ← chỉ \`a\` được mở nên chỉ \`a\` bị đóng
+`,
+      starter: `def open_all(names, fail_on):\n    # Mở lần lượt, luôn đóng những cái ĐÃ mở, theo thứ tự ngược\n    \n`,
+      tests: [
+        { args: [['a', 'b'], null], expected: ['open:a', 'open:b', 'work', 'close:b', 'close:a'], name: 'Mở hết, đóng ngược' },
+        { args: [['a', 'b', 'c'], 'b'], expected: ['open:a', 'error', 'close:a'], name: 'Hỏng ở giữa — chỉ đóng cái đã mở' },
+        { args: [[], null], expected: ['work'], name: 'Không có tài nguyên nào' },
+        { args: [['a'], 'a'], expected: ['error'], name: 'Hỏng ngay cái đầu tiên — không đóng gì cả' },
+        { args: [['a', 'b', 'c'], null], expected: ['open:a', 'open:b', 'open:c', 'work', 'close:c', 'close:b', 'close:a'], name: 'Ba tài nguyên' },
+        { args: [['a', 'b', 'c'], 'c'], expected: ['open:a', 'open:b', 'error', 'close:b', 'close:a'], name: 'Hỏng ở cái cuối' },
+        { args: [['db', 'cache', 'file'], 'cache'], expected: ['open:db', 'error', 'close:db'], name: 'Tên thật, hỏng ở tầng hai' },
+      ],
+      hints: [
+        'Giữ một danh sách `opened` ghi lại những tài nguyên đã mở THÀNH CÔNG. Đây là điểm mấu chốt: bạn chỉ được đóng đúng những thứ trong danh sách này, không phải toàn bộ `names`.',
+        'Khung xử lý: `try:` mở lần lượt rồi ghi `"work"` → `except RuntimeError:` ghi `"error"` → `finally:` đóng. Phần đóng phải nằm trong `finally` để chạy được ở cả hai nhánh.',
+        'Đóng theo thứ tự ngược: `for n in reversed(opened):`. Đừng dùng `opened.reverse()` nếu bạn còn cần danh sách gốc — `reversed()` chỉ tạo một iterator, không sửa list.',
+      ],
+      diagnostics: [
+        { test: 'for\\s+\\w+\\s+in\\s+reversed\\s*\\(\\s*names\\s*\\)', message: 'Bạn đang đóng theo `names` — tức là đóng cả những tài nguyên CHƯA hề mở được (và cả cái đã gây lỗi). Chỉ được đóng những cái nằm trong danh sách đã mở thành công.' },
+        { test: '^(?![\\s\\S]*finally)[\\s\\S]*def\\s+open_all', message: 'Không thấy `finally`. Nếu phần đóng tài nguyên chỉ nằm ở nhánh thành công hoặc chỉ trong `except`, sẽ luôn có một trường hợp bị rò rỉ tài nguyên. Dọn dẹp thuộc về `finally`.' },
+        { test: '\\.reverse\\s*\\(\\s*\\)', message: '`list.reverse()` đảo ngược TẠI CHỖ và trả về `None` — nếu bạn viết `for n in opened.reverse():` sẽ gặp `TypeError: NoneType is not iterable`. Dùng `reversed(opened)` (tạo iterator) hoặc `opened[::-1]` (tạo bản sao).' },
+      ],
+      approach: `
+Đây là bài toán mà \`with\` lồng nhau giải quyết **miễn phí** cho bạn — và bài này bắt bạn tự làm để hiểu
+nó đang làm gì.
+
+\`\`\`python
+with open("a") as fa:
+    with open("b") as fb:
+        ...
+# fb đóng trước, rồi mới tới fa — thứ tự NGƯỢC, tự động
+\`\`\`
+
+**Vì sao phải đóng theo thứ tự ngược?** Vì tài nguyên sau thường **phụ thuộc** vào tài nguyên trước: một
+transaction mở trên một connection, một file nằm trong một thư mục tạm, một cursor thuộc về một session.
+Đóng connection trước khi đóng transaction là hỏng. Nguyên tắc chung: **thứ tự huỷ luôn ngược với thứ tự
+tạo** — giống hệt cách ngăn xếp hoạt động (và cũng chính là lý do nó dùng stack).
+
+**Vì sao chỉ đóng những cái đã mở?** Vì lỗi thường xảy ra **ở giữa** quá trình chiếm tài nguyên. Cố đóng
+một thứ chưa mở sẽ gây thêm một exception mới ngay trong lúc dọn dẹp — che mất lỗi gốc, và đây là kiểu bug
+khiến người ta mất hàng giờ nhìn nhầm chỗ.
+
+\`\`\`python
+def open_all(names, fail_on):
+    log = []
+    opened = []
+    try:
+        for n in names:
+            if n == fail_on:
+                raise RuntimeError(n)
+            log.append("open:" + n)
+            opened.append(n)     # chỉ ghi nhận SAU khi mở thành công
+        log.append("work")
+    except RuntimeError:
+        log.append("error")
+    finally:
+        for n in reversed(opened):
+            log.append("close:" + n)
+    return log
+\`\`\`
+
+**Trong Python thật, bạn không nên tự viết cái này.** Khi số tài nguyên biết trước, hãy dùng nhiều context
+manager trên một dòng \`with\`. Khi số lượng **không biết trước** (đúng tình huống của bài này), công cụ
+đúng là \`contextlib.ExitStack\`:
+
+\`\`\`python
+from contextlib import ExitStack
+
+with ExitStack() as stack:
+    files = [stack.enter_context(open(name)) for name in names]
+    # thoát khối -> ExitStack đóng mọi thứ đã đăng ký, theo thứ tự ngược,
+    # kể cả khi việc mở file thứ 3 thất bại giữa chừng
+\`\`\`
+
+\`ExitStack\` chính là phiên bản tổng quát của lời giải trên: nó giữ một ngăn xếp các hàm dọn dẹp và bung
+ngược lại lúc thoát. Biết cách nó hoạt động giúp bạn tin dùng nó đúng chỗ.
+`,
+      solution: `def open_all(names, fail_on):
+    log = []
+    opened = []
+    try:
+        for n in names:
+            if n == fail_on:
+                raise RuntimeError(n)
+            log.append("open:" + n)
+            opened.append(n)
+        log.append("work")
+    except RuntimeError:
+        log.append("error")
+    finally:
+        for n in reversed(opened):
+            log.append("close:" + n)
+    return log`,
+      complexity: {
+        question: 'Độ phức tạp thời gian và bộ nhớ theo số tài nguyên n?',
+        options: [
+          'Thời gian O(n), bộ nhớ O(n) — phải nhớ danh sách những gì đã mở để còn đóng lại',
+          'Thời gian O(n²) vì phải tìm lại từng tài nguyên khi đóng',
+          'Thời gian O(n), bộ nhớ O(1)',
+          'Thời gian O(n log n)',
+        ],
+        answer: 0,
+        why: 'Mỗi tài nguyên được mở tối đa một lần và đóng tối đa một lần → O(n) thời gian. Bộ nhớ O(n) là **bắt buộc, không tối ưu được**: muốn dọn dẹp thì phải nhớ mình đã chiếm những gì. Đó cũng chính là thứ `ExitStack` lưu bên trong nó, và là lý do nó có tên "stack".',
+      },
+      realWorld: 'Mở nhiều file cùng lúc để trộn dữ liệu, chiếm nhiều khoá (lock) theo thứ tự cố định để tránh deadlock, khởi tạo chuỗi kết nối database/cache/message-queue lúc ứng dụng khởi động và tắt chúng theo thứ tự ngược khi dừng. Đây cũng là mô hình của mọi hệ thống quản lý vòng đời tài nguyên: RAII trong C++, `defer` trong Go, `try-with-resources` trong Java.',
     },
   ],
 },

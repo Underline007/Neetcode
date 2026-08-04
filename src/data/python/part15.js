@@ -179,6 +179,50 @@ ket_qua = "".join(parts)      # O(n) tổng — thay vì += từng bước tốn
       answer: 1,
       why: 'Bottleneck thực sự thường nằm ở nơi không ai ngờ tới (một truy vấn database, một vòng lặp nối chuỗi bằng `+=`...). Đo đạc bằng công cụ (`time.perf_counter`, `cProfile`) trước khi tối ưu giúp tập trung đúng công sức vào nơi thực sự tạo ra khác biệt.',
     },
+    {
+      q: '100 thread cùng chạy `counter += 1` mười nghìn lần trên một biến toàn cục. Kết quả cuối cùng thế nào?',
+      options: [
+        'Luôn đúng bằng 1.000.000 — GIL đảm bảo mỗi thao tác là nguyên tử',
+        'Thường NHỎ HƠN 1.000.000 — `counter += 1` gồm ba bước (đọc, cộng, ghi) và GIL có thể chuyển luồng ở giữa',
+        'Luôn lớn hơn 1.000.000',
+        'Chương trình raise RuntimeError',
+      ],
+      answer: 1,
+      why: 'Đây là hiểu lầm phổ biến nhất về GIL: nó đảm bảo **một bytecode tại một thời điểm**, chứ không phải "một dòng code Python tại một thời điểm". `counter += 1` biên dịch thành nhiều bytecode (LOAD, ADD, STORE) và trình thông dịch có thể chuyển luồng ở khe giữa — hai luồng cùng đọc giá trị 5, cùng ghi 6, và một lần tăng biến mất. **GIL bảo vệ trạng thái nội bộ của trình thông dịch, không bảo vệ dữ liệu của bạn.** Vẫn phải dùng `threading.Lock` (hoặc `queue.Queue`) cho mọi trạng thái dùng chung.',
+    },
+    {
+      q: 'Hai lời gọi mạng, mỗi cái mất 1 giây:\n\nawait fetch("A")\nawait fetch("B")\n\nTổng thời gian là bao nhiêu?',
+      options: [
+        'Khoảng 1 giây — async tự động chạy song song',
+        'Khoảng 2 giây — mỗi `await` CHỜ xong mới chạy dòng tiếp theo',
+        'Không xác định',
+        'Lỗi vì thiếu asyncio.run',
+      ],
+      answer: 1,
+      why: '`await` nghĩa là "dừng ở đây cho tới khi việc này xong" — nó nhường CPU cho các tác vụ **khác** đang chờ, nhưng không hề khiến hai dòng liên tiếp chạy đồng thời. Muốn thật sự chồng lấn, phải khởi động cả hai TRƯỚC rồi mới chờ: `await asyncio.gather(fetch("A"), fetch("B"))` → khoảng 1 giây. Đây là lỗi số một khi mới dùng asyncio: viết đúng cú pháp async nhưng vẫn chạy tuần tự, và tự hỏi vì sao code "bất đồng bộ" chẳng nhanh hơn chút nào.',
+    },
+    {
+      q: 'Vì sao chuyển một hàm tính toán rất NHẸ (ví dụ `x * 2`) sang `multiprocessing` thường khiến chương trình CHẬM HƠN?',
+      options: [
+        'Vì multiprocessing vẫn bị GIL giới hạn',
+        'Vì chi phí tạo tiến trình và đóng gói (pickle) dữ liệu qua lại lớn hơn nhiều so với chính phép tính',
+        'Vì Python giới hạn số tiến trình tối đa là 2',
+        'Vì hàm quá nhẹ nên bị hệ điều hành bỏ qua',
+      ],
+      answer: 1,
+      why: 'Mỗi tiến trình con là một trình thông dịch Python riêng: khởi động tốn hàng chục mili-giây, và **mọi dữ liệu đi qua lại đều phải pickle rồi unpickle** vì các tiến trình không chia sẻ bộ nhớ. Chi phí đó cố định và khá lớn, nên chỉ đáng bỏ ra khi mỗi tác vụ đủ nặng (thường từ vài chục mili-giây trở lên). Hai hệ quả thực tế đi kèm: hãy chia dữ liệu thành **lô lớn** thay vì gửi từng phần tử, và nhớ rằng `lambda`/hàm lồng **không pickle được** — đó là lý do bạn hay gặp `PicklingError` khi mới dùng `multiprocessing`.',
+    },
+    {
+      q: 'Kiểm tra `if x in danh_sach` bên trong một vòng lặp duyệt n phần tử. Vấn đề hiệu năng là gì?',
+      options: [
+        'Không có vấn đề gì, `in` luôn là O(1)',
+        'Mỗi phép `in` trên `list` là O(n) → tổng thành O(n²); đổi sang `set` đưa nó về O(n)',
+        '`in` chỉ hoạt động với list đã sắp xếp',
+        'Vấn đề nằm ở bộ nhớ, không phải thời gian',
+      ],
+      answer: 1,
+      why: '`x in list` phải **quét tuần tự** cho tới khi tìm thấy — O(n). Đặt trong một vòng lặp n bước là O(n²): với n = 100.000, đó là mười tỷ phép so sánh (nhiều phút), trong khi bản dùng `set` chạy trong tích tắc. `x in set` (và `x in dict`) là O(1) trung bình nhờ bảng băm. Đây là tối ưu hoá đáng làm nhất trong Python vì nó đổi hẳn **bậc độ phức tạp**, không phải chỉ giảm hằng số — và cũng là lý do nên profile trước: một dòng `in` trông vô hại thường là nút thắt thật sự, chứ không phải "vòng lặp trông có vẻ nặng".',
+    },
   ],
   problems: [
     {
@@ -216,7 +260,7 @@ Viết hàm \`recommend_tool(bound_type, task_count)\` khuyến nghị công c�
         'Bài này chủ yếu luyện đúng TRỰC GIAC phân loại I/O-bound/CPU-bound — phần code thực ra khá ngắn (if/elif/else), phần quan trọng là hiểu ĐÚNG lý do đằng sau mỗi khuyến nghị (xem phần "Ý tưởng cốt lõi" của bài học).',
       ],
       diagnostics: [
-        { test: 'bound_type\\s*==\\s*[\'"]cpu[\'"][\\s\\S]*return\\s+[\'"]asyncio', message: 'Khuyến nghị `asyncio`/`threading` cho tác vụ CPU-bound là SAI hướng: vì GIL, các công cụ dựa trên thread (kể cả asyncio, vốn cũng chạy trên 1 thread) không giúp tính toán thuần Python chạy nhanh hơn — CPU-bound cần `multiprocessing` để tận dụng nhiều nhân CPU thật sự.' },
+        { test: 'bound_type\\s*==\\s*[\'"]cpu[\'"]\\s*:\\s*return\\s+[\'"](asyncio|threading)', message: 'Khuyến nghị `asyncio`/`threading` cho tác vụ CPU-bound là SAI hướng: vì GIL, các công cụ dựa trên thread (kể cả asyncio, vốn cũng chạy trên 1 thread) không giúp tính toán thuần Python chạy nhanh hơn — CPU-bound cần `multiprocessing` để tận dụng nhiều nhân CPU thật sự.' },
       ],
       approach: `
 Bài này là bài tập trực tiếp áp dụng lý thuyết cốt lõi của module: **phân loại đúng loại tác vụ quyết định
@@ -429,6 +473,216 @@ hàng chục giây.
         why: 'Có khoảng `limit` số cần kiểm tra, mỗi lần kiểm tra `is_prime` tốn tối đa O(sqrt(n)) (với n ⊆ limit) — tổng chi phí là O(limit · sqrt(limit)), tốt hơn NHIỀU so với O(limit²) nếu thử chia tới tận `n - 1` cho mỗi số.',
       },
       realWorld: 'Kiểm tra tính nguyên tố xuất hiện trong mật mã học (chọn số nguyên tố lớn cho RSA), bài toán tối ưu hoá thuật toán kinh điển trong phỏng vấn kỹ thuật — nhưng bài học lớn hơn của bài này là tổng quát: LUÔN đặt câu hỏi "có cần lặp/kiểm tra XA đến vậy không, hay có giới hạn toán học nào giúp dừng SỚM HƠN" trước khi chấp nhận một độ phức tạp cao hơn cần thiết.',
+    },
+    {
+      id: 'py-split-batches',
+      title: 'Chia việc đều cho các worker',
+      en: 'Balanced Work Splitting',
+      difficulty: 'Medium',
+      targetMinutes: 14,
+      entry: 'split_batches',
+      lang: 'python',
+      statement: `
+Trước khi giao việc cho \`multiprocessing.Pool\` hay một nhóm thread, bạn phải chia dữ liệu thành các lô.
+
+Viết hàm \`split_batches(items, workers)\` chia \`items\` thành **đúng \`workers\` nhóm**, sao cho:
+- Kích thước hai nhóm bất kỳ chênh nhau **tối đa 1 phần tử**.
+- Các nhóm lớn hơn nằm **trước**.
+- Thứ tự phần tử được giữ nguyên.
+- Nếu \`items\` ít hơn \`workers\`, các nhóm cuối là danh sách **rỗng** (vẫn phải đủ số nhóm).
+
+**Ví dụ**
+- \`split_batches([1,2,3,4,5,6,7], 3)\` → \`[[1,2,3], [4,5], [6,7]]\`
+- \`split_batches([1,2,3], 5)\` → \`[[1], [2], [3], [], []]\`
+- \`split_batches([], 3)\` → \`[[], [], []]\`
+
+> Cách chia phổ biến nhất — \`chunk = len(items) // workers\` rồi cắt theo bước cố định — cho ra **sai số
+> lượng nhóm** và dồn phần dư vào một chỗ. Bộ test bắt đúng các trường hợp đó.
+`,
+      starter: `def split_batches(items, workers):\n    # Chia thành đúng workers nhóm, chênh lệch tối đa 1 phần tử\n    \n`,
+      tests: [
+        { args: [[1, 2, 3, 4, 5, 6, 7], 3], expected: [[1, 2, 3], [4, 5], [6, 7]], name: 'Chia dư — nhóm lớn nằm trước' },
+        { args: [[1, 2, 3, 4], 2], expected: [[1, 2], [3, 4]], name: 'Chia hết' },
+        { args: [[1, 2, 3, 4, 5], 2], expected: [[1, 2, 3], [4, 5]], name: 'Dư một phần tử' },
+        { args: [[1, 2, 3], 5], expected: [[1], [2], [3], [], []], name: 'Ít việc hơn worker' },
+        { args: [[], 3], expected: [[], [], []], name: 'Không có việc — vẫn đủ số nhóm' },
+        { args: [[1, 2, 3], 1], expected: [[1, 2, 3]], name: 'Một worker duy nhất' },
+        { args: [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 4], expected: [[1, 2, 3], [4, 5, 6], [7, 8], [9, 10]], name: 'Mười việc, bốn worker' },
+        { args: [[1], 3], expected: [[1], [], []], name: 'Một việc, ba worker' },
+      ],
+      hints: [
+        'Dùng `q, r = divmod(len(items), workers)`: `q` là kích thước cơ bản của mọi nhóm, `r` là số phần tử dư ra cần rải thêm.',
+        'Rải phần dư: `r` nhóm ĐẦU TIÊN nhận thêm đúng một phần tử. Kích thước nhóm thứ `i` là `q + 1` nếu `i < r`, ngược lại là `q`.',
+        'Duyệt `for i in range(workers)` (không phải duyệt theo `items`) để chắc chắn luôn tạo đủ số nhóm — kể cả khi `items` rỗng. Giữ một con trỏ `start`, cắt `items[start:start + size]`, rồi `start += size`.',
+      ],
+      diagnostics: [
+        { test: 'range\\s*\\(\\s*0\\s*,\\s*len\\s*\\(\\s*items\\s*\\)\\s*,', message: 'Cắt theo bước cố định (`range(0, len(items), chunk)`) cho ra số nhóm PHỤ THUỘC dữ liệu — có thể thừa, thiếu, hoặc bằng 0 khi `items` rỗng. Đề yêu cầu luôn đúng `workers` nhóm, nên hãy lặp theo `range(workers)`.' },
+        { test: '\\[\\s*-\\s*1\\s*\\]\\s*\\.extend|\\[\\s*-\\s*1\\s*\\]\\s*\\+=', message: 'Dồn phần dư vào nhóm cuối làm mất tính cân bằng: với 7 việc và 3 worker bạn sẽ được `[[1,2],[3,4],[5,6,7]]`, tức một worker phải làm nhiều hơn 50% — trong xử lý song song, thời gian hoàn thành do worker CHẬM NHẤT quyết định.' },
+        { test: 'math\\.ceil|-\\s*\\(\\s*-\\s*len', message: 'Dùng `ceil(len/workers)` làm kích thước cho mọi nhóm sẽ khiến các nhóm đầu quá đầy và những nhóm cuối rỗng hoàn toàn (ví dụ 10 việc / 4 worker thành 3+3+3+1). `divmod` cho cách rải đều chính xác.' },
+      ],
+      approach: `
+Đây là bước chuẩn bị của mọi bài toán song song, và cách chia sai làm hỏng chính lợi ích bạn đang tìm:
+**thời gian hoàn thành của cả nhóm bằng thời gian của worker chậm nhất**, nên lệch tải là lãng phí trực
+tiếp.
+
+\`\`\`python
+def split_batches(items, workers):
+    q, r = divmod(len(items), workers)   # q: kích thước nền, r: số phần dư
+    batches = []
+    start = 0
+    for i in range(workers):
+        size = q + (1 if i < r else 0)   # r nhóm đầu nhận thêm 1
+        batches.append(items[start:start + size])
+        start += size
+    return batches
+\`\`\`
+
+**Vì sao \`divmod\` là công cụ đúng.** Nó trả về cùng lúc thương và dư — chính xác hai con số bạn cần:
+"mỗi người ít nhất bao nhiêu" và "còn thừa mấy phần cần rải". Với 7 việc và 3 worker: \`q = 2, r = 1\` →
+kích thước \`[3, 2, 2]\`.
+
+**So sánh ba cách chia sai thường gặp** (7 việc, 3 worker):
+
+| Cách làm | Kết quả | Vấn đề |
+|---|---|---|
+| \`chunk = 7 // 3 = 2\`, cắt theo bước 2 | \`[[1,2],[3,4],[5,6],[7]]\` | **4 nhóm** thay vì 3 |
+| \`chunk = ceil(7/3) = 3\` | \`[[1,2,3],[4,5,6],[7]]\` | nhóm cuối chỉ 1 việc, lệch tải |
+| chia đều rồi dồn dư vào cuối | \`[[1,2],[3,4],[5,6,7]]\` | một worker làm nhiều hơn 50% |
+
+Cả ba đều "chạy được" và đều sai theo cách khó nhận ra cho tới khi lên môi trường thật với dữ liệu lớn.
+
+**Một mẹo Python đáng biết** — cắt theo bước không cần biến đếm:
+
+\`\`\`python
+batches = [items[i::workers] for i in range(workers)]
+\`\`\`
+
+Cách này cũng cho các nhóm chênh nhau tối đa 1 và luôn đủ số nhóm, nhưng nó **xen kẽ** phần tử
+(\`[1,4,7], [2,5], [3,6]\`) chứ không giữ khối liền mạch. Chọn cái nào tuỳ bài toán: khi dữ liệu có tính
+cục bộ (đọc file theo dòng liên tiếp, xử lý ảnh theo vùng), khối liền mạch tốt hơn; khi độ nặng của từng
+phần tử **tăng dần theo vị trí**, cách xen kẽ lại cân tải tốt hơn nhiều.
+`,
+      solution: `def split_batches(items, workers):
+    q, r = divmod(len(items), workers)
+    batches = []
+    start = 0
+    for i in range(workers):
+        size = q + (1 if i < r else 0)
+        batches.append(items[start:start + size])
+        start += size
+    return batches`,
+      complexity: {
+        question: 'Độ phức tạp thời gian và bộ nhớ theo số phần tử n?',
+        options: [
+          'Thời gian O(n), bộ nhớ O(n) — mỗi phần tử được copy đúng một lần sang lô của nó',
+          'Thời gian O(n × workers)',
+          'Thời gian O(n log n) do phải cân bằng các nhóm',
+          'Thời gian O(workers), bộ nhớ O(1)',
+        ],
+        answer: 0,
+        why: 'Các lát cắt cộng lại copy đúng n phần tử → O(n) thời gian và O(n) bộ nhớ phụ. Nếu dữ liệu quá lớn để nhân đôi trong RAM, hãy trả về **cặp chỉ số** (start, end) thay vì lát cắt thật, hoặc dùng `itertools.islice` để tạo lô một cách lười biếng — đúng cách các thư viện xử lý dữ liệu lớn vẫn làm.',
+      },
+      realWorld: 'Chia dữ liệu cho `multiprocessing.Pool`, phân mảnh (sharding) bản ghi cho nhiều worker đọc từ queue, chia file lớn cho các luồng tải song song, phân trang kết quả. Chi tiết "nhóm lớn nằm trước" tuy nhỏ nhưng thường được yêu cầu để kết quả **xác định**, giúp tái hiện lại chính xác một lần chạy khi cần gỡ lỗi.',
+    },
+    {
+      id: 'py-concurrent-vs-sequential',
+      title: 'Song song thì tổng thời gian là max, không phải sum',
+      en: 'Concurrent Completion Order',
+      difficulty: 'Medium',
+      targetMinutes: 15,
+      entry: 'run_schedule',
+      lang: 'python',
+      statement: `
+Cho \`tasks\` là danh sách các tác vụ **I/O-bound** dạng \`[tên, thời_lượng]\` (thời lượng tính bằng giây).
+Giả sử tất cả được khởi động **cùng lúc** (như \`asyncio.gather\`) và chỉ ngồi chờ I/O — không tranh CPU.
+
+Viết hàm \`run_schedule(tasks)\` trả về \`[thứ_tự_hoàn_thành, thời_gian_song_song, thời_gian_tuần_tự]\`:
+- \`thứ_tự_hoàn_thành\` — danh sách **tên** theo thứ tự kết thúc; hai tác vụ cùng thời lượng thì giữ đúng
+  **thứ tự ban đầu** trong \`tasks\`.
+- \`thời_gian_song_song\` — tổng thời gian nếu chạy đồng thời.
+- \`thời_gian_tuần_tự\` — tổng thời gian nếu chạy lần lượt.
+- Danh sách rỗng → \`[[], 0, 0]\`.
+
+**Ví dụ**
+- \`[["a", 3], ["b", 1], ["c", 2]]\` → \`[["b", "c", "a"], 3, 6]\`
+`,
+      starter: `def run_schedule(tasks):\n    # [thứ tự hoàn thành, thời gian song song, thời gian tuần tự]\n    \n`,
+      tests: [
+        { args: [[['a', 3], ['b', 1], ['c', 2]]], expected: [['b', 'c', 'a'], 3, 6], name: 'Ba tác vụ khác thời lượng' },
+        { args: [[['a', 1], ['b', 1]]], expected: [['a', 'b'], 1, 2], name: 'Bằng nhau — giữ thứ tự ban đầu' },
+        { args: [[]], expected: [[], 0, 0], name: 'Không có tác vụ nào' },
+        { args: [[['x', 5]]], expected: [['x'], 5, 5], name: 'Một tác vụ — hai con số bằng nhau' },
+        { args: [[['a', 2], ['b', 2], ['c', 1]]], expected: [['c', 'a', 'b'], 2, 5], name: 'Hai tác vụ đồng hạng' },
+        { args: [[['slow', 10], ['fast', 1]]], expected: [['fast', 'slow'], 10, 11], name: 'Một tác vụ rất chậm chi phối' },
+        { args: [[['a', 0], ['b', 3]]], expected: [['a', 'b'], 3, 3], name: 'Tác vụ tức thì' },
+      ],
+      hints: [
+        'Thứ tự hoàn thành chính là thứ tự thời lượng tăng dần. Dùng `sorted(tasks, key=lambda t: t[1])` — **chỉ** sắp theo thời lượng, đừng sắp theo cả cặp.',
+        'Yêu cầu "cùng thời lượng thì giữ thứ tự ban đầu" được đáp ứng **miễn phí**: thuật toán sắp xếp của Python là ổn định (stable), nên các phần tử có khoá bằng nhau không bị đảo chỗ.',
+        'Thời gian song song là `max` của các thời lượng, tuần tự là `sum`. Nhớ xử lý danh sách rỗng: `max()` trên dãy rỗng raise `ValueError` — dùng `max(..., default=0)` (còn `sum` của dãy rỗng vốn đã là 0).',
+      ],
+      diagnostics: [
+        { test: 'sorted\\s*\\(\\s*tasks\\s*\\)|tasks\\.sort\\s*\\(\\s*\\)', message: 'Sắp xếp trực tiếp danh sách các cặp sẽ so sánh phần tử ĐẦU (tên) trước, rồi mới tới thời lượng — không phải thứ tự hoàn thành. Cần `key=lambda t: t[1]`.' },
+        { test: 'reverse\\s*=\\s*True', message: 'Tác vụ NGẮN hoàn thành trước, nên thứ tự là thời lượng tăng dần — không dùng `reverse=True`.' },
+        { test: '^(?![\\s\\S]*max\\s*\\()[\\s\\S]*def\\s+run_schedule', message: 'Không thấy `max` trong lời giải. Khi các tác vụ I/O chạy đồng thời, tổng thời gian là **thời lượng của tác vụ lâu nhất**, không phải tổng các thời lượng — đó chính là toàn bộ lý do người ta dùng concurrency.' },
+        { test: 'max\\s*\\((?![\\s\\S]*default)(?![\\s\\S]*if\\s+not\\s+tasks)', message: '`max()` trên một dãy rỗng raise `ValueError: max() arg is an empty sequence`. Hãy dùng `max(..., default=0)` hoặc xử lý trường hợp `tasks` rỗng ngay từ đầu.' },
+      ],
+      approach: `
+Bài này biến câu khẩu hiệu "async giúp chạy nhanh hơn" thành một công thức bạn kiểm chứng được.
+
+\`\`\`python
+def run_schedule(tasks):
+    order = [name for name, _ in sorted(tasks, key=lambda t: t[1])]
+    parallel = max((duration for _, duration in tasks), default=0)
+    sequential = sum(duration for _, duration in tasks)
+    return [order, parallel, sequential]
+\`\`\`
+
+**Ý chính: với tác vụ I/O-bound chạy đồng thời, thời gian tổng là \`max\`, không phải \`sum\`.** Ba lời gọi
+API mất 3s, 1s, 2s: chạy tuần tự mất 6 giây, chạy đồng thời mất 3 giây — đúng bằng lời gọi chậm nhất, vì
+trong lúc chờ mạng thì chương trình chẳng làm gì cả, và "chẳng làm gì" thì làm được đồng thời cho nhiều
+tác vụ.
+
+**Ba điều cần nhớ kèm theo:**
+
+1. **Chỉ đúng với I/O-bound.** Nếu các tác vụ này ngốn CPU, chúng phải tranh nhau GIL và tổng thời gian
+   quay về gần \`sum\`. Công thức \`max\` là phần thưởng cho việc **chờ đợi**, không phải cho việc tính toán.
+2. **Tác vụ chậm nhất chi phối tất cả.** Test \`[["slow", 10], ["fast", 1]]\` cho thấy: thêm bao nhiêu tác
+   vụ nhanh cũng không thay đổi gì, muốn nhanh hơn phải tối ưu đúng cái chậm nhất. Đây là lý do người ta
+   đặt **timeout** cho từng tác vụ — một lời gọi treo sẽ giữ cả nhóm lại.
+3. **Tính ổn định của sort là một tính năng, không phải may mắn.** Yêu cầu "cùng thời lượng thì giữ thứ tự
+   ban đầu" được đáp ứng chỉ vì Timsort ổn định. Nhờ đó kết quả **xác định**, tái hiện được — điều tối
+   quan trọng khi gỡ lỗi hệ thống đồng thời, nơi mọi thứ khác đều khó tái hiện.
+
+**Liên hệ với đời thật:** đây chính là khác biệt giữa
+
+\`\`\`python
+for url in urls:            # tuần tự: sum(thời gian)
+    await fetch(url)
+
+await asyncio.gather(*[fetch(u) for u in urls])   # đồng thời: max(thời gian)
+\`\`\`
+
+Vòng lặp \`for\` với \`await\` bên trong trông rất "async" nhưng vẫn chạy tuần tự — bẫy phổ biến nhất khi
+mới học asyncio, và bây giờ bạn đã có công thức để chỉ ra nó tốn bao nhiêu.
+`,
+      solution: `def run_schedule(tasks):
+    order = [name for name, _ in sorted(tasks, key=lambda t: t[1])]
+    parallel = max((duration for _, duration in tasks), default=0)
+    sequential = sum(duration for _, duration in tasks)
+    return [order, parallel, sequential]`,
+      complexity: {
+        question: 'Độ phức tạp thời gian của run_schedule theo số tác vụ n?',
+        options: [
+          'O(n log n) — chi phối bởi phép sắp xếp; `max` và `sum` chỉ là O(n)',
+          'O(n) vì chỉ duyệt danh sách vài lần',
+          'O(n²)',
+          'O(1)',
+        ],
+        answer: 0,
+        why: '`sorted` là O(n log n) và lấn át hai lần duyệt tuyến tính của `max`/`sum`. Nếu chỉ cần hai con số thời gian mà không cần thứ tự hoàn thành, bạn giải được trong O(n) — một ví dụ nhỏ nhưng đúng tinh thần tối ưu: **bỏ bớt thứ mình không cần** thường hiệu quả hơn tăng tốc thứ mình đang làm.',
+      },
+      realWorld: 'Ước lượng thời gian cho một loạt lời gọi API, thiết kế timeout cho từng bước trong pipeline, giải thích cho đồng đội vì sao thêm worker không giúp ích khi có một tác vụ chậm chi phối, và phân tích đường găng (critical path) trong pipeline CI/CD — nơi câu hỏi luôn là "bước nào đang quyết định tổng thời gian?".',
     },
   ],
 },

@@ -170,6 +170,45 @@ rows = list(reader)   # [{'ten': 'An', 'tuoi': '20'}, {'ten': 'Binh', 'tuoi': '2
       answer: 1,
       why: 'Quy ước đặt tên trong module `json`: hậu tố "s" (string) nghĩa là hàm đó làm việc với chuỗi trong bộ nhớ. `dumps`/`loads` thao tác với `str`; `dump`/`load` thao tác trực tiếp với file object, tự xử lý việc ghi/đọc.',
     },
+    {
+      q: 'Kết quả của `json.loads(json.dumps({1: "a", "b": (2, 3)}))` là gì?',
+      options: [
+        "{1: 'a', 'b': (2, 3)} — nguyên vẹn như ban đầu",
+        "{'1': 'a', 'b': [2, 3]} — khoá số thành chuỗi, tuple thành list",
+        'TypeError vì JSON không hỗ trợ khoá số',
+        "{1: 'a', 'b': [2, 3]}",
+      ],
+      answer: 1,
+      why: 'JSON là một định dạng **nghèo hơn** Python: khoá của object bắt buộc phải là chuỗi, và JSON không có khái niệm tuple. Vì vậy `json.dumps` âm thầm chuyển khoá `1` thành `"1"` và tuple thành mảng — sau khi round-trip, kiểu dữ liệu đã đổi mà không có cảnh báo nào. Hệ quả thực tế: đừng bao giờ giả định `json.loads(json.dumps(x)) == x`. (Còn `set` thì thẳng thừng hơn: `TypeError: Object of type set is not JSON serializable`.)',
+    },
+    {
+      q: 'Trên Windows, ghi file CSV bằng `csv.writer` với `open(path, "w", encoding="utf-8")` (không có `newline=""`) sẽ bị gì?',
+      options: [
+        'File bị lỗi mã hoá tiếng Việt',
+        'Xuất hiện một dòng trống xen giữa mỗi dòng dữ liệu',
+        'Không ghi được gì cả',
+        'Không có vấn đề gì, `newline=""` chỉ là tuỳ chọn cho đẹp',
+      ],
+      answer: 1,
+      why: 'Hai tầng cùng thêm ký tự xuống dòng: `csv.writer` tự ghi `\\r\\n` ở cuối mỗi dòng, rồi chế độ text mode của Python lại dịch `\\n` thành `\\r\\n` một lần nữa → thành `\\r\\r\\n`, và Excel hiển thị thành dòng trống xen kẽ. `newline=""` tắt tầng dịch của Python, để module `csv` tự quản lý — đây là lý do tài liệu chính thức yêu cầu LUÔN dùng nó khi mở file cho `csv`, cả khi đọc lẫn khi ghi.',
+    },
+    {
+      q: 'Đoạn code sau: biến `b` chứa gì?\n\nwith open("data.txt") as f:\n    a = f.readlines()\n    b = f.readlines()',
+      options: ['Cùng nội dung với a', 'Danh sách rỗng []', 'None', 'ValueError: I/O operation on closed file'],
+      answer: 1,
+      why: 'File object là một **iterator có con trỏ vị trí**: lần `readlines()` đầu đọc tới cuối file, con trỏ nằm ở EOF, nên lần thứ hai không còn gì để đọc và trả về `[]` — im lặng, không báo lỗi. Đây đúng là bẫy "generator dùng một lần" ở phiên bản file. Muốn đọc lại phải tua con trỏ về đầu bằng `f.seek(0)`, hoặc giữ kết quả trong biến để dùng lại.',
+    },
+    {
+      q: 'Khi duyệt file bằng `for line in f:`, vì sao nên dùng `line.rstrip("\\n")` thay vì `line.strip()`?',
+      options: [
+        'Vì `strip()` chậm hơn đáng kể',
+        'Vì `strip()` bỏ luôn khoảng trắng ở hai đầu — làm mất dữ liệu có ý nghĩa như thụt đầu dòng hoặc giá trị cột có khoảng trắng',
+        'Vì `strip()` không bỏ được ký tự xuống dòng',
+        'Vì `rstrip` là cách duy nhất bỏ được `\\r\\n` của Windows',
+      ],
+      answer: 1,
+      why: 'Mỗi dòng lấy từ file đều còn ký tự `\\n` ở cuối, nên phải cắt. Nhưng `strip()` cắt **mọi** khoảng trắng ở cả hai đầu: file YAML/Python mất thụt đầu dòng, cột CSV `" Nguyen Van A "` mất khoảng trắng cố ý, dòng chỉ gồm dấu tab trở thành rỗng. `rstrip("\\n")` nêu rõ đúng thứ cần bỏ. (Với file Windows đọc ở text mode, `\\r\\n` đã được Python tự dịch về `\\n`; chỉ khi mở ở chế độ nhị phân bạn mới cần lo tới `\\r`.)',
+    },
   ],
   problems: [
     {
@@ -404,6 +443,211 @@ def count_active(jsonl_text):
         why: 'Tách dòng và parse JSON mỗi dòng đều là các thao tác tuyến tính; tổng công việc trên toàn bộ văn bản tỉ lệ thuận với tổng số ký tự, không phụ thuộc theo kiểu bậc hai.',
       },
       realWorld: 'Phân tích log server dạng JSON Lines (định dạng phổ biến của Docker, nhiều hệ thống logging hiện đại): đếm số request lỗi, số user active, mà không cần nạp toàn bộ file log khổng lồ (có thể hàng GB) vào bộ nhớ cùng lúc — xử lý từng dòng một cách "streaming".',
+    },
+    {
+      id: 'py-parse-config-text',
+      title: 'Phân tích file cấu hình key=value',
+      en: 'Parse key=value Config',
+      difficulty: 'Medium',
+      targetMinutes: 14,
+      entry: 'parse_config',
+      lang: 'python',
+      statement: `
+Viết hàm \`parse_config(text)\` phân tích nội dung một file cấu hình dạng \`key=value\` và trả về \`dict\`.
+
+**Quy tắc**
+- Bỏ qua dòng trống và dòng chỉ có khoảng trắng.
+- Bỏ qua dòng **chú thích**: dòng mà ký tự khác khoảng trắng đầu tiên là \`#\`.
+- Tách theo dấu \`=\` **đầu tiên** — phần sau có thể chứa thêm dấu \`=\`.
+- Cắt khoảng trắng thừa ở hai đầu của cả khoá lẫn giá trị.
+- Dòng không chứa dấu \`=\` nào thì bỏ qua.
+- Khoá trùng nhau: dòng **sau ghi đè** dòng trước.
+
+**Ví dụ**
+\`\`\`
+# cau hinh
+host = localhost
+url=http://api.local?a=1&b=2
+\`\`\`
+→ \`{"host": "localhost", "url": "http://api.local?a=1&b=2"}\`
+`,
+      starter: `def parse_config(text):\n    # Trả về dict các cặp key=value\n    \n`,
+      checkerSrc: 'lambda got, exp, args: isinstance(got, dict) and got == exp',
+      tests: [
+        { args: ['a=1\nb=2'], expected: { a: '1', b: '2' }, name: 'Hai cặp cơ bản' },
+        { args: ['# chu thich\nkey = value '], expected: { key: 'value' }, name: 'Bỏ chú thích, cắt khoảng trắng' },
+        { args: ['url=http://api.local?a=1&b=2'], expected: { url: 'http://api.local?a=1&b=2' }, name: 'Giá trị chứa thêm dấu = — bẫy chính' },
+        { args: [''], expected: {}, name: 'Chuỗi rỗng' },
+        { args: ['  \n\nkhong_co_dau_bang\nk=v'], expected: { k: 'v' }, name: 'Dòng trống và dòng không hợp lệ' },
+        { args: ['a=1\na=2'], expected: { a: '2' }, name: 'Khoá trùng — dòng sau thắng' },
+        { args: ['empty='], expected: { empty: '' }, name: 'Giá trị rỗng vẫn là cặp hợp lệ' },
+        { args: ['   # thut dau dong roi moi chu thich\nx=1'], expected: { x: '1' }, name: 'Chú thích có thụt đầu dòng' },
+        { args: ['name = Nguyen Van A'], expected: { name: 'Nguyen Van A' }, name: 'Giá trị có khoảng trắng bên trong' },
+      ],
+      hints: [
+        'Tách văn bản thành từng dòng bằng `text.splitlines()` — nó xử lý sẵn cả `\\n` lẫn `\\r\\n` và không tạo phần tử rỗng thừa ở cuối như `text.split("\\n")`.',
+        'Với mỗi dòng: `line = line.strip()`; nếu `not line` hoặc `line.startswith("#")` thì `continue`. Việc `strip()` trước khi kiểm tra `#` giải quyết luôn trường hợp chú thích có thụt đầu dòng.',
+        'Bẫy quan trọng nhất: `line.split("=")` cắt tại MỌI dấu `=`, làm hỏng URL và chuỗi kết nối. Hãy giới hạn số lần cắt: `key, value = line.split("=", 1)` — số 1 nghĩa là "chỉ cắt một lần, ở dấu đầu tiên".',
+      ],
+      diagnostics: [
+        { test: '\\.split\\s*\\(\\s*["\']=["\']\\s*\\)', message: '`split("=")` cắt tại MỌI dấu bằng: giá trị `http://api.local?a=1&b=2` sẽ bị vỡ thành nhiều mảnh (và lệnh gán hai biến sẽ raise `ValueError: too many values to unpack`). Thêm giới hạn: `split("=", 1)`.' },
+        { test: '\\.split\\s*\\(\\s*["\']\\\\n["\']', message: '`text.split("\\n")` không xử lý được dấu xuống dòng kiểu Windows (`\\r\\n`) — bạn sẽ nhận các giá trị dính ký tự `\\r` ở cuối. Dùng `text.splitlines()`.' },
+        { test: '\\bin\\s+line\\b(?![\\s\\S]*split)', message: 'Kiểm tra `"=" in line` là đúng hướng, nhưng nhớ rằng sau đó vẫn phải cắt tại dấu `=` ĐẦU TIÊN, không phải mọi dấu `=`.' },
+      ],
+      approach: `
+Đây là bài "parser mini" — dạng việc bạn sẽ gặp liên tục khi đọc log, cấu hình, hay dữ liệu thô. Điểm
+đáng học không phải cú pháp mà là **thứ tự các quyết định**.
+
+\`\`\`python
+def parse_config(text):
+    config = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        config[key.strip()] = value.strip()
+    return config
+\`\`\`
+
+**Bốn quyết định, mỗi cái là một cái bẫy đã được cài trong bộ test:**
+
+1. **\`splitlines()\` thay vì \`split("\\n")\`.** \`splitlines()\` hiểu cả \`\\n\`, \`\\r\\n\`, \`\\r\` và không sinh
+   phần tử rỗng thừa ở cuối. Dùng \`split("\\n")\` trên file tạo bởi Windows sẽ để lại \`\\r\` dính vào cuối
+   mọi giá trị — bug kinh điển "so sánh chuỗi thấy giống hệt mà vẫn không bằng nhau".
+
+2. **\`strip()\` trước khi kiểm tra \`#\`.** Nhờ vậy chú thích có thụt đầu dòng vẫn được nhận diện, mà không
+   cần thêm nhánh riêng.
+
+3. **\`split("=", 1)\` — tham số \`maxsplit\`.** Đây là khác biệt giữa parser dùng được và parser hỏng ngay
+   khi gặp URL, chuỗi kết nối database, hay giá trị mã hoá base64 (thường kết thúc bằng \`=\`).
+
+4. **Bỏ qua thay vì raise.** Bài này chọn "dòng lạ thì bỏ qua" — phù hợp với file cấu hình do người viết
+   tay. Một hệ thống nghiêm ngặt hơn có thể muốn báo lỗi kèm **số dòng**; khi đó hãy dùng
+   \`for lineno, line in enumerate(text.splitlines(), 1)\` để thông báo lỗi có ích cho người dùng.
+`,
+      solution: `def parse_config(text):
+    config = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        config[key.strip()] = value.strip()
+    return config`,
+      complexity: {
+        question: 'Độ phức tạp thời gian của parse_config theo tổng số ký tự n của text?',
+        options: [
+          'O(n) — mỗi ký tự được duyệt qua một số lần hằng định (tách dòng, strip, split)',
+          'O(n²) vì mỗi lần chèn vào dict phải kiểm tra khoá đã tồn tại',
+          'O(n log n) do phải sắp xếp các khoá',
+          'O(số dòng)',
+        ],
+        answer: 0,
+        why: 'Các thao tác `splitlines`, `strip`, `split` đều tuyến tính theo độ dài phần chúng xử lý, và mỗi ký tự chỉ thuộc đúng một dòng → tổng cộng O(n). Chèn vào dict là O(1) trung bình. Bộ nhớ cũng O(n) vì `splitlines()` vật chất hoá toàn bộ danh sách dòng — với file rất lớn, nên đọc trực tiếp `for line in f` để giữ bộ nhớ O(1).',
+      },
+      realWorld: 'Đọc file `.env`, `.ini`, `requirements.txt`, `/proc/meminfo` trên Linux, hay bất kỳ định dạng "một dòng một cặp" nào. Chi tiết `maxsplit=1` là thứ phân biệt một hàm chạy được với dữ liệu mẫu và một hàm sống sót với dữ liệu thật — nơi giá trị luôn chứa đúng ký tự mà bạn dùng làm dấu phân tách.',
+    },
+    {
+      id: 'py-canonical-json',
+      title: 'JSON chuẩn hoá để so sánh và ký',
+      en: 'Canonical JSON Dump',
+      difficulty: 'Medium',
+      targetMinutes: 12,
+      entry: 'canonical_json',
+      lang: 'python',
+      statement: `
+Viết hàm \`canonical_json(obj)\` chuyển một object Python thành chuỗi JSON **chuẩn hoá** — cùng dữ liệu thì
+luôn cho ra **đúng một chuỗi duy nhất**, không phụ thuộc thứ tự khoá lúc tạo.
+
+Ba yêu cầu:
+1. Khoá của mọi object được **sắp xếp theo thứ tự chữ cái** (kể cả object lồng nhau).
+2. **Không có khoảng trắng thừa**: dùng \`,\` và \`:\` sát nhau.
+3. **Giữ nguyên ký tự Unicode** (tiếng Việt hiển thị được, không bị escape thành \`\\uXXXX\`).
+
+**Ví dụ**
+- \`{"b": 1, "a": 2}\` → \`'{"a":2,"b":1}'\`
+- \`{"ten": "Hà Nội"}\` → \`'{"ten":"Hà Nội"}'\`
+- \`{"z": {"y": 1, "x": 2}}\` → \`'{"z":{"x":2,"y":1}}'\`
+`,
+      starter: `import json\n\n\ndef canonical_json(obj):\n    # Chuỗi JSON chuẩn hoá: khoá đã sắp xếp, không khoảng trắng, giữ Unicode\n    \n`,
+      tests: [
+        { args: [{ b: 1, a: 2 }], expected: '{"a":2,"b":1}', name: 'Sắp xếp khoá' },
+        { args: [{ ten: 'Hà Nội' }], expected: '{"ten":"Hà Nội"}', name: 'Giữ nguyên tiếng Việt' },
+        { args: [{}], expected: '{}', name: 'Object rỗng' },
+        { args: [{ a: [1, 2] }], expected: '{"a":[1,2]}', name: 'Mảng bên trong — không khoảng trắng' },
+        { args: [{ z: { y: 1, x: 2 } }], expected: '{"z":{"x":2,"y":1}}', name: 'Sắp xếp cả ở tầng lồng nhau' },
+        { args: [[1, 'a']], expected: '[1,"a"]', name: 'Đầu vào là mảng' },
+        { args: [{ a: null, b: true }], expected: '{"a":null,"b":true}', name: 'None và True thành null và true' },
+        { args: [{ m: 1, a: 2, z: 3 }], expected: '{"a":2,"m":1,"z":3}', name: 'Ba khoá xáo trộn' },
+      ],
+      hints: [
+        'Toàn bộ bài nằm ở việc dùng đúng các tham số của `json.dumps` — không cần tự viết vòng lặp nào.',
+        '`sort_keys=True` sắp xếp khoá (và làm việc đó **đệ quy** cho mọi tầng). `ensure_ascii=False` giữ nguyên ký tự Unicode thay vì escape.',
+        'Mặc định `json.dumps` chèn khoảng trắng: `{"a": 1, "b": 2}`. Tham số `separators=(",", ":")` loại bỏ chúng. Kết hợp cả ba: `json.dumps(obj, sort_keys=True, ensure_ascii=False, separators=(",", ":"))`.',
+      ],
+      diagnostics: [
+        { test: 'str\\s*\\(\\s*obj\\s*\\)|repr\\s*\\(', message: '`str(obj)` / `repr(obj)` KHÔNG phải JSON: chúng dùng nháy đơn, và ghi `True`/`None` thay vì `true`/`null`. Phải dùng `json.dumps`.' },
+        { test: '^(?![\\s\\S]*sort_keys)[\\s\\S]*json\\.dumps', message: 'Thiếu `sort_keys=True`. Không có nó, hai dict cùng nội dung nhưng khác thứ tự chèn sẽ cho hai chuỗi khác nhau — đúng thứ mà bài này muốn loại bỏ.' },
+        { test: '^(?![\\s\\S]*separators)[\\s\\S]*json\\.dumps', message: 'Thiếu `separators=(",", ":")`. Mặc định `json.dumps` chèn một khoảng trắng sau mỗi dấu `,` và `:`, nên kết quả sẽ là `{"a": 2, "b": 1}` chứ không phải `{"a":2,"b":1}`.' },
+        { test: 'ensure_ascii\\s*=\\s*True', message: '`ensure_ascii=True` (mặc định) escape mọi ký tự ngoài ASCII: `"Hà Nội"` thành `"H\\\\u00e0 N\\\\u1ed9i"`. Đặt `ensure_ascii=False` để giữ nguyên tiếng Việt.' },
+      ],
+      approach: `
+"Chuẩn hoá" (canonicalization) là bước bắt buộc mỗi khi bạn cần **so sánh, băm, hoặc ký** dữ liệu có cấu
+trúc. Vấn đề gốc: cùng một object có vô số cách biểu diễn thành chuỗi JSON hợp lệ.
+
+\`\`\`python
+json.dumps({"a": 1, "b": 2})   # '{"a": 1, "b": 2}'
+json.dumps({"b": 2, "a": 1})   # '{"b": 2, "a": 1}'   ← khác chuỗi, cùng dữ liệu
+\`\`\`
+
+Nếu bạn băm hai chuỗi này để phát hiện thay đổi, bạn sẽ báo "dữ liệu đã đổi" trong khi thực tế không hề.
+
+\`\`\`python
+import json
+
+def canonical_json(obj):
+    return json.dumps(obj, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+\`\`\`
+
+**Từng tham số giải quyết một nguồn sai khác:**
+
+| Tham số | Loại bỏ sự khác biệt do |
+|---|---|
+| \`sort_keys=True\` | thứ tự chèn khoá (áp dụng đệ quy cho mọi tầng) |
+| \`separators=(",", ":")\` | khoảng trắng trang trí |
+| \`ensure_ascii=False\` | cách biểu diễn ký tự Unicode |
+
+**Vì sao \`ensure_ascii=False\` lại quan trọng ngoài chuyện hiển thị?** Vì nó ảnh hưởng tới **kích thước
+byte**: \`"Hà Nội"\` giữ nguyên tốn 8 byte UTF-8, còn khi escape thành \`\\u00e0...\` thì phình lên gấp nhiều
+lần. Với hệ thống truyền hàng triệu bản ghi, đây là khác biệt thật về băng thông và chi phí lưu trữ.
+
+**Cảnh báo về giới hạn:** chuẩn hoá chỉ có ý nghĩa nếu dữ liệu đầu vào đã đi qua JSON. Như bạn đã thấy ở
+quiz, \`tuple\` biến thành list và khoá số biến thành chuỗi — nên hãy chuẩn hoá **dữ liệu đã đọc từ JSON**,
+đừng chuẩn hoá object Python thuần rồi mong nó khớp với bản đã round-trip. Số thực cũng là một cái bẫy
+riêng: \`1.0\` và \`1\` cho hai chuỗi khác nhau.
+`,
+      solution: `import json
+
+
+def canonical_json(obj):
+    return json.dumps(obj, sort_keys=True, ensure_ascii=False, separators=(",", ":"))`,
+      complexity: {
+        question: 'Độ phức tạp thời gian, biết object có tổng n phần tử và mỗi object con có tối đa k khoá?',
+        options: [
+          'O(n log k) — mỗi phần tử được ghi một lần, cộng chi phí sắp xếp khoá ở từng tầng',
+          'O(n) vì sắp xếp khoá là miễn phí',
+          'O(n²)',
+          'O(n log n) vì phải sắp xếp toàn bộ dữ liệu một lần',
+        ],
+        answer: 0,
+        why: 'Việc tuần tự hoá duyệt qua mỗi phần tử đúng một lần → O(n). Thêm vào đó, `sort_keys=True` sắp xếp danh sách khoá của TỪNG object con, tốn O(k log k) mỗi object; cộng dồn lại cho toàn bộ dữ liệu ra O(n log k). Chi phí sắp xếp này là cái giá rất rẻ để đổi lấy tính tất định.',
+      },
+      realWorld: 'Băm payload để phát hiện thay đổi (ETag, cache key), ký số webhook và API request (chữ ký chỉ đúng khi hai bên tạo ra byte y hệt nhau), lưu snapshot cấu hình để `git diff` gọn gàng, và so sánh kết quả trong test tích hợp. Bất cứ khi nào bạn thấy "hai bản ghi giống hệt nhau mà hệ thống báo khác nhau", nguyên nhân thường là thiếu bước chuẩn hoá này.',
     },
   ],
 },

@@ -212,6 +212,45 @@ FancyTemperature.from_fahrenheit(212)   # trả về FancyTemperature, KHÔNG ph
       answer: 1,
       why: 'Chỉ những phương thức được đánh dấu tường minh `@abstractmethod` mới bị `ABC` enforce việc bắt buộc override ở lớp con. Quên decorator này là một lỗi dễ mắc, khiến một phần "hợp đồng" bạn định thiết kế không thực sự có hiệu lực.',
     },
+    {
+      q: 'Đoạn code sau in ra gì?\n\nclass A:\n    def __len__(self):\n        return 1\n\na = A()\na.__len__ = lambda: 99\nprint(len(a))',
+      options: ['99', '1', 'TypeError', '0'],
+      answer: 1,
+      why: 'Các **phương thức dunder được gọi ngầm** (qua `len()`, `+`, `[]`, `with`, `str()`...) luôn được tra cứu trên **kiểu (type)**, bỏ qua hoàn toàn `__dict__` của instance. Vì vậy gán `a.__len__` không có tác dụng gì với `len(a)` — dù `a.__len__()` gọi trực tiếp thì lại trả 99. Python làm vậy vì lý do hiệu năng (tra cứu trên type có thể cache được) và vì tính nhất quán: mọi instance của một class phải hành xử giống nhau ở tầng ngôn ngữ. Muốn thay đổi hành vi dunder, phải thay đổi ở class.',
+    },
+    {
+      q: 'Đoạn code sau gặp lỗi gì khi chạy `P().x = 5`?\n\nclass P:\n    @property\n    def x(self):\n        return self._x\n\n    @x.setter\n    def x(self, value):\n        self.x = value',
+      options: [
+        'AttributeError: can\'t set attribute',
+        'RecursionError — setter tự gọi lại chính nó vô hạn',
+        'ValueError',
+        'Không lỗi, gán thành công',
+      ],
+      answer: 1,
+      why: '`self.x = value` bên trong setter **kích hoạt lại chính setter đó** — vì `x` giờ là một property, mọi phép gán vào nó đều đi qua setter. Kết quả là đệ quy vô hạn tới khi `RecursionError`. Quy tắc bất di bất dịch: property phải lưu dữ liệu vào một thuộc tính có **tên khác**, theo quy ước là dấu gạch dưới ở đầu — `self._x = value`. Đây là lỗi số một khi mới dùng property, và thông báo `maximum recursion depth exceeded` chẳng gợi ý gì về nguyên nhân.',
+    },
+    {
+      q: 'Lớp con định nghĩa `__init__` riêng nhưng QUÊN gọi `super().__init__()`. Hậu quả là gì?',
+      options: [
+        'Python tự động gọi `__init__` của lớp cha trước',
+        'Mọi thuộc tính do `__init__` của lớp cha tạo ra sẽ KHÔNG tồn tại — lỗi AttributeError xuất hiện muộn, ở một phương thức khác hẳn',
+        'Lỗi ngay khi định nghĩa class',
+        'Lớp con không dùng được các phương thức kế thừa',
+      ],
+      answer: 1,
+      why: 'Khác với Java/C++, Python **không tự gọi** hàm khởi tạo của lớp cha — nếu bạn ghi đè `__init__` thì bạn chịu trách nhiệm hoàn toàn. Các phương thức kế thừa vẫn hoạt động bình thường, nên object trông có vẻ ổn cho tới khi một phương thức nào đó chạm vào `self.thuoc_tinh_cua_lop_cha` và ném `AttributeError` ở nơi cách xa nguyên nhân thật. Vì vậy quy ước là gọi `super().__init__(...)` ngay dòng đầu tiên — và trong hệ thống đa kế thừa thì đó là bắt buộc để chuỗi MRO không bị đứt.',
+    },
+    {
+      q: 'Class dùng `__slots__` thì `vars(obj)` và việc gán thuộc tính mới sẽ ra sao?',
+      options: [
+        'Cả hai vẫn hoạt động bình thường',
+        '`vars(obj)` raise TypeError và gán thuộc tính ngoài danh sách slot raise AttributeError — vì object không còn `__dict__`',
+        'Chỉ gán thuộc tính mới bị chặn, `vars()` vẫn chạy',
+        '`__slots__` chỉ là gợi ý, không ràng buộc gì',
+      ],
+      answer: 1,
+      why: '`__slots__` hoạt động bằng cách **loại bỏ `__dict__`** của instance và thay bằng các ô nhớ cố định — đó chính là nguồn gốc của khoản tiết kiệm bộ nhớ (thường 40–50% với object nhỏ). Cái giá phải trả đi kèm: `vars(obj)` (vốn chỉ trả về `obj.__dict__`) raise `TypeError`, gán thuộc tính lạ raise `AttributeError`, và một số thư viện dựa vào `__dict__` (serializer, ORM, mixin động) sẽ không hoạt động. Vì vậy `__slots__` chỉ đáng dùng khi bạn thật sự tạo hàng triệu object nhỏ — không phải như một thói quen mặc định.',
+    },
   ],
   problems: [
     {
@@ -603,6 +642,275 @@ def make_from_fahrenheit_typename(cls_name, f):
         why: 'Toàn bộ luồng chỉ là một phép tính số học và tạo một instance — chi phí hằng số, không có vòng lặp hay đệ quy nào phụ thuộc kích thước dữ liệu.',
       },
       realWorld: 'Thư viện thực tế dùng mẫu này RẤT nhiều: `datetime.fromtimestamp()`, `pathlib.Path.home()`, `dict.fromkeys()` — đều là `classmethod` factory cho phép lớp con (nếu có) kế thừa đúng hành vi tạo object mà không cần viết lại; hiểu đúng cơ chế `cls` giúp tránh viết factory method "chỉ đúng cho một lớp duy nhất" khi thiết kế thư viện/framework cho người khác kế thừa.',
+    },
+    {
+      id: 'py-money-operators',
+      title: 'Nạp chồng toán tử và ý nghĩa của NotImplemented',
+      en: 'Operator Overloading & NotImplemented',
+      difficulty: 'Hard',
+      targetMinutes: 20,
+      entry: 'Money',
+      lang: 'python',
+      statement: `
+Viết class \`Money(amount, currency)\` với hai thuộc tính \`amount\` và \`currency\`, và các hành vi sau:
+
+- \`Money + Money\` **cùng loại tiền** → một \`Money\` mới với tổng số tiền.
+- \`Money + Money\` **khác loại tiền** → \`raise ValueError\`.
+- \`Money + <thứ không phải Money>\` (ví dụ \`money + 5\`) → phải khiến Python raise \`TypeError\`.
+  **Đừng tự raise** — hãy trả về giá trị đặc biệt mà Python quy định cho tình huống "tôi không biết cộng
+  với kiểu này".
+- \`Money == Money\` → \`True\` khi cùng \`amount\` **và** cùng \`currency\`.
+- \`Money == <thứ không phải Money>\` → \`False\` (không được raise lỗi).
+
+**Hệ thống chấm** tạo hai đối tượng từ \`(amount1, currency1, amount2, currency2)\` rồi trả về
+\`[kết_quả_cộng, a == b, a == "chuỗi", kết_quả_của_a + 5]\`, trong đó kết quả cộng là
+\`[amount, currency]\` nếu thành công hoặc tên lỗi nếu thất bại.
+
+**Ví dụ** với \`(10, "USD", 5, "USD")\` → \`[[15, "USD"], False, False, "TypeError"]\`
+`,
+      starter: `class Money:\n    def __init__(self, amount, currency):\n        self.amount = amount\n        self.currency = currency\n\n    # Bổ sung __add__ và __eq__\n    \n`,
+      harnessSrc: `def harness(Cls, args, t):
+    a = Cls(args[0], args[1])
+    b = Cls(args[2], args[3])
+    out = []
+    try:
+        s = a + b
+        out.append([s.amount, s.currency])
+    except ValueError:
+        out.append("ValueError")
+    out.append(bool(a == b))
+    out.append(bool(a == "chuoi"))
+    try:
+        a + 5
+        out.append("khong loi")
+    except TypeError:
+        out.append("TypeError")
+    return out`,
+      tests: [
+        { args: [10, 'USD', 5, 'USD'], expected: [[15, 'USD'], false, false, 'TypeError'], name: 'Cộng cùng loại tiền' },
+        { args: [10, 'USD', 10, 'USD'], expected: [[20, 'USD'], true, false, 'TypeError'], name: 'Hai giá trị bằng nhau' },
+        { args: [10, 'USD', 5, 'EUR'], expected: ['ValueError', false, false, 'TypeError'], name: 'Khác loại tiền — ValueError' },
+        { args: [0, 'VND', 0, 'VND'], expected: [[0, 'VND'], true, false, 'TypeError'], name: 'Số tiền 0 vẫn bằng nhau' },
+        { args: [-5, 'USD', 5, 'USD'], expected: [[0, 'USD'], false, false, 'TypeError'], name: 'Số âm, tổng bằng 0' },
+        { args: [10, 'USD', 10, 'EUR'], expected: ['ValueError', false, false, 'TypeError'], name: 'Cùng số tiền nhưng khác loại — KHÔNG bằng nhau' },
+        { args: [100, 'JPY', 200, 'JPY'], expected: [[300, 'JPY'], false, false, 'TypeError'], name: 'Cộng số lớn' },
+      ],
+      hints: [
+        '`__add__(self, other)` được gọi khi Python gặp `a + b`. Bên trong, trước hết hãy kiểm tra `isinstance(other, Money)`; nếu cùng `currency` thì trả về `Money(self.amount + other.amount, self.currency)`, nếu khác thì `raise ValueError`.',
+        'Với kiểu hoàn toàn xa lạ (`money + 5`), **đừng `raise TypeError`**. Hãy `return NotImplemented` — đây là tín hiệu chuẩn nói với Python "tôi không xử lý được kiểu này". Python sẽ thử phép toán ngược (`(5).__radd__`), và khi cả hai đều từ chối, nó tự raise `TypeError` với thông báo đầy đủ và chính xác.',
+        '`__eq__` cũng dùng cùng cơ chế: `return NotImplemented` khi `other` không phải `Money`. Khác biệt quan trọng là ở kết cục — với phép so sánh bằng, Python **không** raise mà quay về so sánh định danh, cho ra `False`. Đúng như đề bài yêu cầu.',
+      ],
+      diagnostics: [
+        { test: 'raise\\s+TypeError', message: 'Đừng tự `raise TypeError` cho kiểu không hỗ trợ. Hãy `return NotImplemented` — Python sẽ thử phép toán phản chiếu ở toán hạng bên kia trước, rồi mới tự raise `TypeError` với thông báo chuẩn. Tự raise là bạn cắt mất cơ hội hợp tác giữa hai kiểu.' },
+        { test: 'return\\s+NotImplementedError', message: '`NotImplementedError` (một **exception**) khác hoàn toàn `NotImplemented` (một **giá trị singleton**). Trả về một lớp exception sẽ bị Python coi là kết quả hợp lệ và truthy — `a + 5` sẽ "thành công" một cách vô nghĩa. Bạn cần `NotImplemented`, không có đuôi `Error`.' },
+        { test: 'def\\s+__eq__[\\s\\S]{0,300}?return\\s+False', message: 'Trả `False` khi gặp kiểu lạ tuy cho ra kết quả đúng ở bài này, nhưng nó chặn Python thử `other.__eq__(self)`. Nếu sau này có một lớp khác biết cách so sánh với `Money`, nó sẽ không bao giờ được hỏi tới. `return NotImplemented` mới là cách đúng.' },
+      ],
+      approach: `
+Nạp chồng toán tử trong Python không phải là "viết một hàm cho dấu +". Nó là tham gia vào một **giao thức
+thương lượng giữa hai kiểu dữ liệu**, và \`NotImplemented\` chính là ngôn ngữ của cuộc thương lượng đó.
+
+\`\`\`python
+class Money:
+    def __init__(self, amount, currency):
+        self.amount = amount
+        self.currency = currency
+
+    def __add__(self, other):
+        if not isinstance(other, Money):
+            return NotImplemented                 # "tôi không biết, hỏi bên kia đi"
+        if self.currency != other.currency:
+            raise ValueError("khong the cong hai loai tien khac nhau")
+        return Money(self.amount + other.amount, self.currency)
+
+    def __eq__(self, other):
+        if not isinstance(other, Money):
+            return NotImplemented
+        return (self.amount, self.currency) == (other.amount, other.currency)
+
+    def __repr__(self):
+        return f"Money({self.amount}, {self.currency!r})"
+\`\`\`
+
+**Khi bạn \`return NotImplemented\`, Python làm gì?**
+
+1. Thử phép toán phản chiếu ở toán hạng bên kia (\`(5).__radd__(money)\`).
+2. Nếu bên đó cũng trả \`NotImplemented\`, Python **tự** raise:
+   \`TypeError: unsupported operand type(s) for +: 'Money' and 'int'\` — thông báo đầy đủ, đúng chuẩn, và
+   bạn không phải viết một dòng nào.
+3. Riêng với \`==\`, không có raise: Python quay về so sánh **định danh object**, cho ra \`False\`.
+
+Chính bước 1 là điều bạn phá hỏng nếu tự \`raise TypeError\`. Giả sử sau này ai đó viết một lớp
+\`ExchangeRate\` biết cách cộng với \`Money\` — nếu \`Money.__add__\` tự raise, lớp kia không bao giờ được hỏi
+tới. \`NotImplemented\` giữ cho hệ thống **mở rộng được**.
+
+**Vì sao \`ValueError\` cho tiền khác loại, chứ không phải \`NotImplemented\`?** Vì đây là hai loại "không
+làm được" khác nhau về bản chất:
+
+| Tình huống | Ý nghĩa | Cách xử lý |
+|---|---|---|
+| \`Money + int\` | **sai kiểu** — có thể kiểu khác biết cách làm | \`return NotImplemented\` |
+| \`USD + EUR\` | **đúng kiểu, sai giá trị** — không ai cứu được | \`raise ValueError\` |
+
+Phân biệt được hai loại lỗi này là dấu hiệu rõ của người đã hiểu mô hình dữ liệu của Python.
+
+**Cạm bẫy tên gọi:** \`NotImplemented\` (giá trị singleton, dùng để trả về) hoàn toàn khác
+\`NotImplementedError\` (exception, dùng để đánh dấu phương thức trừu tượng chưa cài đặt). Gõ nhầm một chữ
+\`Error\` là bug im lặng — Python sẽ coi lớp exception đó là một kết quả hợp lệ.
+`,
+      solution: `class Money:
+    def __init__(self, amount, currency):
+        self.amount = amount
+        self.currency = currency
+
+    def __add__(self, other):
+        if not isinstance(other, Money):
+            return NotImplemented
+        if self.currency != other.currency:
+            raise ValueError("khong the cong hai loai tien khac nhau")
+        return Money(self.amount + other.amount, self.currency)
+
+    def __eq__(self, other):
+        if not isinstance(other, Money):
+            return NotImplemented
+        return (self.amount, self.currency) == (other.amount, other.currency)
+
+    def __repr__(self):
+        return f"Money({self.amount}, {self.currency!r})"`,
+      complexity: {
+        question: 'Chi phí của một phép `Money + Money` là bao nhiêu?',
+        options: [
+          'O(1) — vài phép kiểm tra kiểu, một phép cộng, một lần tạo object',
+          'O(n) theo số chữ số của số tiền',
+          'O(log n)',
+          'Không xác định vì phụ thuộc giao thức thương lượng kiểu',
+        ],
+        answer: 0,
+        why: '`isinstance`, so sánh chuỗi ngắn, cộng số và tạo object đều là hằng số. Điều đáng lưu ý không phải bậc O mà là **hằng số**: mỗi phép cộng tạo ra một object mới (thiết kế bất biến, an toàn), nên cộng dồn hàng triệu lần trong vòng lặp sẽ tạo hàng triệu object tạm. Khi đó hãy cộng các số thô rồi bọc lại thành `Money` một lần ở cuối.',
+      },
+      realWorld: 'Mọi kiểu dữ liệu miền nghiệp vụ có phép toán riêng: tiền tệ, đơn vị đo lường (không được cộng mét với giây), vector/ma trận, khoảng thời gian. Việc chặn `USD + EUR` ở tầng kiểu dữ liệu đã ngăn được những sự cố tài chính có thật — và cũng chính là lý do các thư viện như `pint` (đơn vị vật lý) hay `moneyed` tồn tại thay vì để mọi người dùng số thực trần.',
+    },
+    {
+      id: 'py-callable-accumulator',
+      title: 'Object gọi được như hàm (__call__, __len__, __bool__)',
+      en: 'Callable Objects',
+      difficulty: 'Medium',
+      targetMinutes: 16,
+      entry: 'Accumulator',
+      lang: 'python',
+      statement: `
+Viết class \`Accumulator\` — một object **dùng được như một hàm**, nhưng vẫn có trạng thái đọc được từ ngoài.
+
+- \`acc = Accumulator()\` — tổng ban đầu bằng 0, chưa được gọi lần nào.
+- \`acc(x)\` — cộng \`x\` vào tổng và **trả về tổng hiện tại**.
+- \`len(acc)\` — số lần \`acc\` đã được gọi.
+- \`bool(acc)\` — \`True\` nếu đã được gọi **ít nhất một lần**, ngược lại \`False\`.
+
+> Chú ý: \`bool(acc)\` dựa trên **số lần gọi**, không phải giá trị của tổng. Một accumulator đã được gọi với
+> giá trị \`0\` vẫn phải là \`True\`.
+
+**Hệ thống chấm** tạo một accumulator, ghi lại \`bool()\` ban đầu, gọi lần lượt với từng giá trị trong danh
+sách (ghi lại từng kết quả trả về), rồi ghi \`len()\` và \`bool()\` cuối cùng.
+
+**Ví dụ** với \`[1, 2, 3]\` → \`[False, 1, 3, 6, 3, True]\`
+`,
+      starter: `class Accumulator:\n    def __init__(self):\n        self.total = 0\n        self.calls = 0\n\n    # Bổ sung __call__, __len__ và __bool__ (nếu cần)\n    \n`,
+      harnessSrc: `def harness(Cls, args, t):
+    acc = Cls()
+    out = [bool(acc)]
+    for x in args[0]:
+        out.append(acc(x))
+    out.append(len(acc))
+    out.append(bool(acc))
+    return out`,
+      tests: [
+        { args: [[1, 2, 3]], expected: [false, 1, 3, 6, 3, true], name: 'Ba lần gọi, tổng tích luỹ' },
+        { args: [[]], expected: [false, 0, false], name: 'Chưa gọi lần nào' },
+        { args: [[0]], expected: [false, 0, 1, true], name: 'Gọi với 0 — bool vẫn phải là True' },
+        { args: [[5, -5]], expected: [false, 5, 0, 2, true], name: 'Tổng về 0 sau hai lần gọi' },
+        { args: [[10]], expected: [false, 10, 1, true], name: 'Một lần gọi' },
+        { args: [[-1, -2]], expected: [false, -1, -3, 2, true], name: 'Toàn số âm' },
+        { args: [[100, 0, 0]], expected: [false, 100, 100, 100, 3, true], name: 'Cộng thêm 0 vẫn tính là một lần gọi' },
+      ],
+      hints: [
+        'Phương thức `__call__(self, x)` biến một instance thành thứ gọi được: `acc(5)` chính là `acc.__call__(5)`. Bên trong, cập nhật `self.total` và `self.calls`, rồi `return self.total`.',
+        '`len(acc)` gọi `__len__(self)` và **bắt buộc trả về số nguyên không âm** — trả về số âm hay float sẽ raise `TypeError`. Ở đây nó phải trả `self.calls`, không phải `self.total`.',
+        'Về `__bool__`: nếu bạn không định nghĩa nó, Python sẽ **tự động dùng `__len__`** (khác 0 là True). Nhờ vậy hành vi mong muốn có được miễn phí. Nhưng nếu bạn viết `__bool__` dựa trên `self.total`, test "gọi với 0" sẽ fail — vì tổng bằng 0 không có nghĩa là chưa được gọi.',
+      ],
+      diagnostics: [
+        { test: 'def\\s+__bool__[\\s\\S]{0,150}?self\\.total', message: '`__bool__` của bạn dựa trên `self.total`. Đề yêu cầu nó phản ánh **số lần gọi**: một accumulator đã được gọi với giá trị `0` có tổng bằng 0 nhưng vẫn phải là `True`.' },
+        { test: 'def\\s+__len__[\\s\\S]{0,80}?return\\s+self\\.total', message: '`__len__` phải trả về số lần gọi (`self.calls`), không phải tổng. Ngoài ra `__len__` bắt buộc trả số nguyên không âm — nếu tổng âm, Python sẽ raise `ValueError: __len__() should return >= 0`.' },
+        { test: '^(?![\\s\\S]*__call__)[\\s\\S]*class\\s+Accumulator', message: 'Không thấy `__call__`. Không có nó, `acc(5)` sẽ raise `TypeError: Accumulator object is not callable` — một object chỉ "gọi được" khi class của nó định nghĩa `__call__`.' },
+      ],
+      approach: `
+Trong Python, **"gọi được" (callable) là một hành vi, không phải một loại object**. Hàm gọi được vì kiểu
+\`function\` có \`__call__\`; class gọi được (tạo instance) vì metaclass của nó có \`__call__\`. Bạn cũng có
+thể tham gia câu lạc bộ đó:
+
+\`\`\`python
+class Accumulator:
+    def __init__(self):
+        self.total = 0
+        self.calls = 0
+
+    def __call__(self, x):
+        self.total += x
+        self.calls += 1
+        return self.total
+
+    def __len__(self):
+        return self.calls
+\`\`\`
+
+**\`__bool__\` ở đâu?** Không cần viết. Python xác định tính chân trị theo thứ tự: tìm \`__bool__\` trước,
+không có thì tìm \`__len__\` (khác 0 là \`True\`), không có nốt thì mọi object đều \`True\`. Vì \`__len__\` của
+ta đã trả về số lần gọi, \`bool(acc)\` tự động đúng như yêu cầu. Đây là ví dụ đẹp về việc **cài một giao
+thức thì được tặng kèm giao thức khác** — nhưng cũng là cái bẫy: nếu bạn tự viết \`__bool__\` dựa trên
+\`total\`, bạn phá vỡ sự nhất quán giữa \`len(acc) == 0\` và \`not acc\`.
+
+**Callable object khác closure ở điểm nào?** Bạn đã viết một bộ đếm bằng closure ở module về hàm. Cả hai
+đều giữ trạng thái, nhưng:
+
+| | Closure | Callable object |
+|---|---|---|
+| Trạng thái | giấu kín, không đọc được từ ngoài | là thuộc tính công khai (\`acc.total\`) |
+| Kiểm tra trong test | khó | dễ — đọc thẳng thuộc tính |
+| Thêm hành vi | phải trả về nhiều hàm | thêm phương thức bình thường |
+| Độ dài code | ngắn hơn | dài hơn |
+
+Quy tắc chọn: **trạng thái đơn giản và riêng tư → closure; trạng thái cần quan sát, cấu hình hoặc nhiều
+thao tác → callable object.**
+
+**Trong thực tế**, callable object là nền tảng của: decorator có cấu hình phức tạp, các layer của PyTorch
+(\`model(x)\` chính là \`model.__call__(x)\`), validator có thể cấu hình, và mọi API kiểu "hàm nhưng có
+thuộc tính".
+`,
+      solution: `class Accumulator:
+    def __init__(self):
+        self.total = 0
+        self.calls = 0
+
+    def __call__(self, x):
+        self.total += x
+        self.calls += 1
+        return self.total
+
+    def __len__(self):
+        return self.calls
+
+    def __repr__(self):
+        return f"Accumulator(total={self.total}, calls={self.calls})"`,
+      complexity: {
+        question: 'Chi phí của một lời gọi `acc(x)` so với gọi một hàm thường?',
+        options: [
+          'O(1), nhưng có thêm một chút chi phí tra cứu `__call__` trên type so với gọi hàm trực tiếp',
+          'O(n) theo số lần đã gọi trước đó',
+          'Nhanh hơn hàm thường vì không phải tạo khung stack',
+          'O(log n)',
+        ],
+        answer: 0,
+        why: 'Hai phép cộng và một lần trả về — hằng số, không phụ thuộc lịch sử. Chi phí phụ so với hàm thường là bước tra `type(acc).__call__` rồi mới gọi; nhỏ nhưng có thật, và đó là lý do trong vòng lặp cực nóng người ta vẫn ưu tiên hàm hoặc closure. Bộ nhớ là O(1) vì chỉ giữ hai con số, không lưu lịch sử.',
+      },
+      realWorld: 'Mô hình machine learning (`model(x)` trong PyTorch/Keras), decorator có trạng thái (rate limiter, circuit breaker đếm số lỗi liên tiếp), hàm callback có cấu hình, và các validator dựng động. Mỗi khi bạn thấy một "hàm" mà lại đọc được thuộc tính của nó (`fn.cache_info()`, `fn.calls`), gần như chắc chắn đó là một callable object hoặc một hàm được gắn thêm thuộc tính.',
     },
   ],
 },

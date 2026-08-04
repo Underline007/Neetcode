@@ -196,6 +196,45 @@ def parse_all(strs):
       answer: 1,
       why: 'Exception nên dành cho trường hợp thực sự "ngoại lệ" (hiếm, không mong đợi). Nếu một "lỗi" xảy ra RẤT THƯỜNG XUYÊN trong logic bình thường (ví dụ kiểm tra tồn tại), một câu `if` kiểm tra trước thường rẻ hơn về hiệu năng so với việc liên tục raise/catch exception trong vòng lặp lớn.',
     },
+    {
+      q: 'Hàm sau trả về giá trị nào?\n\ndef f():\n    try:\n        return 1\n    finally:\n        return 2\n\nprint(f())',
+      options: ['1', '2', 'SyntaxError vì có hai lệnh return', 'None'],
+      answer: 1,
+      why: '`finally` chạy **trước khi** hàm thực sự trả về: giá trị `1` đã được chuẩn bị nhưng chưa bàn giao, và một lệnh `return` trong `finally` sẽ **ghi đè** nó. Nguy hiểm hơn: nếu `try` đang raise exception mà `finally` có `return`, exception đó bị **nuốt mất im lặng**. Quy tắc thực hành: `finally` chỉ dùng để dọn dẹp — không bao giờ đặt `return`, `break` hay `continue` trong đó.',
+    },
+    {
+      q: 'Đoạn code sau in ra gì?\n\ntry:\n    1 / 0\nexcept ZeroDivisionError as e:\n    pass\nprint(e)',
+      options: [
+        'division by zero',
+        'NameError — biến e không còn tồn tại sau khối except',
+        'None',
+        'ZeroDivisionError()',
+      ],
+      answer: 1,
+      why: 'Python 3 **tự động xoá** biến `e` khi ra khỏi khối `except` (tương đương `del e` ngầm). Lý do: đối tượng exception giữ tham chiếu tới traceback, traceback giữ tham chiếu tới toàn bộ khung stack, và khung stack lại chứa `e` — một vòng tham chiếu giữ sống mọi biến cục bộ của hàm. Muốn dùng lại sau này, phải tự gán ra biến khác: `except ... as e: err = e`.',
+    },
+    {
+      q: 'Khối `else` của `try` raise một `ValueError`. Khối `except ValueError` viết ngay phía trên có bắt được không?\n\ntry:\n    x = 1\nexcept ValueError:\n    print("bat duoc")\nelse:\n    raise ValueError("tu else")',
+      options: [
+        'Có — else vẫn thuộc phạm vi bảo vệ của try',
+        'Không — exception thoát ra ngoài, chương trình dừng với ValueError',
+        'Có, nhưng chỉ khi thêm khối finally',
+        'SyntaxError: try không được có else',
+      ],
+      answer: 1,
+      why: 'Khối `else` nằm **ngoài** vùng được bảo vệ: nó chỉ chạy khi `try` không có lỗi, và exception phát sinh trong đó KHÔNG bị các `except` cùng cấp bắt. Đó chính là lý do `else` tồn tại — nó cho bạn thu hẹp phần code được `try` bảo vệ xuống đúng dòng có thể lỗi, tránh việc `except` vô tình nuốt một lỗi khác đến từ phần xử lý phía sau (loại bug che giấu lỗi thật rất khó tìm).',
+    },
+    {
+      q: 'Vì sao KHÔNG nên dùng `assert` để validate dữ liệu người dùng (ví dụ `assert age > 0`) trong code chạy thật?',
+      options: [
+        'Vì `assert` chậm hơn `if` rất nhiều',
+        'Vì mọi lệnh `assert` bị LOẠI BỎ hoàn toàn khi Python chạy với cờ tối ưu `-O` — kiểm tra biến mất trên môi trường production',
+        'Vì `assert` chỉ hoạt động bên trong hàm',
+        'Vì `AssertionError` không bắt được bằng `except`',
+      ],
+      answer: 1,
+      why: '`python -O` (và biến môi trường `PYTHONOPTIMIZE`) xoá sạch mọi `assert` khỏi bytecode. Nếu bạn dùng nó để chặn dữ liệu xấu, lớp bảo vệ đó **biến mất im lặng** đúng lúc quan trọng nhất — đây từng là nguyên nhân của nhiều lỗ hổng bảo mật thật. `assert` chỉ dành cho những điều "không bao giờ được sai nếu code đúng" (bất biến nội bộ, hỗ trợ debug và test). Validate dữ liệu ngoài phải dùng `if ...: raise ValueError(...)`.',
+    },
   ],
   problems: [
     {
@@ -505,6 +544,236 @@ mất hết ý nghĩa "retry".
         why: 'Vòng lặp `for attempt in range(max_attempts)` chạy tối đa k lần, mỗi lần gọi operation() một lần — tổng chi phí tuyến tính theo số lượt thử tối đa.',
       },
       realWorld: 'Gọi API bên thứ ba, kết nối database, gửi message tới message queue — các thao tác I/O qua mạng có thể lỗi tạm thời (timeout, connection reset); retry với giới hạn số lần giúp hệ thống tự phục hồi khỏi lỗi thoáng qua mà không cần can thiệp thủ công, đồng thời vẫn báo lỗi thật nếu vấn đề kéo dài (không lỗi tạm thời).',
+    },
+    {
+      id: 'py-try-finally-order',
+      title: 'Thứ tự thật sự của try / except / else / finally',
+      en: 'Execution Order of try Blocks',
+      difficulty: 'Medium',
+      targetMinutes: 15,
+      entry: 'process',
+      lang: 'python',
+      statement: `
+Viết hàm \`process(steps)\` xử lý lần lượt từng bước trong danh sách \`steps\` (danh sách chuỗi) và trả về
+**nhật ký** các sự kiện theo đúng thứ tự xảy ra.
+
+Quy tắc cho **mỗi** bước \`s\`:
+1. Ghi \`"start:" + s\`.
+2. Nếu \`s == "boom"\` → \`raise ValueError(s)\`, bắt lại ngay tại chỗ và ghi \`"error:" + s\`.
+3. Nếu \`s == "stop"\` → **trả về nhật ký ngay lập tức** (kết thúc hàm, không xử lý các bước sau).
+4. Dù xảy ra chuyện gì ở trên, luôn ghi \`"done:" + s\` **trước khi** rời khỏi bước đó.
+
+Sau khi chạy hết mọi bước mà không gặp \`"stop"\`, ghi thêm \`"end"\` rồi trả về nhật ký.
+
+**Ví dụ**
+- \`["a"]\` → \`["start:a", "done:a", "end"]\`
+- \`["boom"]\` → \`["start:boom", "error:boom", "done:boom", "end"]\`
+- \`["stop", "a"]\` → \`["start:stop", "done:stop"]\`
+
+> Chú ý ví dụ cuối: \`"done:stop"\` vẫn được ghi **dù đã gặp \`return\`**. Cấu trúc nào của Python cho bạn
+> đảm bảo đó?
+`,
+      starter: `def process(steps):\n    log = []\n    # Với mỗi bước: start -> (có thể lỗi) -> có thể return sớm -> LUÔN ghi done\n    \n    return log\n`,
+      tests: [
+        { args: [['a']], expected: ['start:a', 'done:a', 'end'], name: 'Một bước bình thường' },
+        { args: [['boom']], expected: ['start:boom', 'error:boom', 'done:boom', 'end'], name: 'Bước gây lỗi' },
+        { args: [['stop', 'a']], expected: ['start:stop', 'done:stop'], name: 'return sớm — finally vẫn phải chạy' },
+        { args: [[]], expected: ['end'], name: 'Danh sách rỗng' },
+        { args: [['a', 'boom', 'b']], expected: ['start:a', 'done:a', 'start:boom', 'error:boom', 'done:boom', 'start:b', 'done:b', 'end'], name: 'Lỗi ở giữa, vòng lặp vẫn tiếp tục' },
+        { args: [['boom', 'stop']], expected: ['start:boom', 'error:boom', 'done:boom', 'start:stop', 'done:stop'], name: 'Lỗi rồi dừng' },
+        { args: [['x', 'y', 'z']], expected: ['start:x', 'done:x', 'start:y', 'done:y', 'start:z', 'done:z', 'end'], name: 'Ba bước bình thường' },
+      ],
+      hints: [
+        'Đặt `try` **bên trong** vòng `for`, không phải bọc cả vòng lặp — vì sau một bước lỗi, vòng lặp vẫn phải chạy tiếp bước sau.',
+        'Việc "luôn ghi done trước khi rời khỏi bước" chính là định nghĩa của `finally`: nó chạy khi khối kết thúc bình thường, khi có exception, VÀ khi có `return` — đúng ba trường hợp của bài này.',
+        'Với `"stop"`, hãy viết `return log` ngay trong `try`. Python sẽ chuẩn bị giá trị trả về, chạy `finally` (ghi `"done:stop"` vào chính list `log` đó), rồi mới thật sự trả về — nên `"done:stop"` vẫn kịp nằm trong kết quả.',
+      ],
+      diagnostics: [
+        { test: 'try\\s*:\\s*\\n\\s+for\\s', message: 'Bạn đang bọc `try` quanh CẢ vòng lặp. Khi bước đầu tiên lỗi, luồng nhảy thẳng ra `except` và vòng lặp kết thúc — các bước sau không được xử lý. `try` phải nằm bên trong thân vòng lặp.' },
+        { test: 'except\\s*:\\s*$|except\\s+Exception', message: 'Đề chỉ nói tới `ValueError`. Bắt `except:` trần hoặc `except Exception` sẽ nuốt luôn cả những lỗi thật của code bạn (gõ sai tên biến, sai kiểu), khiến bài sai mà không hiểu vì sao. Hãy bắt đúng loại: `except ValueError`.' },
+        { test: 'finally\\s*:\\s*\\n\\s+return', message: 'Đừng đặt `return` trong `finally`: nó ghi đè giá trị trả về của `try` và nuốt luôn exception đang lan truyền. `finally` chỉ nên chứa thao tác dọn dẹp.' },
+      ],
+      approach: `
+Bài này biến sơ đồ luồng của \`try\` thành thứ bạn phải **tự tay dựng lại**, nên không thể học vẹt.
+
+\`\`\`python
+def process(steps):
+    log = []
+    for s in steps:
+        try:
+            log.append("start:" + s)
+            if s == "boom":
+                raise ValueError(s)
+            if s == "stop":
+                return log          # finally vẫn chạy trước khi trả về!
+        except ValueError:
+            log.append("error:" + s)
+        finally:
+            log.append("done:" + s)
+    log.append("end")
+    return log
+\`\`\`
+
+**Ba điều cần rút ra:**
+
+**1. \`finally\` mạnh hơn \`return\`.** Khi gặp \`return log\`, Python ghi nhớ giá trị sẽ trả về, chạy
+\`finally\`, rồi mới bàn giao. Vì \`log\` là list mutable và \`finally\` sửa **chính object đó**, phần tử
+\`"done:stop"\` kịp có mặt trong kết quả. (Nếu \`log\` là chuỗi bất biến, \`finally\` sẽ không kịp tác động —
+một chi tiết đáng suy ngẫm về mutable/immutable.)
+
+**2. Phạm vi của \`try\` quyết định phạm vi phục hồi.** Đặt \`try\` quanh cả vòng lặp nghĩa là "một bước lỗi
+thì bỏ toàn bộ"; đặt trong thân vòng lặp nghĩa là "lỗi một bước thì bỏ qua bước đó, đi tiếp". Hai lựa chọn
+thiết kế hoàn toàn khác nhau, và bộ test ở đây yêu cầu cái thứ hai.
+
+**3. Bắt hẹp thay vì bắt rộng.** \`except ValueError\` chỉ bắt đúng thứ bạn dự đoán được. \`except
+Exception\` sẽ nuốt luôn \`AttributeError\` do bạn gõ sai tên biến, biến một lỗi lập trình rõ ràng thành một
+hành vi sai lặng lẽ.
+
+**Sơ đồ đầy đủ để thuộc:** \`try\` → (có lỗi? → \`except\` khớp) → (không lỗi? → \`else\`) → \`finally\`
+(mọi trường hợp, kể cả khi đang \`return\` hoặc exception đang lan ra ngoài).
+`,
+      solution: `def process(steps):
+    log = []
+    for s in steps:
+        try:
+            log.append("start:" + s)
+            if s == "boom":
+                raise ValueError(s)
+            if s == "stop":
+                return log
+        except ValueError:
+            log.append("error:" + s)
+        finally:
+            log.append("done:" + s)
+    log.append("end")
+    return log`,
+      complexity: {
+        question: 'Độ phức tạp thời gian của process theo số bước n?',
+        options: [
+          'O(n) — mỗi bước tốn một lượng công việc hằng số',
+          'O(n²) vì mỗi lần raise exception phải dựng lại toàn bộ ngăn xếp',
+          'O(n log n)',
+          'O(1)',
+        ],
+        answer: 0,
+        why: 'Mỗi bước làm vài phép append (O(1) khấu hao) → O(n) tổng cộng. Lưu ý về hằng số: dựng và raise một exception đắt hơn nhiều so với một lệnh `if` (phải tạo object, thu thập traceback). Điều đó không đổi bậc O, nhưng là lý do không nên dùng exception cho luồng điều khiển xảy ra thường xuyên trong vòng lặp nóng.',
+      },
+      realWorld: 'Xử lý hàng loạt bản ghi mà một bản ghi hỏng không được làm dừng cả lô (import CSV, consumer đọc message queue), kèm yêu cầu "luôn giải phóng tài nguyên/ghi log kết thúc dù thành công hay thất bại". Đây đúng là bộ khung của mọi worker chạy nền trong hệ thống thật.',
+    },
+    {
+      id: 'py-get-nested',
+      title: 'Truy cập dữ liệu lồng nhau an toàn',
+      en: 'Safe Nested Lookup',
+      difficulty: 'Medium',
+      targetMinutes: 14,
+      entry: 'get_nested',
+      lang: 'python',
+      statement: `
+Viết hàm \`get_nested(data, keys, default)\` đi lần lượt theo danh sách khoá \`keys\` để lấy giá trị lồng
+sâu bên trong \`data\`.
+
+- Nếu đi hết được, trả về giá trị tìm thấy.
+- Nếu **bất kỳ tầng nào** thiếu khoá, hoặc giá trị ở tầng đó không cho phép truy cập theo khoá
+  (ví dụ đang là số nguyên), trả về \`default\`.
+- \`keys\` rỗng → trả về chính \`data\`.
+
+**Ví dụ**
+- \`get_nested({"a": {"b": {"c": 1}}}, ["a", "b", "c"], None)\` → \`1\`
+- \`get_nested({"a": {"b": 1}}, ["a", "x"], "N/A")\` → \`"N/A"\`
+- \`get_nested({"a": 5}, ["a", "b"], "N/A")\` → \`"N/A"\` (số 5 không truy cập được bằng khoá)
+
+**Hai test dễ trượt nhất**
+- Giá trị tìm thấy là \`0\` → phải trả về \`0\`, **không** phải \`default\`.
+- Giá trị tìm thấy là \`None\` (khoá có tồn tại) → phải trả về \`None\`, **không** phải \`default\`.
+`,
+      starter: `def get_nested(data, keys, default):\n    # Đi theo từng khoá trong keys; thiếu khoá hoặc không truy cập được -> default\n    \n`,
+      tests: [
+        { args: [{ a: { b: { c: 1 } } }, ['a', 'b', 'c'], null], expected: 1, name: 'Ba tầng lồng nhau' },
+        { args: [{ a: { b: { c: 0 } } }, ['a', 'b', 'c'], -1], expected: 0, name: 'Giá trị 0 — falsy nhưng hợp lệ' },
+        { args: [{ a: { b: null } }, ['a', 'b'], 'miss'], expected: null, name: 'Giá trị None nhưng khoá CÓ tồn tại' },
+        { args: [{ a: { b: 1 } }, ['a', 'x'], 'N/A'], expected: 'N/A', name: 'Thiếu khoá ở tầng cuối' },
+        { args: [{ a: 5 }, ['a', 'b'], 'N/A'], expected: 'N/A', name: 'Tầng giữa là số nguyên' },
+        { args: [{ a: 1 }, [], 'N/A'], expected: { a: 1 }, name: 'keys rỗng — trả về chính data' },
+        { args: [{}, ['a'], null], expected: null, name: 'Dict rỗng' },
+        { args: [{ a: { b: 'text' } }, ['a', 'b', 'c'], 'N/A'], expected: 'N/A', name: 'Tầng giữa là chuỗi' },
+        { args: [{ user: { name: 'An' } }, ['user', 'name'], 'khach'], expected: 'An', name: 'Trường hợp thông thường' },
+      ],
+      hints: [
+        'Dùng một biến con trỏ `cur = data`, rồi lặp qua từng khoá và đi sâu dần: `cur = cur[k]`. Câu hỏi thật sự là xử lý lỗi ở đâu và bắt lỗi gì.',
+        'Có hai loại lỗi khác nhau: khoá không tồn tại → `KeyError`; giá trị hiện tại không hỗ trợ truy cập bằng khoá (số nguyên, `None`) → `TypeError`. Bắt cả hai bằng một tuple: `except (KeyError, TypeError)`.',
+        'Bẫy lớn nhất: đừng bao giờ viết `return cur or default`. Toán tử `or` coi `0`, `""`, `[]`, `None` là "không có" và sẽ thay chúng bằng `default` — trong khi đề yêu cầu phân biệt rạch ròi "khoá không tồn tại" với "khoá tồn tại và giá trị là 0/None".',
+      ],
+      diagnostics: [
+        { test: '\\bor\\s+default\\b', message: '`... or default` biến MỌI giá trị falsy (`0`, `""`, `[]`, `None`) thành `default` — làm mất khả năng phân biệt "không có khoá" với "khoá có giá trị là 0". Hãy `return default` ở đúng nhánh lỗi, và `return cur` ở nhánh thành công.' },
+        { test: 'except\\s*:\\s*$', message: '`except:` trần bắt cả `KeyboardInterrupt` và những lỗi lập trình của chính bạn. Hãy nêu rõ loại lỗi bạn dự đoán: `except (KeyError, TypeError)`.' },
+        { test: 'if\\s+not\\s+cur\\b|if\\s+cur\\s*:', message: 'Kiểm tra `if not cur` là kiểm tra tính falsy, không phải kiểm tra "khoá có tồn tại không". Giá trị hợp lệ `0`, `""`, `[]` sẽ bị hiểu nhầm thành thiếu dữ liệu.' },
+      ],
+      approach: `
+Bài này là bài tập điển hình cho triết lý **EAFP** (Easier to Ask Forgiveness than Permission) của Python:
+thay vì kiểm tra trước mọi điều kiện, cứ thử làm rồi bắt đúng lỗi có thể xảy ra.
+
+\`\`\`python
+def get_nested(data, keys, default):
+    cur = data
+    for k in keys:
+        try:
+            cur = cur[k]
+        except (KeyError, TypeError, IndexError):
+            return default
+    return cur
+\`\`\`
+
+**Vì sao bắt cả \`TypeError\`?** Vì hai kiểu hỏng hoàn toàn khác nhau đều có thể xảy ra:
+
+\`\`\`python
+{"a": {}}["a"]["b"]     # KeyError  — đúng kiểu dữ liệu, chỉ là thiếu khoá
+{"a": 5}["a"]["b"]      # TypeError — 'int' object is not subscriptable
+\`\`\`
+
+Chỉ bắt \`KeyError\` là lời giải "gần đúng" hay gặp nhất, và nó vỡ ngay khi dữ liệu thật có cấu trúc không
+đồng nhất — chính xác là tình huống mà hàm này sinh ra để xử lý.
+
+**Vì sao \`or default\` là sai (không chỉ là "chưa đẹp")?** Vì nó trộn lẫn hai câu hỏi khác nhau: *"khoá
+này có tồn tại không?"* và *"giá trị của nó có truthy không?"*. Với dữ liệu thật — số lượng bằng 0, chuỗi
+rỗng, danh sách rỗng, cờ \`False\` — đây là bug làm sai lệch số liệu:
+
+\`\`\`python
+get_nested({"gio_hang": {"so_luong": 0}}, ["gio_hang", "so_luong"], 1)
+# đúng: 0 (giỏ trống)   —   với 'or default': 1 (báo có 1 món!)
+\`\`\`
+
+**Lời giải LBYL tương đương** (Look Before You Leap) cũng chấp nhận được, và đôi khi dễ đọc hơn:
+
+\`\`\`python
+for k in keys:
+    if not isinstance(cur, dict) or k not in cur:
+        return default
+    cur = cur[k]
+\`\`\`
+
+Chọn cái nào? Nếu trường hợp thiếu khoá là **hiếm**, EAFP nhanh hơn (không tốn phí kiểm tra ở đường đi
+thành công). Nếu thiếu khoá là **thường xuyên**, LBYL nhanh hơn vì raise exception khá đắt.
+`,
+      solution: `def get_nested(data, keys, default):
+    cur = data
+    for k in keys:
+        try:
+            cur = cur[k]
+        except (KeyError, TypeError, IndexError):
+            return default
+    return cur`,
+      complexity: {
+        question: 'Độ phức tạp thời gian của get_nested theo số khoá k trong danh sách keys?',
+        options: [
+          'O(k) — mỗi tầng là một lần tra cứu dict O(1) trung bình',
+          'O(n) với n là tổng số khoá trong toàn bộ cấu trúc dữ liệu',
+          'O(k²)',
+          'O(k log n)',
+        ],
+        answer: 0,
+        why: 'Hàm chỉ đi thẳng xuống đúng một nhánh, mỗi tầng một lần tra bảng băm O(1) trung bình → O(k), hoàn toàn không phụ thuộc kích thước tổng thể của dữ liệu. Đó là ưu điểm lớn so với việc duyệt đệ quy toàn bộ cây để tìm khoá.',
+      },
+      realWorld: 'Đọc dữ liệu từ JSON của API bên thứ ba, file cấu hình nhiều tầng, payload webhook — những nguồn mà cấu trúc không được đảm bảo và thường xuyên thiếu trường. Đây chính là ý tưởng đằng sau `dict.get` nối chuỗi, `pydantic` với giá trị mặc định, hay toán tử `?.` của JavaScript; điểm khác biệt là ở Python bạn tự viết được nó trong 6 dòng và kiểm soát chính xác nó phân biệt "thiếu" với "rỗng" thế nào.',
     },
   ],
 },

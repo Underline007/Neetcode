@@ -167,6 +167,35 @@ def is_prime(n):
       answer: 1,
       why: 'Dấu `*` đứng một mình trong danh sách tham số là một "cột mốc" — nó không nhận đối số, chỉ đánh dấu ranh giới: mọi tham số sau nó bắt buộc phải gọi bằng tên (keyword-only argument).',
     },
+    {
+      q: 'Đoạn code sau in ra gì?\n\ndef outer():\n    n = 0\n    def inner():\n        n += 1\n    inner()\n    return n\n\nprint(outer())',
+      options: ['0', '1', 'UnboundLocalError — n bị coi là biến cục bộ của inner', 'None'],
+      answer: 2,
+      why: 'Python quyết định phạm vi biến **lúc biên dịch hàm**, không phải lúc chạy: chỉ cần trong `inner` có một lệnh GÁN cho `n` (`n += 1` là đọc rồi gán), Python xếp `n` là biến cục bộ của `inner` trên toàn bộ hàm. Khi chạy tới `n += 1` nó phải ĐỌC `n` cục bộ trước — mà biến này chưa được gán lần nào → `UnboundLocalError`. Sửa bằng cách khai `nonlocal n` ở đầu `inner`. Lưu ý: chỉ ĐỌC (`return n`) thì hoàn toàn không cần `nonlocal`.',
+    },
+    {
+      q: 'Đoạn code sau in ra gì?\n\nfor x in [1, 3, 5]:\n    if x % 2 == 0:\n        break\nelse:\n    print("A")\nprint("B")',
+      options: ['Chỉ in B', 'In A rồi in B', 'Chỉ in A', 'Không in gì cả'],
+      answer: 1,
+      why: 'Khối `else` của vòng lặp nên đọc là **"no-break"** chứ không phải "nếu không": nó chạy khi vòng lặp kết thúc tự nhiên mà KHÔNG gặp `break`. Danh sách trên không có số chẵn nên không `break` → `A` được in, rồi `B`. Bẫy phụ: nếu vòng lặp chạy trên danh sách RỖNG (không lặp lần nào), `else` vẫn chạy — vì vẫn không có `break` nào xảy ra.',
+    },
+    {
+      q: 'Hàm sau được gọi lúc 10:00 và gọi lại lúc 11:00. Kết quả hai lần gọi thế nào?\n\nimport time\n\ndef stamp(msg, t=time.time()):\n    return t',
+      options: [
+        'Hai giá trị khác nhau, mỗi lần là thời điểm gọi hàm',
+        'Hai lần trả về CÙNG một giá trị — thời điểm module được nạp và câu lệnh def chạy',
+        'Lỗi vì không được gọi hàm trong biểu thức giá trị mặc định',
+        'Lần đầu ra thời gian, lần sau trả về None',
+      ],
+      answer: 1,
+      why: 'Biểu thức giá trị mặc định được tính **đúng một lần**, tại thời điểm câu lệnh `def` được thực thi (thường là lúc import module) — không phải mỗi lần gọi hàm. Đây cùng gốc rễ với bẫy `def f(x=[])`, nhưng nguy hiểm hơn vì không có gì "tích luỹ" để bạn nhận ra: hàm chỉ âm thầm trả về dữ liệu cũ. Cách đúng: `def stamp(msg, t=None): if t is None: t = time.time()`.',
+    },
+    {
+      q: 'Đoạn code sau in ra gì?\n\nnums = [1, 2, 2, 3]\nfor n in nums:\n    if n % 2 == 0:\n        nums.remove(n)\nprint(nums)',
+      options: ['[1, 3]', '[1, 2, 3]', '[1, 2, 2, 3]', 'RuntimeError: list changed size during iteration'],
+      answer: 1,
+      why: 'Vòng `for` trên list chạy theo **chỉ số nội bộ** 0, 1, 2… Sau khi xoá số 2 ở vị trí 1, mọi phần tử phía sau dịch trái một ô (số 2 thứ hai rơi vào vị trí 1), nhưng chỉ số vòng lặp vẫn tăng lên 2 → phần tử đó bị **nhảy qua**. Python không hề báo lỗi ở đây (khác với `dict`/`set`: sửa trong lúc duyệt sẽ raise `RuntimeError`), nên bug im lặng. Cách đúng: tạo list mới bằng comprehension, hoặc gán slice `nums[:] = [...]` nếu bắt buộc phải sửa tại chỗ.',
+    },
   ],
   problems: [
     {
@@ -379,6 +408,205 @@ tạp kiểm tra nguyên tố từ O(n) xuống O(√n).
         why: 'Vòng lặp chạy từ 2 tới int(n**0.5)+1, tức khoảng √n bước — đây là lý do giới hạn thử ước tới căn bậc hai là một tối ưu hoá quan trọng so với thử tới n.',
       },
       realWorld: 'Cấu trúc for-else dùng bất cứ đâu cần "tìm kiếm rồi hành động khác nhau tuỳ có tìm thấy hay không" mà không cần biến cờ phụ: kiểm tra tính hợp lệ (validation) khi duyệt qua danh sách quy tắc, tìm kiếm phần tử khớp điều kiện trong xử lý dữ liệu.',
+    },
+    {
+      id: 'py-make-counter',
+      title: 'Bộ đếm độc lập bằng closure',
+      en: 'Independent Counters (Closure + nonlocal)',
+      difficulty: 'Medium',
+      targetMinutes: 12,
+      entry: 'make_counter',
+      lang: 'python',
+      statement: `
+Viết hàm \`make_counter(start)\` trả về **một hàm không tham số**. Mỗi lần hàm đó được gọi, bộ đếm tăng
+thêm 1 và trả về giá trị **mới**.
+
+Quan trọng: mỗi lần gọi \`make_counter\` phải cho ra một bộ đếm **hoàn toàn độc lập** — hai bộ đếm không
+được dùng chung trạng thái.
+
+**Hệ thống chấm sẽ làm như sau** với đầu vào \`(start, steps)\`:
+1. Tạo bộ đếm thứ nhất \`c1 = make_counter(start)\` và bộ đếm thứ hai \`c2 = make_counter(start)\`.
+2. Gọi \`c1()\` đúng \`steps\` lần, ghi lại từng giá trị.
+3. Gọi \`c2()\` **một lần**, ghi tiếp giá trị đó vào cuối.
+
+**Ví dụ** với \`start = 10, steps = 3\` → \`[11, 12, 13, 11]\`
+(giá trị cuối là \`11\` chứ không phải \`14\` — vì \`c2\` là bộ đếm riêng, bắt đầu lại từ \`10\`).
+`,
+      starter: `def make_counter(start):\n    # Trả về một hàm: mỗi lần gọi tăng bộ đếm thêm 1 và trả về giá trị mới\n    \n`,
+      harnessSrc: `def harness(fn, args, t):
+    start, steps = args
+    c1 = fn(start)
+    c2 = fn(start)
+    out = []
+    for _ in range(steps):
+        out.append(c1())
+    out.append(c2())
+    return out`,
+      tests: [
+        { args: [10, 3], expected: [11, 12, 13, 11], name: 'Ví dụ trong đề' },
+        { args: [0, 1], expected: [1, 1], name: 'Một bước — kiểm tra tính độc lập' },
+        { args: [0, 5], expected: [1, 2, 3, 4, 5, 1], name: 'Năm bước liên tiếp' },
+        { args: [-3, 2], expected: [-2, -1, -2], name: 'Bắt đầu từ số âm' },
+        { args: [100, 4], expected: [101, 102, 103, 104, 101], name: 'Bắt đầu từ số lớn' },
+        { args: [7, 0], expected: [8], name: 'Không gọi c1 lần nào' },
+      ],
+      hints: [
+        'Hàm bên trong cần GÁN LẠI biến `start` (hoặc một biến đếm) nằm ở hàm bao ngoài. Chỉ đọc thì tự do, nhưng gán lại thì Python mặc định coi đó là biến cục bộ mới.',
+        'Từ khoá bạn cần là `nonlocal` (không phải `global`): nó nói với Python "biến này thuộc hàm bao ngoài gần nhất, đừng tạo biến cục bộ mới". `global` sẽ khiến mọi bộ đếm dùng chung một biến ở cấp module — sai yêu cầu độc lập.',
+        'Khung lời giải: `def make_counter(start): n = start` → `def step(): nonlocal n; n += 1; return n` → `return step`. Mỗi lần gọi `make_counter` tạo một biến `n` mới, nên các bộ đếm tự nhiên độc lập với nhau.',
+      ],
+      diagnostics: [
+        { test: '^\\s*global\\s+', message: '`global` khiến MỌI bộ đếm cùng đọc/ghi một biến duy nhất ở cấp module — bộ đếm thứ hai sẽ tiếp tục từ giá trị của bộ đếm thứ nhất thay vì bắt đầu lại. Bạn cần `nonlocal` (biến thuộc hàm bao ngoài), không phải `global`.' },
+        { test: '^(?![\\s\\S]*nonlocal)[\\s\\S]*\\bdef make_counter\\b', message: 'Không thấy `nonlocal` trong code. Nếu hàm lồng bên trong có lệnh gán cho biến đếm (`n += 1`) mà không khai `nonlocal n`, Python coi `n` là biến cục bộ mới và raise `UnboundLocalError`. (Cách hợp lệ khác: giữ trạng thái trong một container mutable, ví dụ `box = [start]` rồi sửa `box[0]`.)' },
+      ],
+      approach: `
+Bài này gói trọn ba khái niệm về phạm vi biến trong Python.
+
+**1. Closure là gì.** Hàm lồng bên trong "nhớ" được môi trường nơi nó được TẠO RA, không phải nơi nó được
+gọi. Biến \`n\` sống lâu hơn lời gọi \`make_counter\` vì vẫn còn hàm \`step\` tham chiếu tới nó.
+
+**2. Vì sao cần \`nonlocal\`.** Python phân tích phạm vi biến lúc biên dịch hàm: thấy có lệnh gán cho \`n\`
+ở đâu đó trong \`step\` là nó xếp \`n\` vào biến cục bộ của \`step\` — kể cả dòng gán nằm sau dòng đọc.
+\`nonlocal n\` đảo ngược quyết định đó, trỏ về biến \`n\` của hàm bao ngoài gần nhất.
+
+**3. Vì sao \`global\` là sai ở đây.** \`global\` trỏ tới một biến duy nhất ở cấp module — dùng chung cho
+mọi bộ đếm. Test \`[0, 1] → [1, 1]\` được thiết kế riêng để bắt lỗi này: nếu dùng \`global\`, giá trị cuối
+sẽ là \`2\`.
+
+\`\`\`python
+def make_counter(start):
+    n = start                 # mỗi lời gọi make_counter tạo MỘT n mới
+    def step():
+        nonlocal n            # trỏ tới n của make_counter, không tạo biến mới
+        n += 1
+        return n
+    return step               # trả về HÀM, không gọi nó (không có dấu ngoặc)
+\`\`\`
+
+**Lỗi gõ hay gặp:** viết \`return step()\` thay vì \`return step\` — cái đầu gọi hàm ngay và trả về một
+con số, cái sau trả về chính hàm đó. Đây cũng là nền tảng của decorator ở module sau.
+`,
+      solution: `def make_counter(start):
+    n = start
+
+    def step():
+        nonlocal n
+        n += 1
+        return n
+
+    return step`,
+      complexity: {
+        question: 'Mỗi lần gọi bộ đếm (`c1()`) tốn độ phức tạp thời gian và bộ nhớ bao nhiêu?',
+        options: [
+          'Thời gian O(1), bộ nhớ O(1) — chỉ cộng và trả về một biến duy nhất',
+          'Thời gian O(n) vì phải duyệt lại lịch sử các lần gọi trước',
+          'Thời gian O(1) nhưng bộ nhớ O(n) vì mỗi lần gọi lưu thêm một giá trị',
+          'Thời gian O(log n)',
+        ],
+        answer: 0,
+        why: 'Closure chỉ giữ MỘT ô nhớ cho biến `n` (gọi là cell), không lưu lịch sử. Mỗi lần gọi chỉ là một phép cộng và một lần đọc ô nhớ đó — hằng số cả về thời gian lẫn bộ nhớ, dù bạn gọi một triệu lần.',
+      },
+      realWorld: 'Sinh ID tăng dần cho từng phiên làm việc, đếm số lần thử lại của mỗi request riêng biệt, tạo nhiều rate-limiter độc lập cho từng người dùng. Điểm mấu chốt luôn là: mỗi thực thể phải có trạng thái RIÊNG — dùng biến toàn cục là lỗi thiết kế kinh điển khiến hệ thống chạy sai khi có nhiều người dùng đồng thời.',
+    },
+    {
+      id: 'py-remove-evens-inplace',
+      title: 'Xoá số chẵn tại chỗ (không tạo list mới)',
+      en: 'Remove Evens In Place',
+      difficulty: 'Medium',
+      targetMinutes: 12,
+      entry: 'remove_evens',
+      lang: 'python',
+      statement: `
+Viết hàm \`remove_evens(nums)\` xoá mọi số chẵn khỏi \`nums\`, giữ nguyên thứ tự các số lẻ, rồi \`return nums\`.
+
+**Ràng buộc quan trọng:** phải sửa **chính object list được truyền vào** — mọi biến khác đang trỏ tới list
+đó ở bên ngoài cũng phải thấy được thay đổi. Hệ thống chấm kiểm tra điều này bằng \`result is nums\` và
+bằng cách đọc lại list gốc sau khi hàm chạy xong.
+
+Kết quả trả về của mỗi test có dạng \`[giá_trị_return, có_đúng_là_object_gốc_không, nội_dung_list_gốc]\`.
+
+**Ví dụ**
+- \`[1, 2, 2, 3]\` → \`[[1, 3], True, [1, 3]]\`
+- \`[2, 4, 6]\` → \`[[], True, []]\`
+
+> Hai cách viết "hiển nhiên" nhất đều sai ở bài này: xoá trong lúc duyệt, và gán \`nums = [...]\`.
+`,
+      starter: `def remove_evens(nums):\n    # Xoá số chẵn NGAY TRÊN object nums, rồi trả về chính nums\n    \n`,
+      harnessSrc: `def harness(fn, args, t):
+    original = args[0]
+    result = fn(original)
+    return [result, result is original, original]`,
+      tests: [
+        { args: [[1, 2, 2, 3]], expected: [[1, 3], true, [1, 3]], name: 'Hai số chẵn liền nhau — bẫy nhảy phần tử' },
+        { args: [[2, 4, 6]], expected: [[], true, []], name: 'Toàn số chẵn' },
+        { args: [[1, 3, 5]], expected: [[1, 3, 5], true, [1, 3, 5]], name: 'Toàn số lẻ' },
+        { args: [[]], expected: [[], true, []], name: 'Danh sách rỗng' },
+        { args: [[2, 2, 2, 1]], expected: [[1], true, [1]], name: 'Ba số chẵn liên tiếp ở đầu' },
+        { args: [[0, 1]], expected: [[1], true, [1]], name: 'Số 0 cũng là số chẵn' },
+        { args: [[1, 2, 3, 4, 5, 6]], expected: [[1, 3, 5], true, [1, 3, 5]], name: 'Chẵn lẻ xen kẽ' },
+      ],
+      hints: [
+        'Cách 1 (sai): `for n in nums: if n % 2 == 0: nums.remove(n)`. Xoá phần tử làm các phần tử sau dịch trái, còn chỉ số vòng lặp vẫn tăng → bạn nhảy qua một phần tử. Test "hai số chẵn liền nhau" bắt đúng lỗi này.',
+        'Cách 2 (cũng sai): `nums = [n for n in nums if n % 2 != 0]; return nums`. Lệnh gán chỉ trỏ CÁI TÊN `nums` sang một list mới — object gốc bên ngoài không hề đổi, nên `result is nums` sẽ là False.',
+        'Cách đúng: tính danh sách kết quả bằng comprehension, rồi **ghi đè toàn bộ nội dung** của object gốc bằng gán slice: `nums[:] = [n for n in nums if n % 2 != 0]`. Gán slice sửa tại chỗ, không đổi định danh object.',
+      ],
+      diagnostics: [
+        { test: '\\.remove\\s*\\(', message: '`list.remove()` gọi bên trong vòng lặp `for` đang duyệt chính list đó sẽ làm vòng lặp NHẢY QUA phần tử kế tiếp (và mỗi lời gọi còn là O(n) vì phải tìm rồi dịch chuyển). Hãy tính kết quả bằng comprehension rồi gán slice.' },
+        { test: '^\\s*nums\\s*=\\s*[^=]', message: 'Gán `nums = ...` chỉ đổi hướng CÁI TÊN `nums` bên trong hàm — object list ở ngoài không thay đổi, nên kiểm tra `result is nums` sẽ thất bại. Bạn cần gán slice `nums[:] = ...` để ghi đè nội dung của chính object đó.' },
+      ],
+      approach: `
+Bài này buộc bạn phân biệt rạch ròi hai thao tác mà cú pháp trông rất giống nhau:
+
+\`\`\`python
+nums = [1, 3]      # ĐỔI HƯỚNG CÁI TÊN: object cũ không đổi, người gọi không thấy gì
+nums[:] = [1, 3]   # GHI ĐÈ NỘI DUNG object cũ: mọi tên khác trỏ tới nó đều thấy
+\`\`\`
+
+Đây chính là hệ quả trực tiếp của mô hình "pass by object reference" ở module 1: hàm nhận được một
+**tham chiếu tới object**, nên nó có thể sửa object đó, nhưng không thể bắt biến của người gọi trỏ đi
+chỗ khác.
+
+**Vì sao không xoá trong lúc duyệt.** Vòng \`for\` trên list dùng một chỉ số ẩn tăng dần. \`remove()\` làm
+list ngắn lại và dồn các phần tử về trước, trong khi chỉ số vẫn tiếp tục tăng — kết quả là bỏ sót phần
+tử, im lặng, không báo lỗi.
+
+**Lời giải chuẩn:**
+
+\`\`\`python
+def remove_evens(nums):
+    nums[:] = [n for n in nums if n % 2 != 0]
+    return nums
+\`\`\`
+
+Vế phải được tính xong **hoàn toàn** trước khi ghi đè, nên không có chuyện "vừa đọc vừa sửa".
+
+**Cách khác cũng đúng** (khi không được phép cấp phát thêm bộ nhớ): duyệt bằng con trỏ ghi — kỹ thuật
+two-pointer bạn đã học ở lộ trình thuật toán:
+
+\`\`\`python
+w = 0
+for n in nums:
+    if n % 2 != 0:
+        nums[w] = n
+        w += 1
+del nums[w:]
+\`\`\`
+`,
+      solution: `def remove_evens(nums):
+    nums[:] = [n for n in nums if n % 2 != 0]
+    return nums`,
+      complexity: {
+        question: 'So sánh độ phức tạp: lời giải gán slice, và lời giải gọi `nums.remove(x)` cho từng số chẵn?',
+        options: [
+          'Cả hai đều O(n)',
+          'Gán slice là O(n); gọi `remove()` cho k số chẵn là O(n × k) vì mỗi lời gọi phải tìm rồi dịch chuyển mảng',
+          'Gán slice là O(n²) vì phải copy hai lần',
+          'Cả hai đều O(n²)',
+        ],
+        answer: 1,
+        why: '`nums[:] = [...]` duyệt một lượt để dựng danh sách mới rồi ghi đè một lượt → O(n). Ngược lại, mỗi `list.remove(x)` phải quét tìm phần tử (O(n)) rồi dịch trái toàn bộ phần đuôi (O(n)); lặp lại cho k số chẵn thành O(n × k) — với mảng toàn số chẵn thì đúng bằng O(n²).',
+      },
+      realWorld: 'Lọc bớt phần tử của một danh sách đang được nhiều nơi trong chương trình cùng tham chiếu (giỏ hàng, danh sách kết nối đang mở, hàng đợi công việc). Nếu bạn gán lại tên thay vì sửa tại chỗ, các thành phần khác vẫn giữ tham chiếu tới bản cũ — bug "sao dữ liệu không cập nhật" rất phổ biến trong hệ thống lớn.',
     },
   ],
 },

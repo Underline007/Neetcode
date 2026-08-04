@@ -186,6 +186,30 @@ them_10(5)   # 15
       answer: 1,
       why: 'Decorator không tham số nhận thẳng hàm cần bọc (2 tầng: decorator(fn) -> wrapper). Decorator CÓ tham số cấu hình cần thêm một tầng ngoài cùng: hàm nhận tham số cấu hình, trả về decorator thật sự, decorator đó mới nhận hàm cần bọc (3 tầng lồng nhau).',
     },
+    {
+      q: 'Đoạn code sau in ra gì?\n\ng = (x for x in [1, 2, 3])\nprint(sum(g), sum(g))',
+      options: ['6 6', '6 0', '6 None', 'TypeError ở lần sum thứ hai'],
+      answer: 1,
+      why: 'Generator là **iterator dùng một lần**: `sum(g)` đầu tiên chạy hết dãy và đưa nó về trạng thái cạn kiệt. Lần `sum(g)` thứ hai không hề báo lỗi — nó chỉ thấy một dãy RỖNG và trả về `0`. Đây là bug im lặng cực khó tìm khi bạn truyền một generator vào hàm khác rồi định dùng lại. Muốn duyệt nhiều lần, hãy vật chất hoá nó: `data = list(g)`.',
+    },
+    {
+      q: 'Đoạn code sau in ra gì?\n\nnums = [1, 2, 3]\ng = (x * 10 for x in nums)\nnums = [4, 5, 6]\nprint(list(g))',
+      options: ['[40, 50, 60]', '[10, 20, 30]', '[]', '[10, 20, 30, 40, 50, 60]'],
+      answer: 1,
+      why: 'Generator expression lười biếng ở **thân** nhưng **eager** ở iterable ngoài cùng: `nums` được tính và gắn vào generator ngay lúc tạo, nên nó giữ tham chiếu tới list `[1, 2, 3]` gốc. Gán `nums = [4, 5, 6]` chỉ đổi hướng cái tên, không đụng tới object generator đang giữ. Nhưng chú ý mặt còn lại của bẫy: nếu bạn **sửa tại chỗ** (`nums.append(4)`) thì generator SẼ thấy phần tử mới, vì nó vẫn duyệt đúng object đó.',
+    },
+    {
+      q: 'Với hai decorator xếp chồng:\n\n@a\n@b\ndef f(): ...\n\nThứ tự áp dụng là gì?',
+      options: ['f = a(b(f)) — b (gần hàm nhất) được áp dụng trước', 'f = b(a(f)) — a (trên cùng) được áp dụng trước', 'Hai decorator chạy song song, thứ tự không quan trọng', 'Lỗi cú pháp, Python chỉ cho phép một decorator'],
+      answer: 0,
+      why: 'Decorator được áp dụng **từ dưới lên** (gần định nghĩa hàm nhất trước), nhưng lúc CHẠY thì lớp ngoài cùng (`a`) chạy trước vì nó bọc bên ngoài. Thứ tự này quyết định hành vi thật: `@cache` đặt trên `@log` sẽ khiến các lần trúng cache không được ghi log, còn đặt dưới thì mọi lời gọi đều được ghi. Đây là nguồn bug kinh điển khi kết hợp `@app.route`, `@login_required`, `@cache` trong web framework.',
+    },
+    {
+      q: 'Đoạn code sau in ra gì?\n\ndef log(fn):\n    def wrapper(*args, **kwargs):\n        fn(*args, **kwargs)\n    return wrapper\n\n@log\ndef add(a, b):\n    return a + b\n\nprint(add(1, 2))',
+      options: ['3', 'None', 'wrapper', 'TypeError'],
+      answer: 1,
+      why: '`wrapper` gọi `fn(...)` nhưng **quên `return`** kết quả, nên nó trả về `None` mặc định — và vì `add` bây giờ CHÍNH LÀ `wrapper`, mọi lời gọi `add(...)` đều trả `None`. Python không cảnh báo gì cả. Đây là lỗi số một khi tự viết decorator: quy tắc bất di bất dịch là thân wrapper phải kết thúc bằng `return fn(*args, **kwargs)`.',
+    },
   ],
   problems: [
     {
@@ -481,6 +505,205 @@ def fib_calls(n):
         why: 'Không có memoize, đệ quy fibonacci tính lại cùng một giá trị hàng triệu lần (cây đệ quy phân nhánh theo cấp số nhân) — O(2ⁿ). Có memoize, mỗi giá trị k chỉ tính một lần (cache miss), các lần gọi lại là tra cứu O(1) — tổng cộng chỉ O(n) lần tính thực sự.',
       },
       realWorld: 'Đây chính xác là ý tưởng nền tảng của Dynamic Programming "top-down" (đệ quy + nhớ đã học ở phần thuật toán) — và cũng là cách các framework web cache kết quả tính toán tốn kém (render template, truy vấn tổng hợp) theo tham số đầu vào để tránh tính lại không cần thiết.',
+    },
+    {
+      id: 'py-count-calls-decorator',
+      title: 'Decorator đếm số lần gọi (đủ 3 chi tiết)',
+      en: 'Call-Counting Decorator',
+      difficulty: 'Medium',
+      targetMinutes: 15,
+      entry: 'count_calls',
+      lang: 'python',
+      statement: `
+Viết decorator \`count_calls(fn)\` thoả **cả ba** yêu cầu:
+
+1. Hàm bao (wrapper) gọi \`fn\` với đúng mọi tham số và **trả về đúng kết quả** của \`fn\`.
+2. Gắn thuộc tính \`.calls\` lên hàm bao — số lần đã được gọi, khởi đầu bằng \`0\`.
+3. **Giữ nguyên metadata** của hàm gốc: \`wrapped.__name__\` phải vẫn là tên hàm gốc, không phải \`"wrapper"\`.
+
+**Hệ thống chấm** sẽ decorate một hàm tên \`add(a, b)\` rồi gọi nó \`n\` lần với các tham số tăng dần,
+và trả về \`[kết_quả_lần_gọi_cuối, wrapped.calls, wrapped.__name__]\` (kết quả là \`0\` nếu \`n = 0\`).
+
+**Ví dụ** với \`n = 3\` → \`[5, 3, "add"]\`
+(lần cuối gọi \`add(2, 3)\` nên bằng \`5\`; đã gọi 3 lần; tên hàm vẫn là \`add\`).
+
+> Ba yêu cầu tương ứng với ba lỗi phổ biến nhất khi tự viết decorator. Bộ test kiểm tra riêng từng cái.
+`,
+      starter: `def count_calls(fn):\n    # Trả về hàm bao: đếm số lần gọi, trả đúng kết quả, giữ nguyên metadata\n    \n`,
+      harnessSrc: `def harness(fn, args, t):
+    def add(a, b):
+        return a + b
+    wrapped = fn(add)
+    last = 0
+    for i in range(args[0]):
+        last = wrapped(i, i + 1)
+    return [last, wrapped.calls, wrapped.__name__]`,
+      tests: [
+        { args: [3], expected: [5, 3, 'add'], name: 'Gọi 3 lần' },
+        { args: [0], expected: [0, 0, 'add'], name: 'Chưa gọi lần nào — calls phải là 0' },
+        { args: [1], expected: [1, 1, 'add'], name: 'Gọi đúng một lần' },
+        { args: [5], expected: [9, 5, 'add'], name: 'Gọi 5 lần' },
+        { args: [10], expected: [19, 10, 'add'], name: 'Gọi 10 lần' },
+      ],
+      hints: [
+        'Khung chuẩn của decorator: `def count_calls(fn):` → định nghĩa `def wrapper(*args, **kwargs):` bên trong → `return wrapper` (trả về HÀM, không gọi nó). Thân wrapper phải kết thúc bằng `return fn(*args, **kwargs)`.',
+        'Để đếm mà không cần `nonlocal`: gắn bộ đếm thẳng lên chính hàm bao. Trong Python, hàm cũng là object nên có thuộc tính: đặt `wrapper.calls = 0` NGAY TRƯỚC `return wrapper`, rồi trong thân wrapper viết `wrapper.calls += 1`.',
+        'Metadata: thêm `@functools.wraps(fn)` ngay trên `def wrapper` — nó copy `__name__`, `__doc__`, `__module__`... từ hàm gốc sang. Không có nó, `wrapped.__name__` sẽ là `"wrapper"` và test thứ ba fail.',
+      ],
+      diagnostics: [
+        { test: '^(?![\\s\\S]*wraps)[\\s\\S]*def\\s+count_calls', message: 'Không thấy `functools.wraps`. Không có nó, hàm bao mang tên `"wrapper"` và làm mất `__doc__`, `__module__` của hàm gốc — hỏng cả log, traceback lẫn tài liệu tự sinh. Thêm `@functools.wraps(fn)` ngay trên `def wrapper`.' },
+        { test: '^\\s+fn\\s*\\(\\s*\\*', message: 'Bạn gọi `fn(*args, **kwargs)` nhưng không `return` kết quả — hàm sau khi decorate sẽ luôn trả về `None`. Dòng đó phải là `return fn(*args, **kwargs)`.' },
+        { test: 'return\\s+wrapper\\s*\\(', message: '`return wrapper()` GỌI hàm bao ngay lập tức và trả về kết quả của nó. Decorator phải trả về CHÍNH HÀM: `return wrapper` (không có dấu ngoặc).' },
+      ],
+      approach: `
+Decorator chỉ là đường cú pháp: \`@count_calls\` đặt trên \`def add\` tương đương với
+\`add = count_calls(add)\`. Hiểu vậy rồi thì ba yêu cầu của bài đều tự nhiên.
+
+\`\`\`python
+import functools
+
+def count_calls(fn):
+    @functools.wraps(fn)              # (3) copy metadata từ fn sang wrapper
+    def wrapper(*args, **kwargs):
+        wrapper.calls += 1            # (2) bộ đếm sống trên chính object hàm
+        return fn(*args, **kwargs)    # (1) BẮT BUỘC có return
+    wrapper.calls = 0
+    return wrapper                    # trả về hàm, KHÔNG gọi nó
+\`\`\`
+
+**Vì sao \`wrapper.calls\` mà không phải \`nonlocal\`?** Cả hai đều đúng, nhưng gắn lên hàm khiến bộ đếm
+**đọc được từ bên ngoài** (\`add.calls\`) — rất tiện để kiểm tra trong test hoặc theo dõi số liệu. Với
+\`nonlocal counter\` thì biến bị giấu kín trong closure, không ai truy cập được.
+
+**Vì sao \`*args, **kwargs\` chứ không liệt kê tham số cụ thể?** Vì decorator phải dùng lại được cho MỌI
+hàm, không biết trước chữ ký. \`*args, **kwargs\` là cách "nhận mọi thứ rồi chuyển tiếp nguyên vẹn".
+
+**Vì sao \`functools.wraps\` quan trọng trong thực tế?** Không có nó, mọi hàm đã decorate đều tên là
+\`"wrapper"\`: log bị vô nghĩa, traceback khó đọc, tài liệu tự sinh (Sphinx/FastAPI) sai, và các framework
+định tuyến theo tên hàm sẽ trùng khoá. Một dòng ngăn được cả loạt vấn đề.
+
+**Bẫy về trạng thái dùng chung:** nếu bạn đặt \`calls = 0\` ở cấp module thay vì gắn lên \`wrapper\`, thì
+MỌI hàm được decorate sẽ cùng chia sẻ một bộ đếm — sai ngay khi decorator được dùng cho hàm thứ hai.
+`,
+      solution: `import functools
+
+
+def count_calls(fn):
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        wrapper.calls += 1
+        return fn(*args, **kwargs)
+
+    wrapper.calls = 0
+    return wrapper`,
+      complexity: {
+        question: 'Decorator này làm tăng chi phí mỗi lời gọi hàm lên bao nhiêu?',
+        options: [
+          'O(1) thêm cố định — một phép cộng và một tầng gọi hàm phụ',
+          'O(n) theo số lần đã gọi trước đó',
+          'O(log n)',
+          'Không tốn thêm gì, decorator chỉ chạy lúc định nghĩa',
+        ],
+        answer: 0,
+        why: 'Mỗi lời gọi phải đi qua thêm một khung stack (wrapper) rồi mới tới hàm thật, cộng một phép tăng biến đếm — chi phí hằng số, không phụ thuộc lịch sử. Đáng lưu ý: chi phí hằng số này vẫn có thật, nên decorator "nặng" đặt trên một hàm gọi hàng triệu lần trong vòng lặp nóng vẫn có thể thành nút thắt hiệu năng.',
+      },
+      realWorld: 'Đếm số lần gọi API để áp rate limit, đo số lần cache miss, thống kê hàm nào được gọi nhiều nhất khi profiling, và đếm số lần retry. Mẫu "gắn trạng thái lên chính hàm bao" cũng là cách `functools.lru_cache` cung cấp `fn.cache_info()` và `fn.cache_clear()` cho bạn.',
+    },
+    {
+      id: 'py-fib-infinite-gen',
+      title: 'Generator vô hạn: dãy Fibonacci',
+      en: 'Infinite Fibonacci Generator',
+      difficulty: 'Medium',
+      targetMinutes: 12,
+      entry: 'fib_gen',
+      lang: 'python',
+      statement: `
+Viết **generator vô hạn** \`fib_gen()\` sinh ra dãy Fibonacci: \`0, 1, 1, 2, 3, 5, 8, 13, ...\`
+
+- Hàm **không nhận tham số nào** — nó không biết trước người dùng sẽ lấy bao nhiêu số.
+- Mỗi lần gọi \`fib_gen()\` phải cho ra một dãy **mới, bắt đầu lại từ đầu**.
+
+**Hệ thống chấm** sẽ lấy \`n\` số đầu tiên bằng \`itertools.islice(fib_gen(), n)\`, sau đó gọi
+\`fib_gen()\` **lần nữa** và lấy 3 số đầu để kiểm tra dãy có bắt đầu lại đúng không.
+Kết quả mỗi test có dạng \`[n_số_đầu, 3_số_đầu_của_lần_gọi_mới]\`.
+
+**Ví dụ** với \`n = 5\` → \`[[0, 1, 1, 2, 3], [0, 1, 1]]\`
+
+> Nếu bạn định xây một list rồi \`return\`, hãy tự hỏi: list đó dài bao nhiêu? Bài sẽ **timeout**,
+> không phải sai kết quả.
+`,
+      starter: `def fib_gen():\n    # Generator VÔ HẠN: yield lần lượt 0, 1, 1, 2, 3, 5, ...\n    \n`,
+      harnessSrc: `def harness(fn, args, t):
+    import itertools
+    n = args[0]
+    first = list(itertools.islice(fn(), n))
+    again = list(itertools.islice(fn(), 3))
+    return [first, again]`,
+      tests: [
+        { args: [5], expected: [[0, 1, 1, 2, 3], [0, 1, 1]], name: 'Năm số đầu' },
+        { args: [0], expected: [[], [0, 1, 1]], name: 'Không lấy số nào' },
+        { args: [1], expected: [[0], [0, 1, 1]], name: 'Chỉ số đầu tiên' },
+        { args: [2], expected: [[0, 1], [0, 1, 1]], name: 'Hai số đầu' },
+        { args: [10], expected: [[0, 1, 1, 2, 3, 5, 8, 13, 21, 34], [0, 1, 1]], name: 'Mười số đầu' },
+        { args: [15], expected: [[0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377], [0, 1, 1]], name: 'Mười lăm số đầu' },
+      ],
+      hints: [
+        'Một hàm chứa `yield` không chạy ngay khi được gọi — nó trả về một generator và chỉ thực thi tới `yield` đầu tiên khi có người yêu cầu giá trị. Nhờ vậy `while True:` bên trong generator là hoàn toàn an toàn.',
+        'Giữ hai biến `a, b = 0, 1`. Mỗi vòng: `yield a` rồi cập nhật `a, b = b, a + b`. Phép gán bội tính toàn bộ vế phải trước nên không cần biến tạm.',
+        'Đừng thêm điều kiện dừng nào (`while i < n`) — hàm không có tham số `n`. Việc "lấy bao nhiêu" là quyền của bên tiêu thụ, qua `itertools.islice`, `zip(range(n), ...)` hoặc `break` trong vòng `for`.',
+      ],
+      diagnostics: [
+        { test: '\\.append\\s*\\(|return\\s+\\[', message: 'Bạn đang xây một list rồi trả về. Dãy này VÔ HẠN nên vòng lặp không bao giờ kết thúc và bài sẽ timeout. Generator phải `yield` từng giá trị một, không tích trữ.' },
+        { test: '^(?![\\s\\S]*yield)[\\s\\S]*def\\s+fib_gen', message: 'Không thấy `yield` trong hàm. Không có `yield` thì đây chỉ là một hàm thường, không phải generator — `itertools.islice` sẽ báo lỗi vì kết quả không lặp được.' },
+      ],
+      approach: `
+Generator giải quyết một bài toán mà hàm thường không làm được: **mô tả một dãy dài vô hạn bằng bộ nhớ
+hữu hạn**.
+
+\`\`\`python
+def fib_gen():
+    a, b = 0, 1
+    while True:
+        yield a
+        a, b = b, a + b
+\`\`\`
+
+Cơ chế: khi gặp \`yield\`, hàm **đóng băng** toàn bộ trạng thái (giá trị \`a\`, \`b\`, vị trí đang chạy) và
+trả quyền điều khiển về cho người gọi. Lần lấy giá trị tiếp theo, nó **hồi phục đúng chỗ cũ** và chạy tiếp.
+\`while True\` không treo vì mỗi vòng đều dừng lại ở \`yield\` chờ được đánh thức.
+
+**Vì sao "gọi lại thì bắt đầu lại"?** Vì \`fib_gen\` là một **hàm generator**, mỗi lời gọi tạo ra một
+**object generator** riêng với trạng thái riêng. Đừng nhầm hai thứ này:
+
+\`\`\`python
+g = fib_gen()          # g là generator OBJECT — dùng MỘT LẦN, cạn thì thôi
+list(itertools.islice(g, 3))   # [0, 1, 1]
+list(itertools.islice(g, 3))   # [2, 3, 5]  ← đi tiếp, không quay lại đầu
+list(itertools.islice(fib_gen(), 3))  # [0, 1, 1]  ← generator MỚI, bắt đầu lại
+\`\`\`
+
+**Vì sao mẫu này quan trọng:** nó tách bạch "ai sinh dữ liệu" khỏi "ai quyết định lấy bao nhiêu". Cùng
+một \`fib_gen\` dùng được cho "10 số đầu", "số Fibonacci đầu tiên lớn hơn một triệu", hay "sinh mãi cho
+tới khi người dùng bấm dừng" — mà bản thân nó không cần biết gì về các nhu cầu đó. Đây chính là cách
+Python đọc file hàng GB theo từng dòng, hay phân trang dữ liệu từ API.
+`,
+      solution: `def fib_gen():
+    a, b = 0, 1
+    while True:
+        yield a
+        a, b = b, a + b`,
+      complexity: {
+        question: 'Lấy n số đầu tiên từ fib_gen tốn bao nhiêu thời gian và bộ nhớ (bỏ qua chi phí số nguyên lớn)?',
+        options: [
+          'Thời gian O(n), bộ nhớ O(1) — generator chỉ giữ hai biến a và b',
+          'Thời gian O(n), bộ nhớ O(n) vì generator lưu lại mọi giá trị đã sinh',
+          'Thời gian O(2^n) như công thức đệ quy Fibonacci ngây thơ',
+          'Thời gian O(1) vì generator lười biếng',
+        ],
+        answer: 0,
+        why: 'Mỗi giá trị tốn một phép cộng → O(n) tổng cộng. Generator KHÔNG lưu lịch sử: bất kể bạn lấy 10 hay 10 triệu số, nó luôn chỉ giữ đúng hai biến `a` và `b` → bộ nhớ O(1). Đây là điểm khác biệt lớn nhất so với việc trả về một list (O(n) bộ nhớ), và cũng khác hẳn phiên bản đệ quy không cache (O(2^n) thời gian).',
+      },
+      realWorld: 'Mọi luồng dữ liệu không biết trước độ dài: đọc log hàng GB theo từng dòng, phân trang kết quả API (yield từng bản ghi, tự gọi trang tiếp theo khi cần), sinh ID/token liên tục, đọc dữ liệu cảm biến theo thời gian thực. Điểm chung: bên tiêu thụ dừng lúc nào cũng được, và bộ nhớ không phình theo lượng dữ liệu đã đi qua.',
     },
   ],
 },

@@ -186,6 +186,45 @@ d2 = datetime.strptime("2024-03-01", "%Y-%m-%d")
       answer: 1,
       why: 'Tính toán ngày tháng thủ công dễ sai ở các trường hợp biên: năm nhuận, tháng 2/4/6/9/11 có số ngày khác nhau, chuyển giao giữa các năm... `datetime`/`timedelta` đã xử lý đúng toàn bộ các trường hợp này, đã được kiểm thử kỹ qua hàng triệu ứng dụng thực tế.',
     },
+    {
+      q: '`list(zip([1, 2, 3], ["a", "b"]))` trả về gì?',
+      options: [
+        "[(1, 'a'), (2, 'b'), (3, None)]",
+        "[(1, 'a'), (2, 'b')]",
+        'ValueError vì hai danh sách khác độ dài',
+        "[(1, 'a'), (2, 'b'), (3,)]",
+      ],
+      answer: 1,
+      why: '`zip` dừng ở dãy **ngắn nhất** và **im lặng bỏ qua** phần dư — không cảnh báo gì. Đây là nguồn mất dữ liệu thầm lặng khi ghép hai danh sách mà bạn tưởng chúng luôn cùng độ dài (ví dụ ghép tên cột với giá trị dòng CSV bị thiếu ô). Từ Python 3.10 có `zip(a, b, strict=True)` để raise `ValueError` khi độ dài lệch — nên dùng mặc định mỗi khi bạn *kỳ vọng* hai dãy bằng nhau. Muốn giữ phần dư thì dùng `itertools.zip_longest`.',
+    },
+    {
+      q: 'Đoạn code sau in ra gì?\n\nfrom collections import Counter\nc = Counter("ab")\nprint(c["z"], len(c))',
+      options: ['0 2', '0 3', 'KeyError', 'None 2'],
+      answer: 0,
+      why: '`Counter` trả về `0` cho khoá chưa từng thấy — nhưng **không tạo khoá mới**, nên `len(c)` vẫn là 2. Đây là điểm khác biệt tinh tế và quan trọng so với `defaultdict(int)`: cùng trả về `0`, nhưng `defaultdict` **chèn** khoá vào dict ngay khi bạn chỉ định đọc nó, làm dict phình lên và làm sai kết quả khi bạn đếm số khoá hay lặp qua chúng. Muốn đọc mà chắc chắn không tạo khoá với `defaultdict`, dùng `d.get(key, 0)`.',
+    },
+    {
+      q: 'Vì sao có thể sắp xếp theo nhiều tiêu chí bằng cách gọi `sorted` NHIỀU LẦN, theo thứ tự ưu tiên từ thấp đến cao?',
+      options: [
+        'Vì `sorted` tự động nhớ các lần sắp xếp trước',
+        'Vì thuật toán sắp xếp của Python (Timsort) **ổn định** — các phần tử bằng nhau giữ nguyên thứ tự tương đối vốn có',
+        'Vì `sorted` luôn sắp xếp lại từ đầu nên thứ tự cũ không quan trọng',
+        'Đó là hiểu lầm — phải luôn dùng một key tuple duy nhất',
+      ],
+      answer: 1,
+      why: '**Tính ổn định** (stability) là lời hứa của Timsort: hai phần tử có khoá bằng nhau sẽ giữ nguyên thứ tự chúng vốn có. Nhờ vậy `sorted(sorted(data, key=ten), key=diem, reverse=True)` cho ra "xếp theo điểm giảm dần, cùng điểm thì theo tên tăng dần". Cách này đặc biệt hữu ích khi các tiêu chí có chiều sắp xếp KHÁC nhau (cái tăng, cái giảm) — điều mà một key tuple duy nhất khó diễn đạt với dữ liệu không phải số. Không phải ngôn ngữ nào cũng đảm bảo điều này, nên đừng mang giả định đó đi nơi khác.',
+    },
+    {
+      q: 'Trừ hai đối tượng `datetime`, một cái tạo bằng `datetime.now()` và một cái có gắn múi giờ (timezone-aware), sẽ ra sao?',
+      options: [
+        'Trả về timedelta bình thường, Python tự quy đổi múi giờ',
+        'TypeError: can\'t subtract offset-naive and offset-aware datetimes',
+        'Kết quả đúng nhưng bị lệch đúng số giờ của múi giờ',
+        'Đối tượng naive tự động được coi là UTC',
+      ],
+      answer: 1,
+      why: 'Python chia `datetime` thành hai loại: **naive** (không biết mình thuộc múi giờ nào) và **aware** (có `tzinfo`). Trộn hai loại là lỗi, và Python từ chối đoán — vì đoán sai sẽ tạo ra sai lệch nhiều giờ mà không ai phát hiện. Quy tắc thực hành cho hệ thống thật: **lưu và tính toán mọi thứ ở UTC dạng aware** (`datetime.now(timezone.utc)`), chỉ đổi sang giờ địa phương ở ngay lớp hiển thị. Lưu ý `datetime.utcnow()` trả về một đối tượng **naive** — cái tên gây hiểu nhầm này đã bị đánh dấu deprecated từ Python 3.12.',
+    },
   ],
   problems: [
     {
@@ -550,6 +589,236 @@ def days_between(date1, date2):
         why: 'Chuỗi ngày luôn có độ dài cố định ("YYYY-MM-DD"), và việc trừ hai đối tượng `datetime` là phép toán số học nội bộ không phụ thuộc khoảng cách thực tế giữa hai ngày — dù hai ngày cách nhau 1 ngày hay 100 năm, chi phí tính toán như nhau.',
       },
       realWorld: 'Tính số ngày còn lại của gói dịch vụ/subscription, tính hạn thanh toán hoá đơn, tính tuổi chính xác theo ngày sinh — mọi hệ thống quản lý có yếu tố thời gian đều cần phép tính này chính xác tuyệt đối, sai một ngày có thể gây tranh chấp thực tế với khách hàng.',
+    },
+    {
+      id: 'py-bisect-rank',
+      title: 'Xếp hạng trên danh sách đã sắp xếp (bisect)',
+      en: 'Ranking with bisect',
+      difficulty: 'Medium',
+      targetMinutes: 14,
+      entry: 'rank_pairs',
+      lang: 'python',
+      statement: `
+Cho \`scores\` là danh sách điểm **đã sắp xếp tăng dần** (có thể có giá trị trùng nhau) và \`queries\` là
+danh sách các điểm cần tra cứu.
+
+Với **mỗi** query \`q\`, trả về một cặp \`[số phần tử < q, số phần tử <= q]\`.
+Kết quả cuối cùng là danh sách các cặp đó, theo đúng thứ tự \`queries\`.
+
+**Ví dụ** với \`scores = [10, 20, 20, 30]\`
+- \`q = 20\` → \`[1, 3]\` (một phần tử nhỏ hơn 20; ba phần tử nhỏ hơn hoặc bằng 20)
+- \`q = 25\` → \`[3, 3]\` (không có phần tử nào bằng 25 nên hai con số trùng nhau)
+- \`q = 5\` → \`[0, 0]\`
+
+> Yêu cầu về hiệu năng: mỗi query phải chạy trong **O(log n)**, không được duyệt lại cả danh sách.
+`,
+      starter: `import bisect\n\n\ndef rank_pairs(scores, queries):\n    # Mỗi query -> [số phần tử < q, số phần tử <= q]\n    \n`,
+      tests: [
+        { args: [[10, 20, 20, 30], [20]], expected: [[1, 3]], name: 'Giá trị trùng lặp — hai con số khác nhau' },
+        { args: [[10, 20, 20, 30], [25]], expected: [[3, 3]], name: 'Giá trị không tồn tại' },
+        { args: [[10, 20, 20, 30], [5, 35]], expected: [[0, 0], [4, 4]], name: 'Ngoài hai biên' },
+        { args: [[], [7]], expected: [[0, 0]], name: 'Danh sách rỗng' },
+        { args: [[1, 1, 1], [1]], expected: [[0, 3]], name: 'Toàn bộ đều bằng nhau' },
+        { args: [[1, 2, 3], [1, 2, 3]], expected: [[0, 1], [1, 2], [2, 3]], name: 'Nhiều query' },
+        { args: [[10, 20, 20, 30], [30]], expected: [[3, 4]], name: 'Phần tử cuối cùng' },
+        { args: [[5], []], expected: [], name: 'Không có query nào' },
+      ],
+      hints: [
+        'Module `bisect` làm sẵn tìm kiếm nhị phân cho bạn. Hai hàm cốt lõi: `bisect_left(a, x)` và `bisect_right(a, x)` — cả hai đều trả về **vị trí chèn** để danh sách vẫn giữ thứ tự.',
+        'Điểm khác nhau nằm ở chỗ chúng chèn vào đâu khi `x` đã tồn tại: `bisect_left` chèn TRƯỚC nhóm giá trị bằng `x`, `bisect_right` chèn SAU nhóm đó.',
+        'Suy ra ý nghĩa đếm: `bisect_left(a, x)` chính bằng **số phần tử nhỏ hơn x**, còn `bisect_right(a, x)` bằng **số phần tử nhỏ hơn hoặc bằng x**. Hiệu của chúng là số lần x xuất hiện.',
+      ],
+      diagnostics: [
+        { test: '\\.count\\s*\\(|len\\s*\\(\\s*\\[\\s*\\w+\\s+for', message: 'Đếm bằng `count()` hoặc comprehension là O(n) cho MỖI query — với nhiều query thì thành O(n × m). Danh sách đã được sắp xếp sẵn, hãy tận dụng bằng tìm kiếm nhị phân O(log n).' },
+        { test: 'sorted\\s*\\(\\s*scores|scores\\.sort\\s*\\(', message: '`scores` đã được sắp xếp sẵn theo đề bài — sắp xếp lại là O(n log n) thừa, và làm mất luôn ưu điểm chính của cấu trúc dữ liệu này.' },
+        { test: 'bisect\\.bisect\\s*\\((?![\\s\\S]*bisect_left)', message: '`bisect.bisect` là bí danh của `bisect_right`. Bài này cần CẢ HAI biến thể — hãy gọi tên đầy đủ `bisect_left` và `bisect_right` để code nói rõ ý định.' },
+      ],
+      approach: `
+Danh sách đã sắp xếp là một cấu trúc dữ liệu có "siêu năng lực" mà nhiều người bỏ phí: mọi câu hỏi dạng
+*"có bao nhiêu phần tử nhỏ hơn X"* đều trả lời được trong \`O(log n)\`.
+
+\`\`\`python
+import bisect
+
+def rank_pairs(scores, queries):
+    return [[bisect.bisect_left(scores, q), bisect.bisect_right(scores, q)] for q in queries]
+\`\`\`
+
+**Chìa khoá là hiểu \`bisect_left\` và \`bisect_right\` nói gì.** Cả hai trả lời cùng một câu hỏi — *"chèn
+x vào đâu thì danh sách vẫn có thứ tự?"* — nhưng khác nhau khi \`x\` đã có mặt:
+
+\`\`\`
+scores = [10, 20, 20, 30]
+                ↑       ↑
+      bisect_left(20)=1  bisect_right(20)=3
+\`\`\`
+
+Từ đó suy ra ba công thức đáng thuộc:
+
+| Cần biết | Công thức |
+|---|---|
+| số phần tử **< x** | \`bisect_left(a, x)\` |
+| số phần tử **<= x** | \`bisect_right(a, x)\` |
+| số lần **x xuất hiện** | \`bisect_right(a, x) - bisect_left(a, x)\` |
+
+**Vì sao không tự viết binary search?** Không phải vì khó, mà vì binary search là thuật toán **nổi tiếng
+dễ viết sai** ở các điều kiện biên (\`<\` hay \`<=\`, \`mid\` hay \`mid+1\`) — đúng loại lỗi chỉ lộ ra với dữ
+liệu trùng lặp hoặc ở hai đầu mảng. \`bisect\` là code C đã được kiểm nghiệm hàng chục năm.
+
+**Người anh em cần biết: \`bisect.insort(a, x)\`** chèn \`x\` vào đúng vị trí, giữ danh sách luôn có thứ tự.
+Nhưng chú ý bản chất: tìm vị trí là O(log n), còn **chèn vào giữa list vẫn là O(n)** vì phải dịch chuyển
+phần đuôi. Nếu bạn cần chèn liên tục với tần suất cao, hãy cân nhắc heap (\`heapq\`) hoặc cây cân bằng thay
+vì list đã sắp xếp.
+`,
+      solution: `import bisect
+
+
+def rank_pairs(scores, queries):
+    result = []
+    for q in queries:
+        lower = bisect.bisect_left(scores, q)
+        upper = bisect.bisect_right(scores, q)
+        result.append([lower, upper])
+    return result`,
+      complexity: {
+        question: 'Độ phức tạp thời gian với n phần tử và m query?',
+        options: [
+          'O(m log n) — mỗi query là hai lần tìm kiếm nhị phân',
+          'O(n × m) vì mỗi query phải duyệt danh sách',
+          'O(n log n + m)',
+          'O(n + m)',
+        ],
+        answer: 0,
+        why: 'Mỗi `bisect_*` là O(log n) và mỗi query gọi hai lần → O(m log n). So sánh cho rõ khoảng cách: với n = 1.000.000 và m = 1.000, cách duyệt tuần tự tốn khoảng một tỷ phép so sánh, còn bisect chỉ tốn khoảng 40.000 — nhanh hơn hàng chục nghìn lần, chỉ nhờ tận dụng dữ liệu đã sắp xếp.',
+      },
+      realWorld: 'Bảng xếp hạng game ("bạn đứng trên bao nhiêu phần trăm người chơi"), phân vị điểm thi, tra khung thuế/khung giá theo bậc, tìm bản ghi log gần một mốc thời gian nhất, và ánh xạ giá trị ngẫu nhiên sang phân phối có trọng số (`random.choices` dùng chính `bisect` bên trong).',
+    },
+    {
+      id: 'py-lru-cache-ordereddict',
+      title: 'Tự cài LRU cache bằng OrderedDict',
+      en: 'LRU Cache with OrderedDict',
+      difficulty: 'Hard',
+      targetMinutes: 22,
+      entry: 'lru_ops',
+      lang: 'python',
+      statement: `
+Cài đặt một **LRU cache** (Least Recently Used — loại bỏ mục ít được dùng gần đây nhất) rồi chạy một chuỗi
+thao tác.
+
+Viết hàm \`lru_ops(capacity, ops)\`. Mỗi phần tử của \`ops\` là:
+- \`["put", key, value]\` — ghi giá trị. Nếu vượt sức chứa, **loại bỏ mục ít được dùng gần đây nhất**.
+- \`["get", key]\` — đọc giá trị, trả về \`None\` nếu không có.
+
+Cả \`get\` **và** \`put\` (kể cả khi ghi đè khoá đã có) đều làm khoá đó trở thành **mới dùng nhất**.
+
+Trả về danh sách kết quả của **các thao tác \`get\`**, theo thứ tự chúng xuất hiện.
+
+**Ví dụ** với \`capacity = 2\`:
+\`\`\`
+put a=1, put b=2, get a, put c=3, get b
+\`\`\`
+→ \`[1, None]\`
+(\`get a\` trả 1 và đẩy \`a\` lên mới nhất; \`put c\` vì thế loại bỏ \`b\` chứ không phải \`a\`.)
+`,
+      starter: `from collections import OrderedDict\n\n\ndef lru_ops(capacity, ops):\n    # Trả về danh sách kết quả của các thao tác "get"\n    \n`,
+      tests: [
+        { args: [2, [['put', 'a', 1], ['put', 'b', 2], ['get', 'a'], ['put', 'c', 3], ['get', 'b']]], expected: [1, null], name: 'get làm đổi thứ tự loại bỏ' },
+        { args: [1, [['put', 'a', 1], ['put', 'b', 2], ['get', 'a']]], expected: [null], name: 'Sức chứa 1' },
+        { args: [2, [['get', 'x']]], expected: [null], name: 'Đọc khoá chưa từng có' },
+        { args: [2, [['put', 'a', 1], ['put', 'a', 2], ['get', 'a']]], expected: [2], name: 'Ghi đè khoá cũ' },
+        { args: [3, [['put', 'a', 1], ['put', 'b', 2], ['put', 'c', 3], ['get', 'a'], ['put', 'd', 4], ['get', 'b'], ['get', 'a']]], expected: [1, null, 1], name: 'Sức chứa 3, loại bỏ đúng b' },
+        { args: [2, [['put', 'a', 1], ['put', 'b', 2], ['put', 'a', 9], ['put', 'c', 3], ['get', 'b'], ['get', 'a']]], expected: [null, 9], name: 'put cũng làm mới độ ưu tiên' },
+        { args: [2, []], expected: [], name: 'Không có thao tác nào' },
+        { args: [2, [['put', 'a', 1], ['get', 'a'], ['get', 'a']]], expected: [1, 1], name: 'Đọc lặp lại' },
+      ],
+      hints: [
+        '`OrderedDict` là `dict` có thêm khả năng **di chuyển khoá trong thứ tự**. Quy ước tiện dụng: coi đầu danh sách là "cũ nhất", cuối là "mới nhất".',
+        'Hai phương thức bạn cần: `cache.move_to_end(key)` đẩy một khoá xuống cuối (đánh dấu vừa dùng), và `cache.popitem(last=False)` lấy ra **phần tử đầu tiên** — tức mục ít dùng gần đây nhất.',
+        'Khung xử lý `put`: nếu khoá đã có → gán giá trị mới rồi `move_to_end`. Nếu chưa có → gán rồi kiểm tra `if len(cache) > capacity: cache.popitem(last=False)`. Với `get`: nếu không có → `None`; nếu có → `move_to_end` rồi mới trả về giá trị.',
+      ],
+      diagnostics: [
+        { test: 'min\\s*\\(|\\.index\\s*\\(', message: 'Tìm mục ít dùng nhất bằng `min()` hoặc `index()` là O(n) cho mỗi thao tác — làm hỏng đúng cái tính chất khiến LRU cache đáng dùng. `OrderedDict` cho bạn thao tác đó trong O(1).' },
+        { test: 'popitem\\s*\\(\\s*\\)', message: '`popitem()` không tham số lấy phần tử **cuối** (mới dùng nhất) — ngược hoàn toàn với ý định. Bạn cần `popitem(last=False)` để lấy phần tử đầu, tức mục cũ nhất.' },
+        { test: '(?<!\\.)\\bget\\s*\\(\\s*key\\s*\\)(?![\\s\\S]*move_to_end)', message: 'Nhớ rằng thao tác `get` THÀNH CÔNG cũng phải cập nhật độ ưu tiên (`move_to_end`). Nếu chỉ đọc mà không cập nhật, bạn đang cài FIFO chứ không phải LRU — và test đầu tiên sẽ loại bỏ nhầm phần tử.' },
+      ],
+      approach: `
+LRU cache là bài toán kinh điển vì nó đòi hỏi **hai thao tác O(1) cùng lúc**: tra cứu theo khoá, và biết
+được phần tử nào cũ nhất. \`dict\` cho bạn cái thứ nhất, danh sách liên kết cho cái thứ hai — và
+\`OrderedDict\` chính là hai thứ đó ghép sẵn với nhau.
+
+\`\`\`python
+from collections import OrderedDict
+
+def lru_ops(capacity, ops):
+    cache = OrderedDict()      # đầu = cũ nhất, cuối = mới nhất
+    results = []
+
+    for op in ops:
+        if op[0] == "put":
+            _, key, value = op
+            cache[key] = value
+            cache.move_to_end(key)             # vừa dùng -> đẩy xuống cuối
+            if len(cache) > capacity:
+                cache.popitem(last=False)      # loại bỏ mục ở ĐẦU = cũ nhất
+        else:
+            key = op[1]
+            if key not in cache:
+                results.append(None)
+            else:
+                cache.move_to_end(key)         # đọc CŨNG là "vừa dùng"
+                results.append(cache[key])
+
+    return results
+\`\`\`
+
+**Chi tiết phân biệt LRU thật với LRU giả:** \`get\` cũng phải cập nhật thứ tự. Bỏ dòng \`move_to_end\` trong
+nhánh \`get\`, bạn được một cache FIFO — vẫn chạy, vẫn qua nhiều test, nhưng loại bỏ nhầm mục đang được
+đọc liên tục. Test đầu tiên của bài được thiết kế riêng để phát hiện điều này.
+
+**Vì sao dùng \`OrderedDict\` chứ không phải \`dict\` thường?** Từ Python 3.7, \`dict\` cũng giữ thứ tự chèn,
+nhưng nó **không có** \`move_to_end\` và \`popitem(last=False)\`. Với \`dict\`, muốn "làm mới" một khoá bạn
+phải \`del d[k]\` rồi gán lại — vẫn O(1) nhưng dài dòng hơn; còn muốn lấy phần tử đầu thì phải
+\`next(iter(d))\`, và đây đúng là loại code khiến người đọc sau phải dừng lại đoán ý.
+
+**Trong thực tế:** \`functools.lru_cache\` đã làm sẵn tất cả những điều này (bằng danh sách liên kết vòng
+viết bằng C) cho việc cache **kết quả hàm**. Tự cài như bài này chỉ cần thiết khi bạn phải kiểm soát cache
+theo khoá tự chọn, cần thêm TTL, hoặc cần thống kê hit/miss riêng.
+`,
+      solution: `from collections import OrderedDict
+
+
+def lru_ops(capacity, ops):
+    cache = OrderedDict()
+    results = []
+
+    for op in ops:
+        if op[0] == "put":
+            key, value = op[1], op[2]
+            cache[key] = value
+            cache.move_to_end(key)
+            if len(cache) > capacity:
+                cache.popitem(last=False)
+        else:
+            key = op[1]
+            if key not in cache:
+                results.append(None)
+            else:
+                cache.move_to_end(key)
+                results.append(cache[key])
+
+    return results`,
+      complexity: {
+        question: 'Độ phức tạp thời gian cho m thao tác, với sức chứa c?',
+        options: [
+          'O(m) — mỗi thao tác là O(1) khấu hao nhờ bảng băm cộng danh sách liên kết hai chiều',
+          'O(m × c) vì mỗi lần loại bỏ phải quét toàn bộ cache',
+          'O(m log c)',
+          'O(m²)',
+        ],
+        answer: 0,
+        why: '`OrderedDict` kết hợp bảng băm (tra cứu khoá O(1)) với danh sách liên kết hai chiều (di chuyển và lấy phần tử ở hai đầu O(1)). `move_to_end` chỉ nối lại vài con trỏ, `popitem(last=False)` gỡ nút đầu — không có vòng lặp nào. Bộ nhớ là O(c), đúng bằng sức chứa, đó chính là mục đích của cache.',
+      },
+      realWorld: 'Cache truy vấn database, bộ nhớ đệm ảnh/thumbnail trong ứng dụng di động, cache DNS, và bộ đệm trang của hệ điều hành đều dùng LRU hoặc biến thể của nó. Đây cũng là câu hỏi phỏng vấn xuất hiện thường xuyên nhất về cấu trúc dữ liệu — và điểm người ta hay bị hỏi thêm chính là: "vì sao `get` cũng phải cập nhật thứ tự?".',
     },
   ],
 },

@@ -185,6 +185,50 @@ def save(record: UserRecord) -> None: ...
       answer: 1,
       why: 'PEP 604 (Python 3.10+) cho phép dùng dấu `|` để biểu diễn Union ngay trong cú pháp annotation, giúp code ngắn gọn hơn và không cần `from typing import Union` — về ý nghĩa hoàn toàn tương đương `Union[int, str]`.',
     },
+    {
+      q: 'Trong dataclass sau, `b` có trở thành một field không?\n\n@dataclass\nclass P:\n    a: int\n    b = 5',
+      options: [
+        'Có — b là field với giá trị mặc định 5',
+        'Không — thiếu annotation nên b chỉ là thuộc tính class thường, không vào __init__ cũng không vào __eq__',
+        'Lỗi khi định nghĩa class',
+        'Có, nhưng b là field bắt buộc phải truyền',
+      ],
+      answer: 1,
+      why: '`@dataclass` quét `__annotations__` để tìm field — **không có annotation thì không phải field**. `b = 5` chỉ là thuộc tính class bình thường: không xuất hiện trong `__init__`, không được so sánh trong `__eq__`, không có trong `__repr__`. Bug này im lặng tuyệt đối: `P(1) == P(1)` vẫn `True` ngay cả khi bạn đã gán `p1.b = 99`. Muốn `b` là field thì phải viết `b: int = 5`.',
+    },
+    {
+      q: 'Câu lệnh `isinstance(x, list[int])` cho kết quả gì lúc chạy?',
+      options: [
+        'True nếu x là list toàn số nguyên',
+        'TypeError — không dùng được generic có tham số với isinstance',
+        'Luôn True nếu x là list, bất kể kiểu phần tử',
+        'False trong mọi trường hợp',
+      ],
+      answer: 1,
+      why: 'Python raise `TypeError: isinstance() argument 2 cannot be a parameterized generic`. Lý do sâu xa: kiểm tra "list này có toàn số nguyên không" là thao tác **O(n)**, và Python từ chối giấu một vòng lặp sau vẻ ngoài của một phép kiểm tra O(1). Điều này khẳng định lại thông điệp cốt lõi của module: type hint dành cho công cụ phân tích tĩnh; lúc chạy bạn chỉ kiểm tra được `isinstance(x, list)` (kiểu gốc), còn phần tử thì phải tự duyệt — hoặc dùng `pydantic`.',
+    },
+    {
+      q: 'Đoạn code sau gặp vấn đề gì?\n\nclass Node:\n    def next_node(self) -> Node:\n        ...',
+      options: [
+        'Không có vấn đề gì',
+        'NameError — tại thời điểm dòng def được chạy, tên Node chưa tồn tại',
+        'Chỉ mypy báo lỗi, chạy vẫn bình thường',
+        'SyntaxError',
+      ],
+      answer: 1,
+      why: 'Annotation được **tính như một biểu thức bình thường** ngay khi câu lệnh `def` chạy — mà lúc đó class `Node` còn đang được xây, tên của nó chưa gán vào namespace. Ba cách sửa: (1) đặt trong dấu nháy `-> "Node"` (forward reference); (2) thêm `from __future__ import annotations` ở đầu file để mọi annotation trở thành chuỗi, không được tính ngay; (3) dùng `typing.Self` (Python 3.11+). Cách (2) là lựa chọn mặc định tốt cho code mới.',
+    },
+    {
+      q: 'Khai báo `x: Any` khác `x: object` như thế nào đối với công cụ kiểm tra kiểu tĩnh?',
+      options: [
+        'Không khác gì, chỉ là hai cách viết',
+        '`Any` TẮT mọi kiểm tra trên x (làm gì với nó cũng hợp lệ); `object` thì ngược lại — hầu như không làm gì được nếu chưa thu hẹp kiểu',
+        '`object` tắt kiểm tra, còn `Any` bắt buộc phải ép kiểu',
+        '`Any` chỉ dùng được cho tham số hàm',
+      ],
+      answer: 1,
+      why: 'Hai kiểu này nằm ở hai cực đối lập. `Any` là "cửa thoát hiểm": mypy chấp nhận `x.bat_ky_gi()` và `x + 1` mà không kiểm tra gì — nên rắc `Any` để làm mypy im lặng đồng nghĩa với việc **vô hiệu hoá chính công cụ bạn vừa cài đặt**, và cái tệ nhất là nó lan sang các biến khác. `object` là "tổ tiên chung của mọi kiểu": an toàn thật sự, nhưng bạn phải `isinstance` để thu hẹp trước khi dùng. Khi thật sự nhận dữ liệu bất kỳ, `object` + kiểm tra tường minh mới là lựa chọn đúng.',
+    },
   ],
   problems: [
     {
@@ -429,6 +473,278 @@ thật).
         why: 'Việc tạo tập hợp từ `record.keys()` phải duyệt qua tất cả k khoá hiện có trong dict, nên chi phí tỉ lệ thuận với số khoá — dù trong bài này k thường nhỏ và cố định về mặt ý nghĩa (2 khoá), thuật toán tổng quát vẫn là O(k).',
       },
       realWorld: 'Validate payload JSON nhận từ client trước khi lưu vào database — đây chính xác là công việc mà `pydantic`/`FastAPI` tự động hoá dựa trên type hint bạn khai báo, giúp bạn không phải tự viết tay từng hàm `is_valid_xxx` như bài này cho mọi loại dữ liệu trong hệ thống lớn.',
+    },
+    {
+      id: 'py-runtime-type-check',
+      title: 'Kiểm tra kiểu lúc chạy — và bẫy bool là int',
+      en: 'Runtime Type Checking',
+      difficulty: 'Medium',
+      targetMinutes: 14,
+      entry: 'check_types',
+      lang: 'python',
+      statement: `
+Viết hàm \`check_types(values, expected)\` nhận hai danh sách cùng độ dài: \`values\` là các giá trị,
+\`expected\` là tên kiểu mong đợi tương ứng. Trả về danh sách \`True\`/\`False\` cho từng cặp.
+
+Các tên kiểu được hỗ trợ: \`"int"\`, \`"float"\`, \`"str"\`, \`"bool"\`, \`"list"\`, \`"dict"\`, \`"none"\`.
+Tên kiểu không nằm trong danh sách trên → \`False\`.
+
+**Yêu cầu nghiêm ngặt (đây là toàn bộ độ khó của bài):**
+- \`True\` là kiểu \`"bool"\`, **không** được tính là \`"int"\`.
+- \`1\` là kiểu \`"int"\`, **không** được tính là \`"bool"\`.
+- \`2\` **không** được tính là \`"float"\`, và \`1.5\` **không** được tính là \`"int"\`.
+
+**Ví dụ**
+- \`check_types([1, "a", True], ["int", "str", "bool"])\` → \`[True, True, True]\`
+- \`check_types([True], ["int"])\` → \`[False]\`
+`,
+      starter: `def check_types(values, expected):\n    # Trả về list True/False cho từng cặp (giá trị, tên kiểu)\n    \n`,
+      tests: [
+        { args: [[1, 'a', true], ['int', 'str', 'bool']], expected: [true, true, true], name: 'Ba kiểu cơ bản' },
+        { args: [[true], ['int']], expected: [false], name: 'bool KHÔNG được tính là int' },
+        { args: [[1], ['bool']], expected: [false], name: 'int KHÔNG được tính là bool' },
+        { args: [[1.5], ['int']], expected: [false], name: 'float không phải int' },
+        { args: [[2], ['float']], expected: [false], name: 'int không phải float' },
+        { args: [[1.5], ['float']], expected: [true], name: 'float đúng kiểu' },
+        { args: [[null], ['none']], expected: [true], name: 'None' },
+        { args: [[null], ['str']], expected: [false], name: 'None không phải str' },
+        { args: [[[1, 2], { a: 1 }], ['list', 'dict']], expected: [true, true], name: 'list và dict' },
+        { args: [[1], ['so_nguyen']], expected: [false], name: 'Tên kiểu không hỗ trợ' },
+        { args: [[], []], expected: [], name: 'Danh sách rỗng' },
+        { args: [[false, 0], ['bool', 'int']], expected: [true, true], name: 'False và 0 — hai kiểu khác nhau' },
+      ],
+      hints: [
+        'Với hầu hết kiểu, `isinstance(v, int)`, `isinstance(v, str)`... là đủ. Riêng `None` phải kiểm tra bằng `v is None` chứ không phải `isinstance`.',
+        'Bẫy trung tâm: trong Python `bool` là **lớp con của `int`**, nên `isinstance(True, int)` trả về `True`. Để "int" không nhận `True`, bạn phải loại trừ tường minh: `isinstance(v, int) and not isinstance(v, bool)`.',
+        'Chiều ngược lại thì đơn giản: `isinstance(1, bool)` vốn đã là `False` (int không phải lớp con của bool), nên `"bool"` chỉ cần `isinstance(v, bool)`. Với `"float"`, dùng `isinstance(v, float)` — số nguyên `2` không phải instance của `float` nên tự động bị loại.',
+      ],
+      diagnostics: [
+        { test: 'type\\s*\\(\\s*\\w+\\s*\\)\\s*==\\s*int', message: 'So sánh `type(v) == int` tình cờ giải đúng bài này (vì nó loại `bool`), nhưng đó là thói quen xấu: nó cũng loại luôn MỌI lớp con hợp lệ khác. Quy ước Python là dùng `isinstance` và loại trừ `bool` một cách tường minh khi cần.' },
+        { test: 'isinstance\\s*\\(\\s*\\w+\\s*,\\s*int\\s*\\)(?![\\s\\S]*bool)', message: 'Bạn dùng `isinstance(v, int)` mà không loại trừ `bool`. Vì `bool` là lớp con của `int`, `True` sẽ bị nhận nhầm là số nguyên.' },
+        { test: 'isinstance\\s*\\(\\s*\\w+\\s*,\\s*(list|dict)\\s*\\[', message: 'Không dùng được generic có tham số (`list[int]`) với `isinstance` — Python raise `TypeError`. Lúc chạy bạn chỉ kiểm tra được kiểu gốc `list`, phần tử bên trong phải tự duyệt.' },
+      ],
+      approach: `
+Bài này buộc bạn đối mặt với một sự thật lịch sử của Python: **\`bool\` kế thừa từ \`int\`.**
+
+\`\`\`python
+isinstance(True, int)     # True   ← bool LÀ một loại int
+isinstance(1, bool)       # False  ← nhưng int KHÔNG phải bool
+True + True               # 2
+sum([True, False, True])  # 2      ← đôi khi rất tiện
+\`\`\`
+
+Lý do: Python không có kiểu boolean cho tới phiên bản 2.3; trước đó người ta dùng \`1\`/\`0\`. Khi thêm
+\`bool\`, để không phá vỡ hàng loạt code cũ, nó được làm thành **lớp con của \`int\`**. Sự tiện lợi đó
+(đếm phần tử đúng bằng \`sum\`) đi kèm cái giá: mọi phép kiểm tra kiểu ngây thơ đều nhận nhầm.
+
+\`\`\`python
+def check_types(values, expected):
+    def matches(value, name):
+        if name == "bool":
+            return isinstance(value, bool)
+        if name == "int":
+            return isinstance(value, int) and not isinstance(value, bool)
+        if name == "float":
+            return isinstance(value, float)
+        if name == "str":
+            return isinstance(value, str)
+        if name == "list":
+            return isinstance(value, list)
+        if name == "dict":
+            return isinstance(value, dict)
+        if name == "none":
+            return value is None
+        return False
+
+    return [matches(v, n) for v, n in zip(values, expected)]
+\`\`\`
+
+**Thứ tự kiểm tra là mấu chốt.** Nếu bạn xử lý \`"int"\` trước mà không loại \`bool\`, thì \`True\` lọt lưới.
+Đây chính là lý do quiz của module khuyên: khi phân nhánh theo \`isinstance\` trên một Union chứa cả
+\`int\` và \`bool\`, luôn đặt \`bool\` **lên trước**.
+
+**Vì sao \`"float"\` không nhận số nguyên?** Vì \`isinstance(2, float)\` là \`False\` — \`int\` và \`float\` là hai
+lớp độc lập, không ai kế thừa ai. Nhưng chú ý: điều này khác với **quy ước của kiểm tra kiểu tĩnh**, nơi
+mypy chấp nhận truyền \`int\` vào tham số khai \`float\` (numeric tower). Lại thêm một minh chứng cho thông
+điệp lớn của module: **kiểm tra tĩnh và kiểm tra runtime không phải một, và không phải lúc nào cũng đồng ý
+với nhau.**
+
+**Trong dự án thật:** đừng tự viết bộ kiểm tra này. Dùng \`pydantic\` — nó xử lý sẵn kiểu lồng nhau, ép
+kiểu có kiểm soát, và thông báo lỗi chi tiết theo từng trường. Nhưng biết rõ \`bool\`/\`int\` để đọc hiểu khi
+\`pydantic\` phàn nàn ở chế độ \`strict\` thì vẫn cần thiết.
+`,
+      solution: `def check_types(values, expected):
+    def matches(value, name):
+        if name == "bool":
+            return isinstance(value, bool)
+        if name == "int":
+            return isinstance(value, int) and not isinstance(value, bool)
+        if name == "float":
+            return isinstance(value, float)
+        if name == "str":
+            return isinstance(value, str)
+        if name == "list":
+            return isinstance(value, list)
+        if name == "dict":
+            return isinstance(value, dict)
+        if name == "none":
+            return value is None
+        return False
+
+    return [matches(v, n) for v, n in zip(values, expected)]`,
+      complexity: {
+        question: 'Độ phức tạp thời gian theo số cặp n?',
+        options: [
+          'O(n) — mỗi cặp tốn một số phép isinstance hằng định',
+          'O(n × k) với k là tổng số phần tử bên trong các list/dict được kiểm tra',
+          'O(n²)',
+          'O(n log n)',
+        ],
+        answer: 0,
+        why: '`isinstance` chỉ tra cứu chuỗi kế thừa của kiểu (độ dài cố định, rất ngắn) nên là O(1); mỗi cặp qua tối đa 7 nhánh `if` → hằng số. Chú ý: nếu đề yêu cầu kiểm tra cả kiểu PHẦN TỬ bên trong list/dict thì độ phức tạp mới thành O(tổng số phần tử) — đúng lý do Python cấm dùng `list[int]` với `isinstance`.',
+      },
+      realWorld: 'Validate payload API trước khi ghi database, kiểm tra dữ liệu đọc từ JSON/CSV, viết bộ kiểm tra cấu hình lúc khởi động. Bẫy `bool`/`int` gây bug thật rất thường xuyên: một cột "so_luong" nhận `True` thay vì `1` sẽ đi qua mọi lớp kiểm tra và chỉ lộ ra khi báo cáo cuối tháng lệch số.',
+    },
+    {
+      id: 'py-coerce-config-value',
+      title: 'Ép kiểu giá trị cấu hình an toàn',
+      en: 'Safe Config Coercion',
+      difficulty: 'Medium',
+      targetMinutes: 14,
+      entry: 'coerce',
+      lang: 'python',
+      statement: `
+Mọi giá trị đọc từ biến môi trường hay file cấu hình đều là **chuỗi**. Viết hàm \`coerce(text, target)\`
+chuyển chuỗi đó về kiểu mong muốn, trả về \`None\` nếu không chuyển được.
+
+| \`target\` | Quy tắc |
+|---|---|
+| \`"int"\` | Số nguyên hợp lệ → \`int\`; ngược lại \`None\` (kể cả \`"3.5"\`) |
+| \`"float"\` | Số thực hợp lệ → \`float\`; ngược lại \`None\` |
+| \`"bool"\` | \`"true"\`, \`"1"\`, \`"yes"\` → \`True\`; \`"false"\`, \`"0"\`, \`"no"\` → \`False\` (**không phân biệt hoa thường**); mọi giá trị khác → \`None\` |
+| \`"str"\` | Trả về nguyên chuỗi |
+| khác | \`None\` |
+
+**Ví dụ**
+- \`coerce("42", "int")\` → \`42\`
+- \`coerce("False", "bool")\` → \`False\` ← không phải \`True\`!
+- \`coerce("3.5", "int")\` → \`None\`
+- \`coerce("0", "int")\` → \`0\` (giá trị hợp lệ, **không** phải \`None\`)
+`,
+      starter: `def coerce(text, target):\n    # Chuyển chuỗi cấu hình về kiểu target, None nếu không hợp lệ\n    \n`,
+      tests: [
+        { args: ['42', 'int'], expected: 42, name: 'Số nguyên' },
+        { args: ['0', 'int'], expected: 0, name: 'Số 0 — hợp lệ, không phải None' },
+        { args: ['-7', 'int'], expected: -7, name: 'Số âm' },
+        { args: ['3.5', 'int'], expected: null, name: '"3.5" không phải số nguyên' },
+        { args: ['abc', 'int'], expected: null, name: 'Chuỗi không phải số' },
+        { args: ['3.5', 'float'], expected: 3.5, name: 'Số thực' },
+        { args: ['False', 'bool'], expected: false, name: 'Bẫy lớn nhất: bool("False") là True' },
+        { args: ['true', 'bool'], expected: true, name: 'true viết thường' },
+        { args: ['YES', 'bool'], expected: true, name: 'Không phân biệt hoa thường' },
+        { args: ['0', 'bool'], expected: false, name: 'Chuỗi "0" là False' },
+        { args: ['maybe', 'bool'], expected: null, name: 'Giá trị bool không nhận diện được' },
+        { args: ['', 'bool'], expected: null, name: 'Chuỗi rỗng' },
+        { args: ['hello', 'str'], expected: 'hello', name: 'Giữ nguyên chuỗi' },
+        { args: ['5', 'so_nguyen'], expected: null, name: 'Tên kiểu không hỗ trợ' },
+      ],
+      hints: [
+        'Với `"int"` và `"float"`: dùng `try: return int(text) except ValueError: return None` — đây là EAFP, gọn hơn nhiều so với tự viết regex kiểm tra định dạng số.',
+        'Bẫy chí mạng ở `"bool"`: **đừng bao giờ dùng `bool(text)`**. Mọi chuỗi không rỗng đều truthy, nên `bool("False")`, `bool("0")`, `bool("no")` đều trả về `True`. Phải so khớp với tập giá trị đã định nghĩa.',
+        'Chuẩn hoá trước khi so khớp: `t = text.strip().lower()`, rồi `if t in ("true", "1", "yes"): return True`. Nhớ kiểm tra nhánh `False` riêng, và trả `None` cho mọi giá trị còn lại.',
+      ],
+      diagnostics: [
+        { test: 'bool\\s*\\(\\s*text\\s*\\)', message: '`bool("False")` trả về `True`! Trong Python, MỌI chuỗi không rỗng đều truthy — kể cả `"False"`, `"0"`, `"no"`. Đây là bug cấu hình kinh điển (tắt một tính năng bằng `DEBUG=False` mà nó vẫn bật). Phải so khớp chuỗi với danh sách giá trị hợp lệ.' },
+        { test: 'int\\s*\\(\\s*float\\s*\\(', message: '`int(float("3.5"))` cho `3` — nhưng đề yêu cầu `"3.5"` KHÔNG phải số nguyên hợp lệ và phải trả `None`. Ép kiểu âm thầm làm mất dữ liệu là điều tệ nhất một hàm cấu hình có thể làm.' },
+        { test: 'except\\s*:\\s*$|except\\s+Exception', message: 'Hãy bắt đúng loại lỗi mà `int()`/`float()` ném ra: `ValueError` (và `TypeError` nếu đầu vào có thể không phải chuỗi). `except:` trần sẽ che luôn lỗi lập trình của chính bạn.' },
+      ],
+      approach: `
+Đây là bài về **ranh giới giữa dữ liệu chuỗi bên ngoài và dữ liệu có kiểu bên trong** — nơi mọi hệ thống
+đều phải có một lớp chuyển đổi, và cũng là nơi bug hay ẩn nấp nhất.
+
+\`\`\`python
+def coerce(text, target):
+    if target == "str":
+        return text
+    if target == "int":
+        try:
+            return int(text)
+        except ValueError:
+            return None
+    if target == "float":
+        try:
+            return float(text)
+        except ValueError:
+            return None
+    if target == "bool":
+        t = text.strip().lower()
+        if t in ("true", "1", "yes"):
+            return True
+        if t in ("false", "0", "no"):
+            return False
+        return None
+    return None
+\`\`\`
+
+**Bẫy \`bool("False")\` đáng để dừng lại suy nghĩ.** Hàm dựng \`bool()\` không "phân tích" chuỗi — nó hỏi
+"object này có truthy không?". Mọi chuỗi không rỗng đều truthy, nên:
+
+\`\`\`python
+bool("False")   # True
+bool("0")       # True
+bool("")        # False  ← trường hợp DUY NHẤT cho False
+\`\`\`
+
+Hệ quả trong thực tế: \`DEBUG = bool(os.environ.get("DEBUG", ""))\` với \`DEBUG=False\` trong file \`.env\` sẽ
+**bật** chế độ debug trên production. Đây là bug có thật, lặp đi lặp lại ở vô số dự án, và là lý do
+Django/pydantic đều có hàm chuyển đổi bool riêng thay vì dùng \`bool()\`.
+
+**Vì sao \`"3.5"\` phải bị từ chối khi target là \`"int"\`?** Vì \`int("3.5")\` raise \`ValueError\` — Python
+cố tình **không** tự cắt phần thập phân khi phân tích chuỗi (khác với \`int(3.5)\` trên số, cho \`3\`). Nếu
+bạn "sửa" bằng \`int(float(text))\`, bạn đang âm thầm biến cấu hình \`timeout=1.9\` thành \`1\` mà không ai
+biết. Một hàm ép kiểu tốt phải **từ chối rõ ràng** thay vì đoán ý người dùng.
+
+**Vì sao trả \`None\` chứ không raise?** Đây là lựa chọn thiết kế phù hợp cho lớp cấu hình: người gọi
+thường muốn "không hợp lệ thì dùng giá trị mặc định". Nhưng hãy chú ý hệ quả — người gọi phải kiểm tra
+bằng \`is None\`, không được viết \`value or default\`, vì \`0\` và \`False\` là kết quả hợp lệ và cũng falsy.
+`,
+      solution: `def coerce(text, target):
+    if target == "str":
+        return text
+
+    if target == "int":
+        try:
+            return int(text)
+        except (ValueError, TypeError):
+            return None
+
+    if target == "float":
+        try:
+            return float(text)
+        except (ValueError, TypeError):
+            return None
+
+    if target == "bool":
+        t = text.strip().lower()
+        if t in ("true", "1", "yes"):
+            return True
+        if t in ("false", "0", "no"):
+            return False
+        return None
+
+    return None`,
+      complexity: {
+        question: 'Độ phức tạp thời gian theo độ dài chuỗi n?',
+        options: [
+          'O(n) — phân tích số hay so khớp chuỗi đều phải đọc qua từng ký tự',
+          'O(1) vì chỉ có vài lệnh if',
+          'O(n²)',
+          'O(log n) vì int() dùng chia đôi',
+        ],
+        answer: 0,
+        why: '`int(text)` phải duyệt từng chữ số để dựng số, `text.lower()` tạo chuỗi mới O(n), và so khớp `in (...)` với vài chuỗi cố định cũng tuyến tính theo độ dài. Tất cả đều O(n) với n rất nhỏ trong thực tế — chi phí này hoàn toàn không đáng lo, khác hẳn với cái giá của một lần đọc sai cấu hình.',
+      },
+      realWorld: 'Đọc biến môi trường (`os.environ` luôn trả chuỗi), tham số dòng lệnh, giá trị từ file `.env`/`.ini`, và query string của HTTP request — tất cả đều là chuỗi. Đây chính xác là công việc mà `pydantic-settings`, `django-environ`, hay `python-decouple` làm cho bạn; và bẫy `bool("False")` là lý do đầu tiên khiến những thư viện đó tồn tại.',
     },
   ],
 },

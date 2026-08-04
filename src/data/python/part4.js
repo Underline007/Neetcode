@@ -178,6 +178,40 @@ là lý do interface/lớp trừu tượng hữu ích: code dùng chung không c
       answer: 1,
       why: 'Kế thừa phù hợp khi quan hệ thực sự là "is-a" (Circle IS-A Shape). Khi chỉ muốn TÁI SỬ DỤNG hành vi mà không có quan hệ is-a rõ ràng, composition (một class CHỨA instance của class khác) linh hoạt hơn: dễ đổi thành phần lúc runtime, không kéo theo toàn bộ interface của lớp cha, và tránh cây kế thừa sâu khó bảo trì.',
     },
+    {
+      q: 'Đoạn code sau in ra gì?\n\nclass Team:\n    members = []\n    def add(self, name):\n        self.members.append(name)\n\na, b = Team(), Team()\na.add("An")\nprint(b.members)',
+      options: ["[]", "['An']", 'AttributeError vì b chưa có members', 'None'],
+      answer: 1,
+      why: '`members = []` khai ở thân class là **thuộc tính CLASS** — chỉ có đúng một list, dùng chung cho mọi instance. `self.members.append(...)` không hề tạo thuộc tính riêng: Python tra `self.members`, không thấy ở instance nên lấy của class, rồi sửa list đó tại chỗ. (Ngược lại, phép GÁN `self.members = [...]` mới tạo thuộc tính instance che đi thuộc tính class — chính sự bất đối xứng giữa đọc và gán này làm bug khó thấy.) Cách đúng: khởi tạo `self.members = []` trong `__init__`.',
+    },
+    {
+      q: 'Một class chỉ định nghĩa `__str__` (không có `__repr__`). `print(obj)` và `print([obj])` cho kết quả thế nào?',
+      options: [
+        'Cả hai đều dùng `__str__`',
+        '`print(obj)` dùng `__str__`, còn `print([obj])` in ra dạng mặc định `<... object at 0x...>`',
+        'Cả hai đều in dạng mặc định `<... object at 0x...>`',
+        'TypeError vì thiếu `__repr__`',
+      ],
+      answer: 1,
+      why: 'Các container (`list`, `dict`, `tuple`, `set`) luôn dùng `repr()` cho từng phần tử, không dùng `str()` — vì `repr` nhằm phục vụ lập trình viên (chính xác, không mơ hồ) còn `str` phục vụ người dùng cuối. Quy tắc thực dụng: nếu chỉ viết MỘT hàm, hãy viết `__repr__` — `str()` sẽ tự động fallback về nó, còn chiều ngược lại thì không.',
+    },
+    {
+      q: 'Điều gì xảy ra với đoạn code sau?\n\nfrom dataclasses import dataclass\n\n@dataclass\nclass Cart:\n    items: list = []',
+      options: [
+        'Chạy bình thường, nhưng mọi Cart dùng chung một list',
+        'ValueError ngay khi định nghĩa class — dataclass từ chối giá trị mặc định mutable',
+        'TypeError khi tạo instance đầu tiên',
+        'Python tự động copy list cho từng instance',
+      ],
+      answer: 1,
+      why: '`@dataclass` chủ động CHẶN bẫy "giá trị mặc định mutable" (bạn đã gặp ở module về hàm) bằng cách raise `ValueError: mutable default <class \'list\'> for field items` ngay lúc định nghĩa class. Cách đúng là `items: list = field(default_factory=list)` — hàm `list` được gọi lại cho từng instance. Đây là ví dụ hay về thiết kế API tốt: biến một bug im lặng thành lỗi ồn ào, phát hiện càng sớm càng tốt.',
+    },
+    {
+      q: 'Đoạn code sau in ra gì?\n\nclass A:\n    def who(self): return "A"\nclass B(A):\n    def who(self): return "B" + super().who()\nclass C(A):\n    def who(self): return "C" + super().who()\nclass D(B, C): pass\n\nprint(D().who())',
+      options: ['BA', 'BCA', 'BAC', 'TypeError vì đa kế thừa mơ hồ'],
+      answer: 1,
+      why: '`super()` KHÔNG có nghĩa là "lớp cha trực tiếp" — nó nghĩa là "lớp KẾ TIẾP trong MRO (Method Resolution Order) của lớp thực tế của object". MRO của `D` là `D → B → C → A → object`, nên `super().who()` bên trong `B` gọi `C.who`, chứ không phải `A.who`. Đây chính là lý do phải luôn dùng `super()` thay vì gọi thẳng `A.who(self)`: chỉ `super()` mới đảm bảo mọi lớp trong cây kế thừa đều được chạy đúng một lần. Xem MRO bằng `D.__mro__`.',
+    },
   ],
   problems: [
     {
@@ -450,6 +484,226 @@ def total_area(shapes):
         why: 'Tạo object và gọi area() cho mỗi hình là O(1), lặp qua n hình cho tổng O(n).',
       },
       realWorld: 'Đa hình qua kế thừa là xương sống của các hệ thống plugin: nhiều "PaymentProvider" (Stripe, PayPal, MoMo...) cùng có `.charge()`, nhiều "NotificationChannel" (Email, SMS, Push) cùng có `.send()` — code điều phối trung tâm chỉ gọi phương thức chung, không cần biết đang làm việc với cài đặt cụ thể nào.',
+    },
+    {
+      id: 'py-basket-instance-state',
+      title: 'Thuộc tính class hay thuộc tính instance?',
+      en: 'Class vs Instance Attribute',
+      difficulty: 'Medium',
+      targetMinutes: 12,
+      entry: 'run_baskets',
+      lang: 'python',
+      statement: `
+Định nghĩa một class \`Basket\` (giỏ hàng) với:
+- Thuộc tính \`items\` — danh sách sản phẩm, ban đầu **rỗng**.
+- Phương thức \`add(item)\` — thêm một sản phẩm vào giỏ.
+
+Sau đó viết hàm \`run_baskets(a_items, b_items)\`:
+1. Tạo **hai** giỏ hàng riêng biệt.
+2. Thêm lần lượt các phần tử của \`a_items\` vào giỏ thứ nhất, \`b_items\` vào giỏ thứ hai.
+3. Trả về \`[giỏ_1.items, giỏ_2.items]\`.
+
+**Ví dụ**
+- \`run_baskets(["ao"], ["quan"])\` → \`[["ao"], ["quan"]]\`
+
+> Hai giỏ hàng phải **hoàn toàn độc lập**. Nếu kết quả của bạn là \`[["ao", "quan"], ["ao", "quan"]]\`
+> thì bạn vừa gặp một trong những bug OOP kinh điển nhất của Python.
+`,
+      starter: `class Basket:\n    # items: danh sách sản phẩm, RIÊNG cho từng giỏ\n    \n    def add(self, item):\n        pass\n\n\ndef run_baskets(a_items, b_items):\n    # Tạo 2 giỏ, thêm hàng, trả về [items giỏ 1, items giỏ 2]\n    \n`,
+      tests: [
+        { args: [['ao'], ['quan']], expected: [['ao'], ['quan']], name: 'Mỗi giỏ một món' },
+        { args: [[], ['a', 'b']], expected: [[], ['a', 'b']], name: 'Giỏ thứ nhất rỗng' },
+        { args: [['p', 'q'], []], expected: [['p', 'q'], []], name: 'Giỏ thứ hai rỗng' },
+        { args: [[], []], expected: [[], []], name: 'Cả hai giỏ rỗng' },
+        { args: [['1', '2', '3'], ['4']], expected: [['1', '2', '3'], ['4']], name: 'Nhiều món, kiểm tra thứ tự' },
+        { args: [['x'], ['x']], expected: [['x'], ['x']], name: 'Hai giỏ cùng món — vẫn phải tách biệt' },
+      ],
+      hints: [
+        'Viết `items = []` ngay trong thân class sẽ tạo thuộc tính CLASS: chỉ có duy nhất một list, mọi giỏ hàng dùng chung nó.',
+        'Thuộc tính riêng của từng object phải được tạo trong `__init__`, vì `__init__` chạy lại cho MỖI instance: `def __init__(self): self.items = []`.',
+        'Bẫy phụ khi kiểm tra: `self.items.append(x)` (đọc rồi sửa tại chỗ) sẽ dùng chung list của class, nhưng `self.items = [...]` (gán) lại tạo thuộc tính instance mới — nên bug chỉ lộ ra khi bạn `append`, và chỉ ở giỏ thứ hai trở đi.',
+      ],
+      diagnostics: [
+        { test: 'class\\s+Basket[^\\n]*:\\s*\\n\\s+items\\s*=\\s*\\[\\s*\\]', message: '`items = []` viết trực tiếp trong thân class là thuộc tính CLASS — chỉ tồn tại một list duy nhất, dùng chung cho mọi giỏ hàng. Chuyển nó vào `__init__` dưới dạng `self.items = []` để mỗi instance có list riêng.' },
+        { test: '^(?![\\s\\S]*__init__)[\\s\\S]*class\\s+Basket', message: 'Class của bạn chưa có `__init__`. Không có nó thì không có chỗ nào tạo trạng thái RIÊNG cho từng instance — mọi giỏ hàng sẽ buộc phải dùng chung dữ liệu khai ở cấp class.' },
+      ],
+      approach: `
+Python tra cứu thuộc tính theo thứ tự: **instance trước, class sau**. Điều đó tạo ra một bất đối xứng
+mà người mới rất hay vấp:
+
+\`\`\`python
+class Basket:
+    items = []            # MỘT list duy nhất, thuộc về class
+
+b1, b2 = Basket(), Basket()
+b1.items.append("ao")     # ĐỌC self.items -> không có ở instance -> lấy của class -> sửa tại chỗ
+print(b2.items)           # ['ao']  ← b2 "thấy" món hàng của b1
+
+b1.items = ["moi"]        # GÁN -> TẠO thuộc tính instance mới, che thuộc tính class
+print(b2.items)           # ['ao']  ← từ giờ b1 và b2 mới tách nhau
+\`\`\`
+
+Đọc thì đi lên tới class, gán thì tạo mới ở instance. Vì vậy bug chỉ xuất hiện khi bạn **sửa tại chỗ**
+(\`append\`, \`+=\`, \`update\`) — đúng thao tác phổ biến nhất với list và dict.
+
+**Cách đúng:**
+
+\`\`\`python
+class Basket:
+    def __init__(self):
+        self.items = []       # chạy lại cho từng instance -> mỗi giỏ một list riêng
+
+    def add(self, item):
+        self.items.append(item)
+\`\`\`
+
+**Khi nào thuộc tính class là ĐÚNG?** Khi dữ liệu thật sự dùng chung và bất biến: hằng số
+(\`MAX_SIZE = 100\`), bộ đếm tổng số instance, bảng cấu hình chỉ đọc. Nguyên tắc an toàn: **thuộc tính
+class chỉ nên là giá trị immutable.**
+`,
+      solution: `class Basket:
+    def __init__(self):
+        self.items = []
+
+    def add(self, item):
+        self.items.append(item)
+
+
+def run_baskets(a_items, b_items):
+    a = Basket()
+    b = Basket()
+    for item in a_items:
+        a.add(item)
+    for item in b_items:
+        b.add(item)
+    return [a.items, b.items]`,
+      complexity: {
+        question: 'Độ phức tạp thời gian của run_baskets theo tổng số món hàng n = len(a_items) + len(b_items)?',
+        options: ['O(n) — mỗi món được append đúng một lần, append vào list là O(1) khấu hao', 'O(n²) vì mỗi lần append phải copy lại list', 'O(1)', 'O(n log n)'],
+        answer: 0,
+        why: '`list.append` là O(1) khấu hao (amortized): Python cấp phát dư chỗ nên phần lớn lời gọi chỉ ghi vào ô trống, thỉnh thoảng mới copy sang vùng nhớ lớn hơn — trung bình vẫn là hằng số. Hai vòng lặp cộng lại chạy đúng n lần.',
+      },
+      realWorld: 'Bug này xuất hiện thật ở mọi model có danh sách/dict làm trạng thái: giỏ hàng, danh sách quyền của user, cache theo phiên, danh sách lỗi của một form. Triệu chứng đặc trưng là "dữ liệu của người dùng A hiện ra ở tài khoản người dùng B" — nghiêm trọng về bảo mật và cực khó tái hiện trên môi trường dev vì chỉ lộ khi có nhiều instance cùng lúc.',
+    },
+    {
+      id: 'py-point-eq-hash',
+      title: 'Điểm bằng nhau và bài toán hashable',
+      en: 'Value Equality: __eq__ and __hash__',
+      difficulty: 'Medium',
+      targetMinutes: 14,
+      entry: 'Point',
+      lang: 'python',
+      statement: `
+Hoàn thiện class \`Point(x, y)\` sao cho **hai điểm có cùng toạ độ được coi là một**:
+- \`Point(1, 2) == Point(1, 2)\` phải là \`True\`.
+- Đưa nhiều \`Point\` vào một \`set\` thì các điểm trùng toạ độ chỉ được tính **một lần**.
+
+**Hệ thống chấm sẽ làm như sau** với danh sách toạ độ đầu vào:
+1. Tạo một \`Point\` cho mỗi cặp toạ độ.
+2. Đưa tất cả vào một \`set\` và đếm số phần tử.
+3. Kiểm tra \`điểm_đầu_tiên == Point(cùng toạ độ)\`.
+
+Kết quả mỗi test có dạng \`[số_điểm_phân_biệt, kết_quả_so_sánh_bằng]\`.
+
+**Ví dụ** với \`[[1, 2], [1, 2], [3, 4]]\` → \`[2, True]\`
+
+> Chỉ định nghĩa \`__eq__\` là **chưa đủ** — và cách nó hỏng sẽ khiến bạn bất ngờ.
+`,
+      starter: `class Point:\n    def __init__(self, x, y):\n        self.x = x\n        self.y = y\n\n    # Bổ sung những gì cần thiết để hai điểm cùng toạ độ được coi là MỘT\n    \n`,
+      harnessSrc: `def harness(Cls, args, t):
+    pairs = args[0]
+    points = [Cls(x, y) for x, y in pairs]
+    same = points[0] == Cls(pairs[0][0], pairs[0][1])
+    return [len(set(points)), bool(same)]`,
+      tests: [
+        { args: [[[1, 2], [1, 2], [3, 4]]], expected: [2, true], name: 'Một cặp trùng nhau' },
+        { args: [[[0, 0]]], expected: [1, true], name: 'Một điểm duy nhất' },
+        { args: [[[1, 1], [2, 2], [3, 3], [1, 1], [2, 2]]], expected: [3, true], name: 'Nhiều điểm trùng lặp' },
+        { args: [[[5, 6], [6, 5]]], expected: [2, true], name: 'Đảo toạ độ là điểm KHÁC' },
+        { args: [[[-1, 0], [-1, 0], [-1, 0]]], expected: [1, true], name: 'Ba bản sao của cùng một điểm' },
+        { args: [[[2, 3], [2, 3], [2, 4], [9, 9]]], expected: [3, true], name: 'Hỗn hợp' },
+      ],
+      hints: [
+        'Mặc định, Python so sánh object bằng ĐỊNH DANH bộ nhớ — hai `Point(1, 2)` khác nhau luôn `!=`. Muốn so theo giá trị, hãy định nghĩa `__eq__(self, other)` trả về `self.x == other.x and self.y == other.y`.',
+        'Nhưng chỉ thêm `__eq__` thôi thì `set(points)` sẽ raise `TypeError: unhashable type: Point`. Lý do: khi bạn tự định nghĩa `__eq__`, Python TỰ ĐỘNG đặt `__hash__ = None` để tránh mâu thuẫn "hai object bằng nhau nhưng hash khác nhau".',
+        'Vì vậy phải khai luôn `__hash__`, và nó phải nhất quán với `__eq__` — dựa trên đúng những trường dùng để so sánh: `def __hash__(self): return hash((self.x, self.y))`. Cách gọn nhất cho cả bài: dùng `@dataclass(frozen=True)`, nó sinh sẵn cả hai.',
+      ],
+      diagnostics: [
+        { test: '^(?![\\s\\S]*(__hash__|frozen))[\\s\\S]*__eq__', message: 'Bạn có `__eq__` nhưng chưa có `__hash__`. Định nghĩa `__eq__` khiến Python đặt `__hash__ = None`, nên object không còn dùng được trong `set`/làm khoá `dict` (`TypeError: unhashable type`). Thêm `def __hash__(self): return hash((self.x, self.y))`.' },
+        { test: '^(?![\\s\\S]*(__eq__|dataclass))[\\s\\S]*class\\s+Point', message: 'Chưa thấy `__eq__` (hoặc `@dataclass`). Không có nó, `Point(1, 2) == Point(1, 2)` là `False` vì Python so sánh theo địa chỉ bộ nhớ, và `set` cũng sẽ coi mọi điểm là phân biệt.' },
+      ],
+      approach: `
+Bài này chạm tới một **hợp đồng ngầm** của Python mà rất nhiều người viết sai:
+
+> Nếu \`a == b\` thì bắt buộc \`hash(a) == hash(b)\`.
+
+\`set\` và \`dict\` dựa vào hợp đồng đó: chúng dùng \`hash\` để nhảy thẳng tới đúng "ngăn" cần tìm, rồi mới
+dùng \`==\` để xác nhận. Nếu hai object bằng nhau nhưng hash khác nhau, chúng rơi vào hai ngăn khác nhau và
+\`set\` sẽ chứa cả hai — cấu trúc dữ liệu hỏng âm thầm.
+
+Vì hậu quả nguy hiểm như vậy, Python chọn cách **phòng vệ chủ động**: hễ bạn tự viết \`__eq__\`, nó lập tức
+đặt \`__hash__ = None\` cho class đó. Object trở thành unhashable, và bạn nhận \`TypeError\` ồn ào ngay lần
+đầu bỏ vào \`set\` — thay vì một bug đếm sai số liệu âm thầm nhiều tháng sau.
+
+**Lời giải tường minh:**
+
+\`\`\`python
+class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __eq__(self, other):
+        if not isinstance(other, Point):
+            return NotImplemented       # để Python thử phép so sánh ngược lại
+        return (self.x, self.y) == (other.x, other.y)
+
+    def __hash__(self):
+        return hash((self.x, self.y))   # cùng bộ trường với __eq__
+\`\`\`
+
+Trả về \`NotImplemented\` (không phải \`False\`) khi gặp kiểu lạ là quy ước chuẩn: nó cho phép Python thử
+\`other.__eq__(self)\` trước khi kết luận.
+
+**Lời giải Pythonic hơn** — \`@dataclass(frozen=True)\` sinh sẵn \`__init__\`, \`__eq__\`, \`__hash__\` và
+\`__repr__\`, đồng thời khoá object lại thành bất biến (điều kiện an toàn để hash không bao giờ đổi):
+
+\`\`\`python
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class Point:
+    x: int
+    y: int
+\`\`\`
+
+**Cảnh báo cuối:** đừng bao giờ hash theo một trường **mutable**. Nếu \`x\` đổi sau khi object đã nằm trong
+\`set\`, hash của nó thay đổi nhưng nó vẫn nằm ở ngăn cũ — bạn sẽ không bao giờ tìm lại được nó nữa.
+`,
+      solution: `class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __eq__(self, other):
+        if not isinstance(other, Point):
+            return NotImplemented
+        return (self.x, self.y) == (other.x, other.y)
+
+    def __hash__(self):
+        return hash((self.x, self.y))`,
+      complexity: {
+        question: 'Đưa n điểm vào một `set` tốn độ phức tạp thời gian trung bình bao nhiêu?',
+        options: [
+          'O(n) — mỗi lần thêm là O(1) trung bình nhờ bảng băm',
+          'O(n²) vì mỗi điểm phải so sánh `==` với mọi điểm đã có',
+          'O(n log n)',
+          'O(1)',
+        ],
+        answer: 0,
+        why: 'Bảng băm đưa mỗi phần tử thẳng tới ngăn của nó qua `hash`, chỉ so `==` với vài phần tử cùng ngăn → O(1) trung bình cho mỗi lần thêm, O(n) cho toàn bộ. Nhưng nếu `__hash__` viết tệ (ví dụ luôn `return 1`), mọi phần tử dồn vào một ngăn và độ phức tạp SUY BIẾN về O(n²) — hash vẫn "đúng" theo hợp đồng nhưng hiệu năng sụp đổ.',
+      },
+      realWorld: 'Bất cứ khi nào bạn muốn khử trùng lặp hoặc dùng object làm khoá cache: toạ độ trên bản đồ, cặp (user_id, ngày) để chống ghi trùng, khoá tổ hợp trong bộ nhớ đệm, so sánh hai bản ghi xem có thay đổi không. Bộ đôi `__eq__`/`__hash__` chính là thứ mà `@dataclass(frozen=True)` sinh ra cho bạn — biết nó hoạt động thế nào giúp bạn chọn đúng khi dataclass không đủ.',
     },
   ],
 },

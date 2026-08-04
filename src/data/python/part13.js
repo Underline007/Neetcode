@@ -175,6 +175,50 @@ def test_sum_with_fixture(sample_data):     # pytest tự "tiêm" sample_data v�
       answer: 1,
       why: '`pytest.raises` là cách chuẩn để test rằng một đoạn code "phải lỗi đúng cách" — ví dụ đảm bảo hàm validate input thực sự raise đúng loại exception khi nhận dữ liệu sai, thay vì âm thầm trả về giá trị sai hoặc raise nhầm loại lỗi khác.',
     },
+    {
+      q: 'Một hàm test viết `tinh_tong(1, 2) == 3` (QUÊN từ khoá `assert`). Khi chạy pytest, test đó ra sao?',
+      options: [
+        'Fail vì thiếu assert',
+        'PASS — pytest chỉ coi là fail khi có exception, còn một biểu thức so sánh không dùng tới thì bị bỏ qua',
+        'pytest báo lỗi cú pháp',
+        'Test bị bỏ qua (skipped) kèm cảnh báo',
+      ],
+      answer: 1,
+      why: 'pytest quyết định pass/fail dựa trên việc hàm test có **ném ra exception** hay không. Không có `assert` thì không có exception, nên hàm chạy xong và được tính là PASS. Đây là loại lỗi nguy hiểm nhất trong testing: bạn có một bộ test màu xanh nhưng **không kiểm tra gì cả**. Hai cách phòng: đo coverage của nhánh khẳng định, và quan trọng hơn — luôn **chạy thử test với code sai** để chắc chắn nó biết fail (nếu một test chưa bao giờ đỏ, bạn chưa biết nó có hoạt động không).',
+    },
+    {
+      q: 'Một fixture khai `@pytest.fixture(scope="module")` trả về một `dict` rỗng. Test A thêm khoá vào dict đó. Test B nhận được gì?',
+      options: [
+        'Một dict rỗng mới — fixture luôn tạo lại giá trị cho mỗi test',
+        'Đúng cái dict mà test A vừa sửa — vì scope="module" nghĩa là cả module dùng chung một instance',
+        'Lỗi vì fixture không được sửa',
+        'Tuỳ vào thứ tự chạy các test, không xác định được',
+      ],
+      answer: 1,
+      why: '`scope` quyết định fixture được tạo lại bao lâu một lần: `function` (mặc định — mỗi test một instance mới), `class`, `module`, `session`. Với `scope="module"`, mọi test trong file chia sẻ **cùng một object**, nên một test sửa dữ liệu mutable là làm bẩn các test sau — sinh ra loại bug tệ nhất: test chạy riêng thì xanh, chạy cả bộ thì đỏ (hoặc ngược lại). Quy tắc: chỉ mở rộng scope cho những thứ **đắt và chỉ đọc** (kết nối database, dữ liệu mẫu lớn); mọi thứ mutable nên để scope mặc định.',
+    },
+    {
+      q: 'Module `myapp.py` có `import requests` và gọi `requests.get(...)`. Khi viết test, phải patch ở đâu?',
+      options: [
+        '`@patch("requests.get")` — patch tại nơi thư viện được định nghĩa',
+        '`@patch("myapp.requests.get")` — patch tại nơi nó ĐƯỢC DÙNG',
+        'Cả hai đều tương đương',
+        'Không patch được, phải sửa code cho dễ test',
+      ],
+      answer: 1,
+      why: 'Quy tắc nổi tiếng: **"patch where it is used, not where it is defined"**. Khi `myapp` chạy `import requests`, nó tạo một tham chiếu trong namespace của chính nó. Bạn phải thay thế đúng tham chiếu mà code sẽ tra tới lúc chạy. (Với `import requests` rồi gọi `requests.get`, patch `"requests.get"` tình cờ vẫn hiệu quả vì cả hai cùng trỏ tới một object module; nhưng với `from requests import get` thì `myapp.get` là một tên độc lập và chỉ `@patch("myapp.get")` mới ăn.) Nắm nguyên tắc "patch tại nơi tra cứu" thì bạn không cần đoán mò trong cả hai trường hợp.',
+    },
+    {
+      q: 'Vì sao `assert ket_qua is 300` là một khẳng định sai lầm trong test, dù đôi khi nó vẫn pass?',
+      options: [
+        '`is` không dùng được với số',
+        '`is` so sánh **định danh object**, không so sánh giá trị — nó chỉ tình cờ đúng với các số nguyên nhỏ được Python cache sẵn',
+        '`is` chỉ hoạt động bên trong hàm test',
+        'Phải viết `is ==` mới đúng cú pháp',
+      ],
+      answer: 1,
+      why: 'CPython cache sẵn các số nguyên nhỏ (khoảng -5 tới 256), nên `x is 256` có thể `True` còn `x is 300` thì `False` — cùng một logic, kết quả khác nhau chỉ vì giá trị. Đó là định nghĩa của một test **flaky**: đúng sai phụ thuộc chi tiết cài đặt của trình thông dịch, không phụ thuộc code bạn đang kiểm tra. Python 3.8+ còn cảnh báo `SyntaxWarning: "is" with a literal`. Quy tắc: `is` chỉ dùng cho các singleton — `None`, `True`, `False`; mọi so sánh giá trị khác dùng `==`.',
+    },
   ],
   problems: [
     {
@@ -365,6 +409,247 @@ nào xuất hiện khi chạy \`pytest\`.
         why: 'Lọc danh sách bằng `startswith` tốn O(n) (duyệt qua mọi tên một lần). `sorted` trên kết quả đã lọc tốn O(n log n) — vì đây là bước có độ phức tạp cao hơn, nó quyết định độ phức tạp tổng của cả hàm.',
       },
       realWorld: 'Chính là cơ chế bên dưới lệnh `pytest` khi bạn chạy nó trong terminal: quét qua các file/module, lọc ra các hàm khớp quy ước đặt tên, rồi mới thực thi — hiểu rõ cơ chế này giúp debug nhanh tình huống "tôi viết test rồi mà sao pytest báo 0 test nào chạy".',
+    },
+    {
+      id: 'py-approx-equal-nested',
+      title: 'So sánh cấu trúc lồng nhau có dung sai (như pytest.approx)',
+      en: 'Nested Approximate Equality',
+      difficulty: 'Medium',
+      targetMinutes: 18,
+      entry: 'approx_equal',
+      lang: 'python',
+      statement: `
+Viết hàm \`approx_equal(a, b, tol)\` so sánh hai giá trị **có thể lồng nhau** (số, chuỗi, \`None\`, list, dict),
+chấp nhận sai lệch \`tol\` cho các con số.
+
+**Quy tắc, theo đúng thứ tự ưu tiên:**
+1. Nếu **một trong hai** là \`bool\`: chỉ bằng nhau khi cả hai là cùng một giá trị bool
+   (\`True\` **không** bằng \`1\`).
+2. Nếu cả hai là số (\`int\`/\`float\`): bằng nhau khi \`abs(a - b) <= tol\`.
+3. Nếu cả hai là \`list\`: phải cùng độ dài và **từng cặp phần tử** bằng nhau (đệ quy).
+4. Nếu cả hai là \`dict\`: phải cùng **tập khoá** và mọi giá trị tương ứng bằng nhau (đệ quy).
+5. Còn lại: so sánh thông thường bằng \`==\`.
+
+**Ví dụ**
+- \`approx_equal([1.0, 2.0], [1.0, 2.0000001], 1e-5)\` → \`True\`
+- \`approx_equal(True, 1, 1e-5)\` → \`False\`
+- \`approx_equal({"a": 1.0}, {"b": 1.0}, 1e-5)\` → \`False\`
+`,
+      starter: `def approx_equal(a, b, tol):\n    # So sánh đệ quy, có dung sai cho số, phân biệt bool với int\n    \n`,
+      tests: [
+        { args: [[1.0, 2.0], [1.0, 2.0000001], 0.00001], expected: true, name: 'Sai lệch nhỏ hơn dung sai' },
+        { args: [[1.0], [1.1], 0.00001], expected: false, name: 'Sai lệch lớn hơn dung sai' },
+        { args: [{ a: 1.0 }, { a: 1.000001 }, 0.00001], expected: true, name: 'Dict với số gần bằng' },
+        { args: [{ a: 1.0 }, { b: 1.0 }, 0.00001], expected: false, name: 'Khác tập khoá' },
+        { args: [[1, [2.0, 3.0]], [1, [2.0, 3.0000001]], 0.00001], expected: true, name: 'Lồng hai tầng' },
+        { args: ['abc', 'abc', 0.00001], expected: true, name: 'Chuỗi bằng nhau' },
+        { args: ['abc', 'abd', 0.00001], expected: false, name: 'Chuỗi khác nhau' },
+        { args: [[1.0], [1.0, 2.0], 0.00001], expected: false, name: 'Khác độ dài' },
+        { args: [true, 1, 0.00001], expected: false, name: 'True KHÔNG bằng 1 — bẫy chính' },
+        { args: [false, 0, 0.00001], expected: false, name: 'False KHÔNG bằng 0' },
+        { args: [true, true, 0.00001], expected: true, name: 'Hai bool giống nhau' },
+        { args: [null, null, 0.00001], expected: true, name: 'None bằng None' },
+        { args: [null, 0, 0.00001], expected: false, name: 'None không bằng 0' },
+        { args: [{ x: [1.0, { y: 2.0 }] }, { x: [1.0, { y: 2.0000001 }] }, 0.00001], expected: true, name: 'Lồng dict trong list trong dict' },
+      ],
+      hints: [
+        'Cấu trúc lồng nhau ⇒ hàm phải **đệ quy**: khi gặp list hoặc dict, gọi lại chính nó cho từng phần tử/giá trị, truyền nguyên `tol` xuống.',
+        'Thứ tự các nhánh `if` là quan trọng nhất. Vì `bool` là lớp con của `int`, nhánh kiểm tra bool phải đứng **trước** nhánh kiểm tra số — nếu không, `True` sẽ rơi vào nhánh số và `abs(True - 1) <= tol` cho `True`.',
+        'Với list: kiểm tra `len(a) == len(b)` TRƯỚC khi `zip` — vì `zip` cắt theo dãy ngắn hơn và sẽ âm thầm bỏ qua phần dư, khiến `[1.0]` được coi là bằng `[1.0, 2.0]`. Với dict: so `a.keys() == b.keys()` rồi mới duyệt.',
+      ],
+      diagnostics: [
+        { test: '^(?![\\s\\S]*isinstance\\s*\\(\\s*\\w+\\s*,\\s*bool)[\\s\\S]*def\\s+approx_equal', message: 'Không thấy nhánh xử lý riêng cho `bool`. Vì `bool` là lớp con của `int`, `True` sẽ lọt vào nhánh so sánh số và được coi là bằng `1`.' },
+        { test: '^(?![\\s\\S]*len\\s*\\()[\\s\\S]*def\\s+approx_equal', message: 'Không thấy chỗ nào so sánh độ dài. `zip` dừng ở dãy ngắn hơn và im lặng bỏ qua phần dư, nên `[1.0]` sẽ được coi là bằng `[1.0, 2.0]` — phải kiểm tra `len(a) == len(b)` trước.' },
+        { test: 'round\\s*\\(', message: '`round()` không phải công cụ so sánh float: `round(0.1 + 0.2, 10) == round(0.3, 10)` may mắn đúng, nhưng cách này phụ thuộc số chữ số bạn chọn và vẫn sai ở các giá trị biên. Hãy so sánh trực tiếp `abs(a - b) <= tol`.' },
+      ],
+      approach: `
+Đây chính là thứ \`pytest.approx\` làm — và tự viết nó buộc bạn đối mặt với ba quyết định mà một hàm so
+sánh nghiêm túc nào cũng phải trả lời.
+
+\`\`\`python
+def approx_equal(a, b, tol):
+    if isinstance(a, bool) or isinstance(b, bool):
+        return a is b                                   # (1) bool tách riêng, TRƯỚC số
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        return abs(a - b) <= tol                        # (2) dung sai cho số
+    if isinstance(a, list) and isinstance(b, list):
+        return len(a) == len(b) and all(
+            approx_equal(x, y, tol) for x, y in zip(a, b)
+        )                                               # (3) độ dài TRƯỚC zip
+    if isinstance(a, dict) and isinstance(b, dict):
+        return a.keys() == b.keys() and all(
+            approx_equal(a[k], b[k], tol) for k in a
+        )
+    return a == b
+\`\`\`
+
+**Quyết định 1 — vì sao \`bool\` phải đứng trước.** \`isinstance(True, int)\` là \`True\`, nên nếu nhánh số đi
+trước thì \`approx_equal(True, 1, 1e-5)\` tính \`abs(True - 1) == 0\` và trả \`True\`. Với một hàm so sánh
+dùng trong test, đây là lỗi nghiêm trọng: nó khiến bạn không phát hiện được khi hàm đáng lẽ trả \`1\` lại
+trả \`True\`. Dùng \`a is b\` chứ không phải \`a == b\` ở nhánh này, vì \`True == 1\` vẫn đúng.
+
+**Quyết định 2 — vì sao so sánh float cần dung sai.** \`0.1 + 0.2 != 0.3\`. Một test dùng \`==\` cho float sẽ
+đỏ dù logic hoàn toàn đúng. (\`math.isclose\` của thư viện chuẩn còn tinh vi hơn: nó dùng sai số **tương
+đối**, phù hợp hơn khi các con số có độ lớn rất khác nhau — bài này dùng sai số tuyệt đối cho đơn giản.)
+
+**Quyết định 3 — vì sao kiểm tra độ dài trước \`zip\`.** \`zip\` im lặng cắt theo dãy ngắn hơn. Không kiểm
+tra trước thì \`[1.0]\` "bằng" \`[1.0, 2.0]\` — và bạn có một bộ test không phát hiện được dữ liệu bị thiếu.
+Cùng lý do đó, dict phải so **tập khoá** trước, chứ không chỉ duyệt các khoá của \`a\`.
+
+**Nhận xét chung:** ba cái bẫy này đều có chung một dạng — **im lặng chấp nhận thứ đáng lẽ phải bị từ
+chối**. Với code sản phẩm thì đó là bug; với code kiểm thử thì nó tệ hơn nhiều, vì nó làm hỏng chính công
+cụ bạn dùng để phát hiện bug.
+`,
+      solution: `def approx_equal(a, b, tol):
+    if isinstance(a, bool) or isinstance(b, bool):
+        return a is b
+
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        return abs(a - b) <= tol
+
+    if isinstance(a, list) and isinstance(b, list):
+        if len(a) != len(b):
+            return False
+        return all(approx_equal(x, y, tol) for x, y in zip(a, b))
+
+    if isinstance(a, dict) and isinstance(b, dict):
+        if a.keys() != b.keys():
+            return False
+        return all(approx_equal(a[k], b[k], tol) for k in a)
+
+    return a == b`,
+      complexity: {
+        question: 'Độ phức tạp thời gian theo tổng số nút n của cấu trúc dữ liệu?',
+        options: [
+          'O(n) — mỗi nút được so sánh đúng một lần',
+          'O(n²) do đệ quy',
+          'O(n log n)',
+          'O(2^n) với dữ liệu lồng sâu',
+        ],
+        answer: 0,
+        why: 'Đệ quy đi qua mỗi nút của cả hai cấu trúc đúng một lần → O(n). Thêm hai điểm đáng chú ý: `all()` **thoát sớm** ngay khi gặp phần tử đầu tiên không khớp (nên trường hợp khác nhau thường nhanh hơn nhiều), và độ sâu ngăn xếp đệ quy tỉ lệ với **độ sâu lồng nhau** — với dữ liệu lồng quá 1000 tầng bạn sẽ gặp `RecursionError`.',
+      },
+      realWorld: 'So sánh kết quả API với dữ liệu mong đợi trong test tích hợp (nơi mọi thứ đều là JSON lồng nhau và có số thực), kiểm tra đầu ra mô hình machine learning, đối chiếu snapshot. Đây đúng là bài toán mà `pytest.approx`, `numpy.allclose`, và `assertAlmostEqual` sinh ra để giải — và cái bẫy `True == 1` là thứ mà không phải thư viện nào cũng xử lý đúng.',
+    },
+    {
+      id: 'py-diff-dicts',
+      title: 'Báo cáo khác biệt giữa hai dict',
+      en: 'Dict Diff Report',
+      difficulty: 'Medium',
+      targetMinutes: 15,
+      entry: 'diff_dicts',
+      lang: 'python',
+      statement: `
+Khi một test thất bại, thông báo hữu ích nhất không phải "hai dict khác nhau" mà là **khác ở chỗ nào**.
+
+Viết hàm \`diff_dicts(expected, actual)\` trả về một dict có đúng ba khoá, mỗi giá trị là danh sách tên khoá
+**đã sắp xếp theo thứ tự chữ cái**:
+
+- \`"missing"\` — khoá có trong \`expected\` nhưng thiếu ở \`actual\`.
+- \`"extra"\` — khoá có trong \`actual\` nhưng không có trong \`expected\`.
+- \`"different"\` — khoá có ở **cả hai** nhưng giá trị khác nhau.
+
+**Định nghĩa "giá trị khác nhau":** hai giá trị được coi là **bằng nhau** khi \`a == b\` **và** không xảy ra
+trường hợp một cái là \`bool\` còn cái kia thì không. Nghĩa là \`True\` **khác** \`1\`, dù \`True == 1\`.
+
+**Ví dụ**
+- \`diff_dicts({"a": 1, "b": 2}, {"a": 1, "b": 3})\` → \`{"missing": [], "extra": [], "different": ["b"]}\`
+- \`diff_dicts({"x": True}, {"x": 1})\` → \`{"missing": [], "extra": [], "different": ["x"]}\`
+`,
+      starter: `def diff_dicts(expected, actual):\n    # Trả về {"missing": [...], "extra": [...], "different": [...]}\n    \n`,
+      checkerSrc: 'lambda got, exp, args: isinstance(got, dict) and got == exp',
+      tests: [
+        { args: [{ a: 1, b: 2 }, { a: 1, b: 3 }], expected: { missing: [], extra: [], different: ['b'] }, name: 'Một khoá khác giá trị' },
+        { args: [{ a: 1 }, { a: 1, b: 2 }], expected: { missing: [], extra: ['b'], different: [] }, name: 'Có khoá thừa' },
+        { args: [{ a: 1, b: 2 }, { a: 1 }], expected: { missing: ['b'], extra: [], different: [] }, name: 'Thiếu khoá' },
+        { args: [{}, {}], expected: { missing: [], extra: [], different: [] }, name: 'Hai dict rỗng' },
+        { args: [{ a: 1 }, { b: 1 }], expected: { missing: ['a'], extra: ['b'], different: [] }, name: 'Không có khoá chung' },
+        { args: [{ x: true }, { x: 1 }], expected: { missing: [], extra: [], different: ['x'] }, name: 'True khác 1 — bẫy chính' },
+        { args: [{ x: true }, { x: true }], expected: { missing: [], extra: [], different: [] }, name: 'Hai bool giống nhau' },
+        { args: [{ c: 1, a: 2, b: 3 }, {}], expected: { missing: ['a', 'b', 'c'], extra: [], different: [] }, name: 'Kết quả phải sắp xếp chữ cái' },
+        { args: [{ a: [1, 2] }, { a: [1, 2] }], expected: { missing: [], extra: [], different: [] }, name: 'Giá trị là list bằng nhau' },
+        { args: [{ a: [1, 2] }, { a: [2, 1] }], expected: { missing: [], extra: [], different: ['a'] }, name: 'List khác thứ tự là khác nhau' },
+      ],
+      hints: [
+        'Ba tập khoá cần tính đều là phép toán trên `set`: `missing = set(expected) - set(actual)`, `extra = set(actual) - set(expected)`, và khoá chung là giao `set(expected) & set(actual)`.',
+        '`set` không có thứ tự, nên phải `sorted(...)` trước khi trả về — nếu không, kết quả sẽ thay đổi giữa các lần chạy và test trở nên flaky.',
+        'Bẫy `bool`: `True == 1` là `True`, nên so sánh trực tiếp sẽ bỏ sót. Viết một hàm phụ: hai giá trị khác nhau khi `isinstance(a, bool) != isinstance(b, bool)` (một bool một không) **hoặc** `a != b`.',
+      ],
+      diagnostics: [
+        { test: 'return\\s*\\{[\\s\\S]*set\\s*\\(', message: 'Bạn đang trả về `set` trực tiếp. Đề yêu cầu **danh sách đã sắp xếp** — `set` không có thứ tự xác định, nên kết quả sẽ khác nhau giữa các lần chạy và làm test không ổn định.' },
+        { test: '^(?![\\s\\S]*bool)[\\s\\S]*def\\s+diff_dicts', message: 'Không thấy chỗ nào xử lý `bool`. Vì `True == 1` trong Python, so sánh trực tiếp sẽ coi `{"x": True}` và `{"x": 1}` là giống nhau — đúng cái khác biệt mà một báo cáo diff cần chỉ ra.' },
+        { test: 'for\\s+k\\s+in\\s+expected[\\s\\S]{0,200}?for\\s+\\w+\\s+in\\s+actual', message: 'Hai vòng lặp lồng nhau để đối chiếu khoá cho độ phức tạp O(n × m). Phép toán trên `set` (hiệu, giao) làm việc đó trong O(n + m).' },
+      ],
+      approach: `
+Bài này có hai lớp: một bài tập về \`set\`, và một bài học về **thông báo lỗi tốt**.
+
+\`\`\`python
+def diff_dicts(expected, actual):
+    def differs(a, b):
+        if isinstance(a, bool) != isinstance(b, bool):
+            return True                 # một bool, một không -> luôn khác
+        return a != b
+
+    exp_keys = set(expected)
+    act_keys = set(actual)
+
+    return {
+        "missing": sorted(exp_keys - act_keys),
+        "extra": sorted(act_keys - exp_keys),
+        "different": sorted(k for k in exp_keys & act_keys if differs(expected[k], actual[k])),
+    }
+\`\`\`
+
+**Về \`set\`.** \`set(mot_dict)\` cho ra tập **khoá** — cách viết gọn của \`set(d.keys())\`. Ba phép toán tập
+hợp trả lời trọn vẹn câu hỏi "khác nhau ở đâu":
+
+| Phép toán | Ý nghĩa |
+|---|---|
+| \`exp - act\` | có ở kỳ vọng, thiếu ở thực tế |
+| \`act - exp\` | thừa ra ở thực tế |
+| \`exp & act\` | khoá chung — chỉ những khoá này mới cần so giá trị |
+
+Mỗi phép là O(n + m) nhờ bảng băm, thay vì O(n × m) của hai vòng lặp lồng nhau.
+
+**Về \`sorted\`.** Đây không phải chi tiết làm đẹp. Tập hợp không có thứ tự xác định, nên nếu trả về nguyên
+\`set\`, thông báo lỗi của bạn sẽ đổi thứ tự giữa các lần chạy — khiến việc so sánh log giữa hai lần chạy
+CI trở nên vô nghĩa, và test dùng nó thành flaky. **Kết quả xác định là một yêu cầu, không phải tuỳ chọn.**
+
+**Về bẫy \`bool\`.** \`{"active": True}\` và \`{"active": 1}\` là hai dữ liệu khác nhau về ý nghĩa (một cái là
+cờ, một cái là số), nhưng \`==\` coi chúng bằng nhau. Với một công cụ diff dùng để **giải thích vì sao test
+đỏ**, bỏ sót khác biệt này là điều tệ nhất có thể xảy ra: người dùng nhìn báo cáo thấy "không có khác biệt
+nào" trong khi hệ thống vẫn báo lỗi.
+
+**Hướng mở rộng đáng nghĩ:** hàm này chỉ so ở tầng ngoài cùng. Phiên bản đệ quy sẽ báo được đường dẫn kiểu
+\`"user.address.city"\` — chính là cách \`deepdiff\` và thông báo lỗi của pytest hoạt động.
+`,
+      solution: `def diff_dicts(expected, actual):
+    def differs(a, b):
+        if isinstance(a, bool) != isinstance(b, bool):
+            return True
+        return a != b
+
+    exp_keys = set(expected)
+    act_keys = set(actual)
+    common = exp_keys & act_keys
+
+    return {
+        "missing": sorted(exp_keys - act_keys),
+        "extra": sorted(act_keys - exp_keys),
+        "different": sorted(k for k in common if differs(expected[k], actual[k])),
+    }`,
+      complexity: {
+        question: 'Độ phức tạp thời gian với n khoá ở expected và m khoá ở actual?',
+        options: [
+          'O(n + m) cho phần so khớp, cộng O(k log k) để sắp xếp k khoá trong kết quả',
+          'O(n × m) vì phải đối chiếu từng cặp khoá',
+          'O(n log n × m)',
+          'O(1)',
+        ],
+        answer: 0,
+        why: 'Dựng `set` và các phép hiệu/giao đều tuyến tính nhờ băm → O(n + m). Chi phí thêm duy nhất là ba lần `sorted` trên các danh sách kết quả, tổng cộng O(k log k) với k là số khoá thực sự khác biệt — thường rất nhỏ. Đây là cái giá rất rẻ để đổi lấy đầu ra xác định.',
+      },
+      realWorld: 'Chính là công việc của `deepdiff`, thông báo lỗi chi tiết của pytest, và các công cụ so sánh cấu hình giữa hai môi trường (staging vs production). Cùng mẫu này còn dùng để phát hiện thay đổi schema database, đối chiếu response API giữa hai phiên bản trước khi phát hành, và kiểm tra "infrastructure drift" giữa cấu hình khai báo và hạ tầng thực tế.',
     },
   ],
 },

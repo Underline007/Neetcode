@@ -168,6 +168,35 @@ s.strip().lower().replace("world", "python")  # không đổi s gốc
       answer: 1,
       why: 'Gán (`=`) trong Python không copy object — nó chỉ tạo thêm một TÊN trỏ tới object đã có. Với list (mutable), sửa qua tên nào cũng ảnh hưởng object dùng chung. Muốn bản sao độc lập phải copy tường minh: `b = a.copy()`.',
     },
+    {
+      q: 'Đoạn code sau in ra gì?\n\na = [[1, 2], [3, 4]]\nb = a[:]\nb[0].append(99)\nprint(a)',
+      options: ['[[1, 2], [3, 4]]', '[[1, 2, 99], [3, 4]]', 'TypeError vì a[:] tạo bản sao chỉ đọc', '[[1, 2], [3, 4], [99]]'],
+      answer: 1,
+      why: '`a[:]` chỉ là **shallow copy**: nó tạo một list NGOÀI mới, nhưng các phần tử bên trong vẫn là CÙNG object với bản gốc. `b[0]` và `a[0]` trỏ tới đúng một list con, nên `append` qua `b` cũng nhìn thấy được qua `a`. Muốn tách hoàn toàn phải dùng `copy.deepcopy(a)`. Đây chính là nguồn gốc của bug "đã copy rồi mà vẫn dính nhau" — rất khó tìm vì tầng ngoài trông có vẻ độc lập.',
+    },
+    {
+      q: 'Trong Python, `-7 // 2` và `-7 % 2` lần lượt cho kết quả nào?',
+      options: ['-4 và 1', '-3 và -1', '-4 và -1', '-3 và 1'],
+      answer: 0,
+      why: '`//` làm tròn **xuống** (về phía âm vô cực), nên `-7 // 2 == -4` chứ không phải `-3`. Python luôn giữ bất biến `a == (a // b) * b + a % b`; thay số: `-7 == (-4) * 2 + 1`, nên `-7 % 2 == 1` — kết quả của `%` mang dấu của **số chia**. JavaScript/C/Java cắt phần thập phân về 0 và trả `-1`, nên code port từ JS sang Python rất dễ sai âm thầm ở đây.',
+    },
+    {
+      q: 'Đoạn code sau cho kết quả gì?\n\nt = ([1, 2], "x")\nt[0].append(3)\nprint(t)',
+      options: ['TypeError vì tuple là bất biến', "([1, 2, 3], 'x')", "([1, 2], 'x')", 'Tuple tự động được chuyển thành list'],
+      answer: 1,
+      why: 'Tính bất biến của `tuple` chỉ áp dụng cho **các tham chiếu mà nó nắm giữ**: bạn không thể làm `t[0] = ...` (trỏ ô 0 sang object khác), nhưng object list nằm bên trong vẫn mutable và sửa tại chỗ được. Hệ quả quan trọng: tuple chứa list KHÔNG hashable — `{t: 1}` sẽ lỗi. "Bất biến" và "hashable" là hai khái niệm khác nhau.',
+    },
+    {
+      q: 'Vì sao `0.1 + 0.2 == 0.3` trả về `False` trong Python?',
+      options: [
+        'Vì Python tự làm tròn kết quả phép cộng về 1 chữ số thập phân',
+        'Vì `float` là số nhị phân IEEE-754: 0.1 và 0.2 không biểu diễn chính xác được, tổng thực tế là 0.30000000000000004',
+        'Vì `==` trên float luôn trả về False, bắt buộc phải dùng `is`',
+        'Vì 0.1 và 0.2 có kiểu khác nhau nên không so sánh trực tiếp được',
+      ],
+      answer: 1,
+      why: 'Đây không phải bug riêng của Python (JavaScript cũng cho `false`) mà là bản chất số thực nhị phân — 0.1 ở hệ thập phân là số vô hạn tuần hoàn khi đổi sang hệ nhị phân. Cách so sánh đúng: `math.isclose(a, b)`. Với tiền tệ/kế toán, dùng `decimal.Decimal("0.1")` để tính chính xác theo hệ thập phân thay vì float.',
+    },
   ],
   problems: [
     {
@@ -364,6 +393,159 @@ giá trị số thật (kể cả 0) để nói "đã tính, kết quả là 0" 
         why: '`sum(nums)` cộng dồn từng phần tử một, nên chi phí tuyến tính theo n. `len(nums)` là O(1) vì Python list lưu sẵn độ dài, không cần đếm.',
       },
       realWorld: 'Tính điểm trung bình/rating trung bình sản phẩm khi chưa có đánh giá nào — trả `None` để giao diện hiển thị "Chưa có đánh giá" thay vì crash server vì chia cho 0, hoặc hiển thị nhầm "0 sao" khi thực ra là chưa có dữ liệu.',
+    },
+    {
+      id: 'py-grid-first-cell',
+      title: 'Lưới 2 chiều và bẫy nhân danh sách',
+      en: 'Grid Init & The List-Multiplication Trap',
+      difficulty: 'Easy',
+      targetMinutes: 10,
+      entry: 'make_grid',
+      lang: 'python',
+      statement: `
+Viết hàm \`make_grid(rows, cols)\`:
+1. Tạo một lưới \`rows\` hàng × \`cols\` cột, mọi ô đều bằng \`0\`.
+2. Đánh dấu ô góc trên bên trái: \`grid[0][0] = 1\`.
+3. Trả về lưới đó.
+
+**Ví dụ**
+- \`make_grid(2, 3)\` → \`[[1, 0, 0], [0, 0, 0]]\`
+- \`make_grid(1, 1)\` → \`[[1]]\`
+
+> Bài này ngắn nhưng có một cái bẫy: cách viết "gọn" phổ biến nhất sẽ cho kết quả **sai hoàn toàn**
+> mà không hề báo lỗi. Nếu kết quả của bạn có nhiều hàng cùng bị đánh dấu \`1\`, hãy đọc lại phần
+> mutable/immutable của bài giảng.
+`,
+      starter: `def make_grid(rows, cols):\n    # Lưới rows x cols toàn số 0, sau đó đặt ô [0][0] = 1\n    \n`,
+      tests: [
+        { args: [2, 3], expected: [[1, 0, 0], [0, 0, 0]], name: '2 hàng 3 cột' },
+        { args: [1, 1], expected: [[1]], name: 'Lưới 1x1' },
+        { args: [3, 2], expected: [[1, 0], [0, 0], [0, 0]], name: '3 hàng — bẫy lộ rõ nhất ở đây' },
+        { args: [4, 1], expected: [[1], [0], [0], [0]], name: 'Một cột, nhiều hàng' },
+        { args: [1, 5], expected: [[1, 0, 0, 0, 0]], name: 'Một hàng, nhiều cột' },
+        { args: [3, 3], expected: [[1, 0, 0], [0, 0, 0], [0, 0, 0]], name: 'Lưới vuông' },
+      ],
+      hints: [
+        '`[0] * cols` tạo một hàng đúng như mong đợi, vì `0` là kiểu bất biến — nhân danh sách chỉ lặp lại GIÁ TRỊ.',
+        'Nhưng `[[0] * cols] * rows` thì khác: toán tử `*` lặp lại **cùng một tham chiếu** tới hàng đó `rows` lần. Bạn nhận được `rows` cái tên cùng trỏ tới MỘT list duy nhất — sửa một hàng là sửa tất cả.',
+        'Muốn mỗi hàng là một object riêng, phải TẠO MỚI ở mỗi vòng lặp: `[[0] * cols for _ in range(rows)]`. Sau đó mới `grid[0][0] = 1`.',
+      ],
+      diagnostics: [
+        { test: '\\]\\s*\\*\\s*rows|rows\\s*\\*\\s*\\[', message: 'Bạn đang nhân danh sách các hàng (`[[0] * cols] * rows`). Phép nhân này KHÔNG copy — nó lặp lại cùng một tham chiếu, nên mọi hàng thực chất là một list duy nhất. Dùng comprehension `[[0] * cols for _ in range(rows)]` để mỗi hàng là object riêng.' },
+      ],
+      approach: `
+Bài này kiểm tra đúng một điều: **bạn có thật sự hiểu "biến chỉ là cái tên gắn vào object" hay không.**
+
+\`\`\`python
+row = [0] * 3            # ĐÚNG: 0 là immutable, nhân danh sách chỉ lặp lại giá trị
+grid = [[0] * 3] * 2     # SAI: lặp lại cùng MỘT tham chiếu tới list con
+grid[0][0] = 1
+print(grid)              # [[1, 0, 0], [1, 0, 0]]  ← cả hai hàng cùng đổi!
+print(grid[0] is grid[1])  # True — chúng là CÙNG một object
+\`\`\`
+
+Toán tử \`*\` trên list không quan tâm phần tử là gì — nó chỉ sao chép **tham chiếu**. Với số nguyên,
+sao chép tham chiếu là vô hại vì bạn không bao giờ sửa được số \`0\` tại chỗ. Với list con (mutable),
+sao chép tham chiếu nghĩa là chia sẻ chung dữ liệu.
+
+**Cách đúng — dùng comprehension để buộc tạo object mới mỗi vòng:**
+
+\`\`\`python
+grid = [[0] * cols for _ in range(rows)]
+\`\`\`
+
+Dấu \`_\` là quy ước Python cho "biến này tôi không dùng tới, chỉ cần lặp đủ số lần".
+
+Đây cũng là cùng một bẫy với tham số mặc định mutable (\`def f(x=[])\`) mà bạn sẽ gặp ở module sau:
+gốc rễ chung là **một object được tạo một lần rồi bị dùng chung ở nhiều nơi**.
+`,
+      solution: `def make_grid(rows, cols):
+    grid = [[0] * cols for _ in range(rows)]
+    grid[0][0] = 1
+    return grid`,
+      complexity: {
+        question: 'Độ phức tạp thời gian của make_grid theo rows (r) và cols (c)?',
+        options: ['O(r)', 'O(c)', 'O(r × c) — phải khởi tạo từng ô của lưới', 'O(1) vì chỉ gán một ô'],
+        answer: 2,
+        why: 'Phải cấp phát và ghi giá trị 0 cho toàn bộ r × c ô. Việc gán `grid[0][0] = 1` chỉ là O(1) và không làm thay đổi bậc độ phức tạp. Bộ nhớ cũng là O(r × c).',
+      },
+      realWorld: 'Khởi tạo ma trận trạng thái cho game (bàn cờ, lưới va chạm), bảng quy hoạch động (DP table), buffer ảnh. Bug "nhân danh sách" ở đây rất nguy hiểm vì chương trình vẫn chạy trơn tru, chỉ có kết quả sai — thường chỉ lộ ra khi dữ liệu thật đủ lớn.',
+    },
+    {
+      id: 'py-wrap-index',
+      title: 'Chỉ số vòng tròn với số âm',
+      en: 'Circular Index',
+      difficulty: 'Easy',
+      targetMinutes: 8,
+      entry: 'wrap_index',
+      lang: 'python',
+      statement: `
+Một danh sách có \`n\` phần tử được coi là **vòng tròn**: đi quá cuối thì quay về đầu, đi lùi khỏi đầu thì
+vòng về cuối. Viết hàm \`wrap_index(i, n)\` trả về chỉ số hợp lệ trong khoảng \`[0, n)\` tương ứng với \`i\`
+(với \`n >= 1\`, \`i\` có thể âm hoặc lớn hơn \`n\`).
+
+**Ví dụ**
+- \`wrap_index(7, 3)\` → \`1\` (đi 7 bước trên vòng 3 phần tử)
+- \`wrap_index(-1, 5)\` → \`4\` (lùi 1 bước từ đầu thì về phần tử cuối)
+- \`wrap_index(-7, 3)\` → \`2\`
+
+> Nếu bạn đang định viết \`((i % n) + n) % n\` như trong JavaScript, hãy dừng lại và thử \`-7 % 3\`
+> trong Python trước.
+`,
+      starter: `def wrap_index(i, n):\n    # Trả về chỉ số trong khoảng [0, n)\n    \n`,
+      tests: [
+        { args: [0, 5], expected: 0, name: 'Chỉ số 0' },
+        { args: [4, 5], expected: 4, name: 'Chỉ số hợp lệ sẵn' },
+        { args: [5, 5], expected: 0, name: 'Đúng một vòng' },
+        { args: [7, 3], expected: 1, name: 'Vượt quá nhiều vòng' },
+        { args: [-1, 5], expected: 4, name: 'Lùi một bước — bẫy chính' },
+        { args: [-7, 3], expected: 2, name: 'Lùi nhiều vòng' },
+        { args: [-3, 3], expected: 0, name: 'Lùi đúng một vòng tròn' },
+        { args: [-100, 7], expected: 5, name: 'Số âm lớn' },
+      ],
+      hints: [
+        'Phép toán bạn cần là lấy dư `%`. Câu hỏi thật sự là: `%` trong Python xử lý số âm như thế nào?',
+        'Khác với JavaScript/C/Java (kết quả mang dấu của số BỊ chia), Python đảm bảo kết quả của `%` mang dấu của **số chia**. Vì `n` luôn dương nên `i % n` LUÔN nằm trong `[0, n)` — kể cả khi `i` âm.',
+        'Vậy toàn bộ lời giải chỉ là `return i % n`. Không cần `abs()`, không cần cộng thêm `n`, không cần `if i < 0`.',
+      ],
+      diagnostics: [
+        { test: '\\+\\s*n\\s*\\)\\s*%|abs\\s*\\(|if\\s+i\\s*<\\s*0', message: 'Bạn đang dùng công thức của JavaScript (`((i % n) + n) % n`), `abs()`, hoặc tự xử lý nhánh `i < 0`. Trong Python `%` với số chia dương đã LUÔN trả về kết quả không âm — hãy thử `print(-7 % 3)` để tự kiểm chứng.' },
+      ],
+      approach: `
+Đây là bài một dòng, nhưng nó tách bạch người "biết cú pháp Python" với người "hiểu ngữ nghĩa Python".
+
+Python định nghĩa \`//\` là **floor division** (làm tròn xuống, về phía âm vô cực) và bắt \`%\` phải nhất
+quán với nó qua bất biến:
+
+\`\`\`
+a == (a // b) * b + (a % b)
+\`\`\`
+
+Với \`a = -7, b = 3\`: \`-7 // 3 == -3\` (làm tròn xuống, không phải \`-2\`), nên \`-7 % 3 == -7 - (-3)*3 == 2\`.
+Kết quả luôn cùng dấu với **số chia** \`b\`.
+
+JavaScript/C/Java chọn quy ước ngược lại (cắt phần thập phân về 0), nên \`-7 % 3\` ở đó là \`-1\` — vì vậy
+lập trình viên JS phải viết \`((i % n) + n) % n\` để "sửa dấu". Mang thói quen đó sang Python không sai kết
+quả, nhưng là dấu hiệu rõ ràng của việc chưa hiểu ngôn ngữ đang dùng.
+
+\`\`\`python
+def wrap_index(i, n):
+    return i % n
+\`\`\`
+
+**Mở rộng đáng nhớ:** chính vì tính chất này mà Python cho phép \`lst[-1]\` lấy phần tử cuối một cách tự
+nhiên, và các thuật toán vòng tròn (hàng đợi vòng, đồng hồ, xoay mảng, băm nhất quán) viết bằng Python
+ngắn hơn hẳn.
+`,
+      solution: `def wrap_index(i, n):
+    return i % n`,
+      complexity: {
+        question: 'Độ phức tạp thời gian của wrap_index theo giá trị đầu vào i?',
+        options: ['O(1) — một phép lấy dư của phần cứng, không phụ thuộc độ lớn của i', 'O(i) vì phải trừ dần n cho tới khi vào khoảng hợp lệ', 'O(n)', 'O(log i)'],
+        answer: 0,
+        why: 'Phép `%` là một chỉ thị đơn của CPU (với số trong phạm vi máy), không phải vòng lặp trừ dần. Đây cũng là lý do nên dùng `%` thay vì viết `while i < 0: i += n` — cách viết vòng lặp đó là O(i/n) và sẽ treo với số âm rất lớn.',
+      },
+      realWorld: 'Hàng đợi vòng (circular buffer) trong xử lý âm thanh/streaming, chọn server tiếp theo theo round-robin, tính giờ trên đồng hồ 24h, xoay danh sách ảnh trong carousel, và consistent hashing khi phân phối dữ liệu qua nhiều node.',
     },
   ],
 },

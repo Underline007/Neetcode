@@ -176,6 +176,40 @@ __all__ = ["core_function", "CoreClass"]   # chỉ export đúng những gì li�
       answer: 0,
       why: 'Dấu `.` ở đầu đường dẫn import biểu thị "package hiện tại" (relative import) — dùng để tham chiếu tới các module anh em (sibling) nằm cùng package, thay vì phải ghi đường dẫn tuyệt đối đầy đủ từ gốc dự án.',
     },
+    {
+      q: 'Bạn tạo file `random.py` trong thư mục dự án để thử nghiệm. Sau đó một module khác chạy `import random` rồi gọi `random.randint(1, 10)`. Chuyện gì xảy ra?',
+      options: [
+        'Vẫn chạy đúng — Python luôn ưu tiên thư viện chuẩn',
+        'AttributeError: module `random` has no attribute `randint` — Python nạp NHẦM file của bạn',
+        'Python báo lỗi trùng tên module ngay khi bạn tạo file',
+        'Hai module được gộp lại, có đủ cả hàm của bạn lẫn của thư viện chuẩn',
+      ],
+      answer: 1,
+      why: 'Python tìm module theo thứ tự trong `sys.path`, mà phần tử đầu tiên thường là **thư mục chứa script đang chạy** — đứng TRƯỚC thư viện chuẩn. File của bạn thắng, và lỗi hiện ra ở một chỗ hoàn toàn không liên quan (`randint` không tồn tại), khiến việc truy vết rất mất thời gian. Cùng cơ chế đó gây ra bug kinh điển với `email.py`, `json.py`, `types.py`, `test.py`. Kiểm tra nhanh: `import random; print(random.__file__)`.',
+    },
+    {
+      q: 'File `config.py` có dòng `print("nap config")` ở cấp module. Một chương trình thực hiện `import config` ở ba file khác nhau. Dòng đó được in mấy lần?',
+      options: ['3 lần', '1 lần', '0 lần', 'Tuỳ vào thứ tự import'],
+      answer: 1,
+      why: 'Lần import đầu tiên, Python chạy toàn bộ code cấp module rồi lưu object module vào `sys.modules`. Mọi lần `import` sau đó chỉ **lấy lại từ cache**, không chạy lại gì cả. Hai hệ quả lớn: (1) module là **singleton tự nhiên** của Python — biến toàn cục trong module được cả chương trình dùng chung, đây là cách cài đặt cấu hình/kết nối database dùng chung; (2) mọi tác dụng phụ khi import (mở file, gọi mạng) chỉ xảy ra một lần, đúng lúc bạn không kiểm soát — vì vậy code cấp module nên chỉ định nghĩa, đừng làm việc.',
+    },
+    {
+      q: 'Module `mod.py` có `counter = 0` và hàm `inc()` làm `global counter; counter += 1`.\n\nfrom mod import counter, inc\ninc()\nprint(counter)\n\nIn ra gì?',
+      options: ['1', '0', 'None', 'NameError'],
+      answer: 1,
+      why: '`from mod import counter` **copy giá trị hiện tại vào một tên mới** trong module của bạn. `inc()` gán lại `mod.counter` bên trong module gốc, nhưng tên `counter` của bạn vẫn trỏ tới số `0` cũ — hai cái tên độc lập. Đây là lý do quy ước Python là `import mod` rồi dùng `mod.counter` khi giá trị có thể thay đổi: khi đó bạn luôn đọc qua object module, thấy đúng giá trị mới nhất. Với hàm và hằng số thì `from ... import ...` hoàn toàn ổn.',
+    },
+    {
+      q: '`a.py` có `import b` ở đầu file, `b.py` có `import a` ở đầu file. Chạy `python a.py` thì điều gì xảy ra?',
+      options: [
+        'Python lặp vô hạn cho tới khi tràn stack',
+        'Thường là `ImportError: cannot import name ... (most likely due to a circular import)` — vì `b` nhìn thấy `a` mới nạp một PHẦN',
+        'Python tự động sắp xếp lại thứ tự import và chạy bình thường',
+        'Cả hai module được nạp hai lần',
+      ],
+      answer: 1,
+      why: 'Python đưa module vào `sys.modules` **trước khi** chạy xong code của nó. Nên khi `b` gọi `import a`, nó nhận về một object `a` **chưa hoàn thiện** — chỉ có những tên đã kịp định nghĩa trước dòng `import b`. Không có vòng lặp vô hạn (nhờ cache), nhưng nếu `b` cần một tên chưa tồn tại thì lỗi. Cách sửa theo mức độ ưu tiên: tách phần dùng chung ra module thứ ba (đúng nhất), hoặc chuyển lệnh import vào trong hàm để nó chỉ chạy lúc gọi (giải pháp tình thế).',
+    },
   ],
   problems: [
     {
@@ -466,6 +500,261 @@ chính là lý do thực tế \`ModuleNotFoundError\` hay xảy ra: một thư m
         why: 'Vòng lặp duyệt qua từng phần của dotted_path đúng một lần, mỗi lần tra cứu khoá trong dict là thao tác trung bình O(1) — tổng chi phí tuyến tính theo số phần của đường dẫn.',
       },
       realWorld: 'Hiểu đúng cơ chế này giúp debug nhanh các lỗi `ModuleNotFoundError`/`ImportError` kinh điển trong dự án Python thực tế: thiếu `__init__.py` ở một thư mục trung gian, chạy script từ sai vị trí khiến `sys.path` không như mong đợi, hoặc nhầm giữa "absolute import" và "relative import" khi tái cấu trúc lại package.',
+    },
+    {
+      id: 'py-import-order-cycle',
+      title: 'Thứ tự nạp module và phát hiện import vòng',
+      en: 'Import Order & Cycle Detection',
+      difficulty: 'Medium',
+      targetMinutes: 18,
+      entry: 'import_order',
+      lang: 'python',
+      statement: `
+Cho \`deps\` là một \`dict\` mô tả dự án: khoá là tên module, giá trị là danh sách các module mà nó import.
+
+Viết hàm \`import_order(deps)\` trả về **một thứ tự nạp hợp lệ**: mọi module phải xuất hiện **sau** tất cả
+những module mà nó phụ thuộc. Nếu tồn tại **import vòng** (không có thứ tự nào hợp lệ), trả về \`None\`.
+
+**Quy tắc bắt buộc để kết quả là duy nhất:** khi có nhiều module cùng sẵn sàng để nạp, luôn chọn module
+có tên **nhỏ nhất theo thứ tự chữ cái**.
+
+Phụ thuộc không xuất hiện làm khoá trong \`deps\` được coi là **thư viện ngoài** — bỏ qua, không đưa vào
+kết quả.
+
+**Ví dụ**
+- \`{"main": ["utils", "models"], "models": ["utils"], "utils": []}\` → \`["utils", "models", "main"]\`
+- \`{"a": ["b"], "b": ["a"]}\` → \`None\` (import vòng)
+`,
+      starter: `def import_order(deps):\n    # Trả về danh sách thứ tự nạp, hoặc None nếu có import vòng\n    \n`,
+      tests: [
+        { args: [{ a: ['b'], b: [] }], expected: ['b', 'a'], name: 'Phụ thuộc đơn giản' },
+        { args: [{ a: ['b'], b: ['a'] }], expected: null, name: 'Import vòng hai module' },
+        { args: [{ a: [], b: [], c: ['a', 'b'] }], expected: ['a', 'b', 'c'], name: 'Hai module độc lập — thứ tự chữ cái' },
+        { args: [{}], expected: [], name: 'Dự án rỗng' },
+        { args: [{ a: [] }], expected: ['a'], name: 'Một module duy nhất' },
+        { args: [{ main: ['utils', 'models'], models: ['utils'], utils: [] }], expected: ['utils', 'models', 'main'], name: 'Cấu trúc dự án điển hình' },
+        { args: [{ a: ['a'] }], expected: null, name: 'Module tự import chính nó' },
+        { args: [{ x: ['y'], y: ['z'], z: [] }], expected: ['z', 'y', 'x'], name: 'Chuỗi ba tầng' },
+        { args: [{ app: ['os', 'json'] }], expected: ['app'], name: 'Thư viện ngoài — bỏ qua' },
+        { args: [{ a: ['b'], b: ['c'], c: ['a'], d: [] }], expected: null, name: 'Vòng ba module, có thêm module rời' },
+      ],
+      hints: [
+        'Đây chính là bài toán **sắp xếp topo** (topological sort) bạn đã gặp ở lộ trình thuật toán, chỉ đổi ngữ cảnh: đỉnh là module, cạnh `dep -> module` nghĩa là `dep` phải được nạp trước.',
+        'Thuật toán Kahn: đếm `indeg[m]` = số phụ thuộc (chỉ tính những phụ thuộc CÓ trong `deps`). Lấy dần các module có `indeg == 0`, mỗi lần lấy thì giảm bậc của những module phụ thuộc vào nó.',
+        'Để chọn module nhỏ nhất theo chữ cái ở mỗi bước, dùng `heapq` làm hàng đợi ưu tiên (`heappush`/`heappop`). Cuối cùng: nếu số module lấy ra ÍT HƠN tổng số module thì phần còn lại nằm trong vòng — trả về `None`.',
+      ],
+      diagnostics: [
+        { test: '\\.pop\\s*\\(\\s*0\\s*\\)(?![\\s\\S]*sort)', message: 'Dùng hàng đợi thường (`pop(0)`) sẽ cho ra một thứ tự hợp lệ nhưng KHÔNG xác định — đề yêu cầu luôn chọn tên nhỏ nhất theo chữ cái. Dùng `heapq`, hoặc sắp xếp lại danh sách sẵn sàng sau mỗi bước.' },
+        { test: 'return\\s+\\[\\s*\\]\\s*$(?![\\s\\S]*None)', message: 'Khi phát hiện import vòng, đề yêu cầu trả về `None` chứ không phải danh sách rỗng — vì `[]` là kết quả HỢP LỆ của một dự án không có module nào.' },
+        { test: 'sorted\\s*\\(\\s*deps\\s*\\)\\s*$', message: 'Sắp xếp tên module theo chữ cái KHÔNG giải được bài này: thứ tự nạp do quan hệ phụ thuộc quyết định, không phải do tên. Thứ tự chữ cái chỉ dùng để phá thế hoà khi nhiều module cùng sẵn sàng.',
+        },
+      ],
+      approach: `
+Import vòng không phải chuyện lạ — nó là hệ quả tự nhiên khi dự án lớn dần. Việc phát hiện nó **chính là**
+bài toán tìm chu trình trên đồ thị có hướng, và sắp xếp topo giải quyết cả hai câu hỏi cùng lúc: "nạp theo
+thứ tự nào?" và "có nạp được không?".
+
+\`\`\`python
+import heapq
+
+def import_order(deps):
+    indeg = {m: 0 for m in deps}
+    children = {m: [] for m in deps}
+
+    for module, imports in deps.items():
+        for dep in imports:
+            if dep not in deps:      # thư viện ngoài -> không phải đỉnh của đồ thị
+                continue
+            children[dep].append(module)
+            indeg[module] += 1
+
+    ready = [m for m in deps if indeg[m] == 0]
+    heapq.heapify(ready)             # hàng đợi ưu tiên -> luôn lấy tên nhỏ nhất
+
+    order = []
+    while ready:
+        module = heapq.heappop(ready)
+        order.append(module)
+        for child in children[module]:
+            indeg[child] -= 1
+            if indeg[child] == 0:
+                heapq.heappush(ready, child)
+
+    return order if len(order) == len(deps) else None
+\`\`\`
+
+**Vì sao "lấy được ít hơn tổng số" nghĩa là có vòng?** Vì mỗi module chỉ vào hàng đợi khi bậc phụ thuộc
+của nó về 0. Những module nằm trong một vòng luôn chờ nhau, bậc không bao giờ về 0, nên chúng không bao giờ
+được lấy ra. Đây là cách kiểm tra chu trình **rẻ nhất** — không cần thêm lần duyệt nào.
+
+**Ba chi tiết dễ mất điểm:**
+- \`{"a": ["a"]}\` (tự import) là một vòng độ dài 1: \`indeg["a"] == 1\` ngay từ đầu → trả \`None\`. Đúng như
+  Python thật, nơi \`import a\` bên trong chính \`a.py\` là dấu hiệu của lỗi cấu trúc.
+- Phụ thuộc ngoài (\`os\`, \`json\`) phải bị **loại khỏi đồ thị**, nếu không \`indeg\` sẽ đếm cả những đỉnh
+  không tồn tại và mọi module đều bị kẹt.
+- Trả \`None\` chứ không phải \`[]\`: \`[]\` là câu trả lời hợp lệ cho một dự án rỗng, nên hai trường hợp
+  không được lẫn vào nhau — đúng nguyên tắc "phân biệt *không có gì* với *không làm được*".
+
+**Ứng dụng ngược lại:** đảo chiều thuật toán này sẽ cho bạn thứ tự **gỡ cài đặt** an toàn, hay thứ tự chạy
+migration của database.
+`,
+      solution: `import heapq
+
+
+def import_order(deps):
+    indeg = {m: 0 for m in deps}
+    children = {m: [] for m in deps}
+
+    for module, imports in deps.items():
+        for dep in imports:
+            if dep not in deps:
+                continue
+            children[dep].append(module)
+            indeg[module] += 1
+
+    ready = [m for m in deps if indeg[m] == 0]
+    heapq.heapify(ready)
+
+    order = []
+    while ready:
+        module = heapq.heappop(ready)
+        order.append(module)
+        for child in children[module]:
+            indeg[child] -= 1
+            if indeg[child] == 0:
+                heapq.heappush(ready, child)
+
+    return order if len(order) == len(deps) else None`,
+      complexity: {
+        question: 'Độ phức tạp thời gian theo số module V và số quan hệ phụ thuộc E?',
+        options: [
+          'O(V log V + E) — mỗi module vào/ra heap một lần, mỗi cạnh được duyệt một lần',
+          'O(V × E) vì phải quét lại toàn bộ sau mỗi lần lấy module',
+          'O(V²) trong mọi trường hợp',
+          'O(E log E)',
+        ],
+        answer: 0,
+        why: 'Mỗi đỉnh được đẩy vào và lấy ra khỏi heap đúng một lần (mỗi thao tác O(log V)), và mỗi cạnh được xét đúng một lần khi giảm bậc → O(V log V + E). Nếu dùng hàng đợi thường thay cho heap thì còn O(V + E), nhưng ta đánh đổi hệ số log đó để lấy kết quả xác định theo thứ tự chữ cái.',
+      },
+      realWorld: 'Chính là thứ mà `pip` chạy để quyết định thứ tự cài đặt package, `make`/`bazel` dùng để dựng thứ tự biên dịch, công cụ migration database dùng để chạy đúng thứ tự, và các linter kiến trúc (`import-linter`) dùng để chặn import vòng ngay từ CI. Biết nó là một bài topo sort giúp bạn đọc thông báo lỗi của những công cụ này bằng con mắt khác.',
+    },
+    {
+      id: 'py-import-trace',
+      title: 'Mô phỏng sys.modules: code cấp module chạy khi nào?',
+      en: 'Simulating sys.modules Caching',
+      difficulty: 'Medium',
+      targetMinutes: 16,
+      entry: 'import_trace',
+      lang: 'python',
+      statement: `
+Cho \`graph\` là \`dict\` module → danh sách module nó import (theo đúng thứ tự viết trong file), và
+\`sequence\` là danh sách các module mà chương trình chính import lần lượt.
+
+Viết hàm \`import_trace(graph, sequence)\` trả về danh sách tên module theo đúng thứ tự **code cấp module
+của chúng thực sự được chạy**, mô phỏng chính xác cơ chế của Python:
+
+1. Khi nạp module \`M\`: nếu \`M\` **đã có trong cache** thì không làm gì cả.
+2. Ngược lại, **ghi vào cache TRƯỚC** (đúng như Python đưa module vào \`sys.modules\` trước khi chạy),
+   rồi nạp lần lượt từng phụ thuộc của nó, và **cuối cùng** mới tới lượt code của \`M\` chạy.
+3. Module không xuất hiện làm khoá trong \`graph\` coi như không có phụ thuộc nào.
+
+**Ví dụ**
+- \`graph = {"a": ["b"], "b": []}\`, \`sequence = ["a"]\` → \`["b", "a"]\`
+- \`graph = {"a": [], "b": []}\`, \`sequence = ["a", "b", "a"]\` → \`["a", "b"]\` (import lần hai không chạy lại)
+- \`graph = {"a": ["b"], "b": ["a"]}\`, \`sequence = ["a"]\` → \`["b", "a"]\` ← **đây là lý do import vòng không treo**
+`,
+      starter: `def import_trace(graph, sequence):\n    # Trả về thứ tự code cấp module thực sự chạy\n    \n`,
+      tests: [
+        { args: [{ a: ['b'], b: [] }, ['a']], expected: ['b', 'a'], name: 'Phụ thuộc chạy trước' },
+        { args: [{ a: [], b: [] }, ['a', 'b', 'a']], expected: ['a', 'b'], name: 'Import lần hai bị cache chặn' },
+        { args: [{ a: ['c'], b: ['c'], c: [] }, ['a', 'b']], expected: ['c', 'a', 'b'], name: 'Phụ thuộc chung chỉ chạy một lần' },
+        { args: [{}, []], expected: [], name: 'Không import gì' },
+        { args: [{ m: ['u', 'v'], u: [], v: ['u'] }, ['m']], expected: ['u', 'v', 'm'], name: 'Kim cương nhỏ' },
+        { args: [{ a: ['b'], b: ['a'] }, ['a']], expected: ['b', 'a'], name: 'Import vòng — bắt đầu từ a' },
+        { args: [{ a: ['b'], b: ['a'] }, ['b']], expected: ['a', 'b'], name: 'Import vòng — bắt đầu từ b' },
+        { args: [{ app: ['os'] }, ['app']], expected: ['os', 'app'], name: 'Module ngoài graph — không có phụ thuộc' },
+        { args: [{ a: ['b', 'c'], b: [], c: ['b'] }, ['a']], expected: ['b', 'c', 'a'], name: 'Thứ tự phụ thuộc được giữ nguyên' },
+      ],
+      hints: [
+        'Dùng đệ quy: hàm `load(m)` lo việc nạp một module, còn vòng lặp ngoài chỉ gọi `load` cho từng phần tử của `sequence`.',
+        'Giữ một `set` tên `seen` đóng vai `sys.modules`. Chi tiết quyết định toàn bộ bài: `seen.add(m)` phải nằm **TRƯỚC** vòng lặp nạp các phụ thuộc, không phải sau. Đặt sau sẽ gây đệ quy vô hạn ngay khi gặp import vòng.',
+        'Thứ tự append cũng quan trọng: `order.append(m)` nằm **sau** khi đã nạp xong mọi phụ thuộc — vì trong Python thật, các lệnh `import` nằm ở đầu file và phải chạy xong trước phần code còn lại của module.',
+      ],
+      diagnostics: [
+        { test: 'for\\s+dep[\\s\\S]{0,200}?seen\\.add', message: 'Bạn đang thêm module vào `seen` SAU khi nạp phụ thuộc. Với import vòng, module sẽ tự gọi lại chính nó và gây đệ quy vô hạn (RecursionError/timeout). Python đưa module vào `sys.modules` NGAY trước khi chạy code của nó — hãy làm đúng như vậy.' },
+        { test: 'order\\.append\\s*\\(\\s*m\\s*\\)[\\s\\S]{0,120}?for\\s+dep', message: 'Bạn ghi nhận module TRƯỚC khi nạp phụ thuộc của nó. Trong Python, các lệnh `import` ở đầu file chạy xong rồi mới tới phần thân module — nên phụ thuộc phải xuất hiện trước trong kết quả.' },
+      ],
+      approach: `
+Bài này biến một câu hỏi thường bị trả lời mơ hồ ("import vòng có bị lặp vô hạn không?") thành thứ bạn
+phải cài đặt chính xác.
+
+\`\`\`python
+def import_trace(graph, sequence):
+    seen = set()      # đóng vai sys.modules
+    order = []
+
+    def load(module):
+        if module in seen:        # (1) đã nạp -> lấy từ cache, không chạy lại
+            return
+        seen.add(module)          # (2) ĐÁNH DẤU TRƯỚC khi chạy — mấu chốt
+        for dep in graph.get(module, []):
+            load(dep)             # (3) các lệnh import ở đầu file chạy trước
+        order.append(module)      # (4) rồi mới tới phần thân module
+
+    for module in sequence:
+        load(module)
+    return order
+\`\`\`
+
+**Dòng \`seen.add\` đặt ở đâu quyết định tất cả.** Nếu đặt nó **sau** vòng lặp phụ thuộc, đồ thị \`a → b → a\`
+sẽ khiến \`a\` gọi \`b\`, \`b\` gọi lại \`a\`, và vì \`a\` chưa được đánh dấu nên vòng lặp không bao giờ dừng.
+Đặt **trước**, ta có đúng hành vi của Python: \`a\` gọi \`b\`, \`b\` gọi \`a\` và nhận về ngay một object
+\`a\` **mới nạp một phần** (partially initialized).
+
+Đây chính là lời giải thích cho thông báo lỗi bạn hay gặp:
+
+\`\`\`
+ImportError: cannot import name 'X' from partially initialized module 'a'
+(most likely due to a circular import)
+\`\`\`
+
+Python không treo — nó đưa cho bạn một module còn dang dở. Nếu tên \`X\` chưa kịp được định nghĩa (vì nó
+nằm **sau** dòng \`import b\` trong \`a.py\`), bạn nhận lỗi. Từ đó suy ra một mẹo chữa cháy đã trở thành
+kinh nghiệm phổ biến: chuyển lệnh import xuống **cuối file** hoặc **vào trong hàm** thì đôi khi hết lỗi —
+vì lúc đó tên cần thiết đã kịp tồn tại. Đó là vá triệu chứng; cách chữa gốc vẫn là tách phần dùng chung ra
+một module thứ ba.
+
+**Liên hệ với bài trước:** \`import_order\` cho bạn biết dự án **có** import vòng hay không;
+\`import_trace\` cho bạn biết Python **xử lý** vòng đó thế nào khi nó đã tồn tại.
+`,
+      solution: `def import_trace(graph, sequence):
+    seen = set()
+    order = []
+
+    def load(module):
+        if module in seen:
+            return
+        seen.add(module)
+        for dep in graph.get(module, []):
+            load(dep)
+        order.append(module)
+
+    for module in sequence:
+        load(module)
+
+    return order`,
+      complexity: {
+        question: 'Độ phức tạp thời gian theo số module V và số quan hệ import E?',
+        options: [
+          'O(V + E) — mỗi module được nạp thật đúng một lần, mỗi cạnh được xét một lần',
+          'O(V × E) vì mỗi lần import phải quét lại cache',
+          'O(2^V) khi có import vòng',
+          'O(V log V)',
+        ],
+        answer: 0,
+        why: 'Đây là DFS có đánh dấu: nhờ `seen` (kiểm tra O(1) trên set), mỗi module chỉ đi vào thân hàm `load` một lần và mỗi cạnh chỉ được duyệt một lần → O(V + E). Chính cơ chế cache này biến việc import từ nguy cơ bùng nổ tổ hợp thành tuyến tính — và cũng là thứ ngăn import vòng gây đệ quy vô hạn.',
+      },
+      realWorld: 'Hiểu đúng cơ chế này giúp bạn giải thích được: vì sao dòng `print` trong `settings.py` chỉ chạy một lần dù cả chục file import nó; vì sao biến toàn cục trong module trở thành singleton dùng chung toàn ứng dụng (kết nối database, cấu hình, logger); và vì sao đôi khi chuyển một lệnh `import` xuống trong hàm lại làm hết lỗi. Đây cũng là mô hình chung của mọi hệ thống nạp module — kể cả `require`/ESM của JavaScript.',
     },
   ],
 },
