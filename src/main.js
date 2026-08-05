@@ -117,6 +117,20 @@ function router() {
   updateChrome(path);
 }
 
+/** Nút "Sao chép" của mọi khối code (gắn một lần, bắt sự kiện nổi lên). */
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.code-copy');
+  if (!btn) return;
+  try {
+    await navigator.clipboard.writeText(btn.dataset.copy || '');
+    const old = btn.textContent;
+    btn.textContent = '✅ Đã sao chép';
+    setTimeout(() => { btn.textContent = old; }, 1400);
+  } catch {
+    toast('Trình duyệt chặn quyền truy cập clipboard — hãy bôi đen và Ctrl+C.');
+  }
+});
+
 function bindGlobalActions(root) {
   $$('[data-action="start-plan"]', root).forEach((btn) =>
     btn.addEventListener('click', () => {

@@ -6,6 +6,8 @@ import { runTests } from '../runner.js';
 import { md } from '../markdown.js';
 import { $, $$, esc, toast, diffClass, diffLabel } from '../ui.js';
 import { resolveLang, pick } from '../lang.js';
+import { createEditor } from '../editor.js';
+import { HINTS } from '../syntax-hints.js';
 
 const JS_DOMAIN = { problemById: jsProblemById, topicById: jsTopicById, basePath: '' };
 
@@ -31,8 +33,6 @@ export function renderProblem(id, domain = JS_DOMAIN) {
     lastResult: null,
     passedThisSession: false,
   };
-
-  const code = (isPy ? rec.codePy : rec.code) || pick(p, 'starter', lang);
 
   return `
     <div class="row">
@@ -86,19 +86,46 @@ export function renderProblem(id, domain = JS_DOMAIN) {
             <span class="spacer"></span>
             <button class="btn ghost small" id="reset-btn">Khôi phục code mẫu</button>
           </div>
-          <textarea class="editor" id="editor" spellcheck="false">${esc(code)}</textarea>
+          <div id="editor-mount"></div>
         </div>
 
         <div class="row" style="margin-top:12px">
           <button class="btn" id="run-btn">▶ Chạy &amp; chấm điểm</button>
           <span class="muted small">hoặc <span class="kbd">Ctrl</span> + <span class="kbd">Enter</span></span>
         </div>
+
+        ${cheatSheet(lang)}
         ${langLabel === 'Python' ? '<p class="muted small" style="margin:8px 0 0">Lần chạy Python đầu tiên trong phiên cần vài giây để tải môi trường (Pyodide, cần internet lần đầu) — các lần sau nhanh hơn nhiều.</p>' : ''}
 
         <div id="results" style="margin-top:14px"></div>
       </div>
     </div>
   `;
+}
+
+/** Bảng "cú pháp thường dùng": mỗi ô là một mẫu code bấm vào là chèn thẳng vào editor. */
+function cheatSheet(lang) {
+  const dict = HINTS[lang] || HINTS.python;
+  const title = lang === 'python' ? '🧩 Cú pháp Python thường dùng' : '🧩 Cú pháp JavaScript thường dùng';
+  return `
+    <details class="pane cheat-pane" style="margin-top:14px" open>
+      <summary class="pane-head">
+        <strong>${title}</strong>
+        <span class="spacer"></span>
+        <span class="muted small">bấm để chèn vào chỗ con trỏ</span>
+      </summary>
+      <div class="pane-body cheats">
+        ${dict.snippets.map((g, gi) => `
+          <div class="cheat-group">
+            <div class="cheat-title">${esc(g.group)}</div>
+            <div class="chips">
+              ${g.items.map((it, ii) => `<button type="button" class="chip" data-g="${gi}" data-i="${ii}"
+                 title="${esc(it.detail || '')}${it.doc ? ' — ' + esc(it.doc) : ''}">${esc(it.label)}</button>`).join('')}
+            </div>
+          </div>`).join('')}
+        <p class="muted small" style="margin:10px 0 0">Trong lúc gõ, bảng gợi ý tự hiện sau ký tự đầu tiên (hoặc bấm <span class="kbd">Ctrl</span>+<span class="kbd">Space</span>); <span class="kbd">Tab</span> để chọn, <span class="kbd">Esc</span> để đóng. Mỗi gợi ý kèm chữ ký hàm và giải thích ngắn.</p>
+      </div>
+    </details>`;
 }
 
 /* --------------------------- gắn sự kiện --------------------------- */
@@ -112,36 +139,38 @@ export function mountProblem(id, domain = JS_DOMAIN) {
   const hints = pick(p, 'hints', lang);
   const diagnostics = pick(p, 'diagnostics', lang) || [];
   const rec = store.problem(p.id);
-  const editor = $('#editor');
+
+  const editor = createEditor({
+    mount: $('#editor-mount'),
+    value: (isPy ? rec.codePy : rec.code) || starter,
+    lang,
+    onChange: (v) => {
+      if (isPy) rec.codePy = v; else rec.code = v;
+      store.save();
+    },
+    onRun: () => run(),
+  });
+
+  // bảng cú pháp: bấm một mẫu là chèn vào vị trí con trỏ
+  const dict = HINTS[lang] || HINTS.python;
+  $$('.cheats .chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const it = dict.snippets[+chip.dataset.g]?.items[+chip.dataset.i];
+      if (it) editor.insertSnippet(it.insert || it.label);
+    });
+  });
 
   // timer
   const timerEl = $('#timer');
   const tick = setInterval(() => {
-    if (!document.body.contains(timerEl)) { clearInterval(tick); return; }
+    if (!document.body.contains(timerEl)) { clearInterval(tick); editor.destroy(); return; }
     const s = Math.floor((Date.now() - session.startedAt) / 1000);
     timerEl.textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   }, 1000);
 
-  // Tab chèn 2 dấu cách thay vì nhảy focus
-  editor.addEventListener('keydown', (e) => {
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const s = editor.selectionStart, en = editor.selectionEnd;
-      editor.value = editor.value.slice(0, s) + '  ' + editor.value.slice(en);
-      editor.selectionStart = editor.selectionEnd = s + 2;
-    }
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); run(); }
-  });
-  editor.addEventListener('input', () => {
-    if (isPy) rec.codePy = editor.value; else rec.code = editor.value;
-    store.save();
-  });
-
   $('#reset-btn').addEventListener('click', () => {
     if (!confirm('Khôi phục về code mẫu? Code hiện tại sẽ mất.')) return;
     editor.value = starter;
-    if (isPy) rec.codePy = starter; else rec.code = starter;
-    store.save();
   });
 
   $('#run-btn').addEventListener('click', run);

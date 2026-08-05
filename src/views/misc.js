@@ -204,6 +204,20 @@ export function renderGuide() {
       <p>Xếp hạng: <strong>S</strong> ≥115% · <strong>A</strong> ≥100% · <strong>B</strong> ≥80% · <strong>C</strong> ≥60% · <strong>D</strong> còn lại (bắt buộc làm lại).</p>
       <p>Mức thành thạo mỗi chủ đề = 70% từ điểm bài tập + 30% từ quiz. <strong>Đạt 80% mới nên coi là xong một chủ đề.</strong></p>
 
+      <h2>Trình soạn thảo &amp; gợi ý cú pháp</h2>
+      <p>Ô viết code có tô màu cú pháp, đánh số dòng và <strong>bảng gợi ý</strong> kèm chữ ký hàm + giải thích tiếng Việt — đang học Python mà chưa thuộc <code>enumerate</code>, <code>defaultdict</code> hay <code>heappush</code> thì cứ gõ vài ký tự đầu là ra. Bên dưới ô code còn có bảng <em>"Cú pháp thường dùng"</em>: bấm một mẫu là chèn thẳng vào chỗ con trỏ.</p>
+      <table>
+        <thead><tr><th>Phím</th><th>Tác dụng</th></tr></thead>
+        <tbody>
+          <tr><td>Ctrl + Enter</td><td>Chạy &amp; chấm điểm</td></tr>
+          <tr><td>Ctrl + Space</td><td>Mở bảng gợi ý cú pháp bất cứ lúc nào</td></tr>
+          <tr><td>Tab / Enter</td><td>Chọn gợi ý đang sáng · Esc để đóng bảng</td></tr>
+          <tr><td>Tab / Shift + Tab</td><td>Thụt vào / thụt ra (Python 4 dấu cách, JS 2) — bôi đen nhiều dòng thì áp dụng cả khối</td></tr>
+          <tr><td>Enter</td><td>Tự giữ thụt lề; sau dấu <code>:</code> tự thụt vào, sau <code>return</code>/<code>break</code>/<code>continue</code> tự thụt ra</td></tr>
+        </tbody>
+      </table>
+      <p>Ngoặc và nháy tự đóng theo cặp; bôi đen rồi gõ <code>(</code> sẽ bọc vùng đang chọn. Ctrl + Z hoàn tác vẫn hoạt động bình thường.</p>
+
       <h2>Ôn tập ngắt quãng</h2>
       <p>Sau khi giải xong, mỗi bài được lên lịch ôn lại theo thuật toán SM-2 rút gọn: lần đầu sau 1 ngày, rồi 3 ngày, rồi giãn dần theo chất lượng bạn làm được. Bài điểm thấp sẽ quay lại sớm hơn. Đây là phần <strong>quyết định</strong> bạn còn nhớ gì sau 30 ngày — đừng bỏ qua.</p>
 
