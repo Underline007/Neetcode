@@ -263,6 +263,16 @@ const COMMON_RULES = [
       + 'thì vấn đề là độ phức tạp: hãy tìm cách bỏ bớt một vòng lặp (thường bằng `Map`/`Set`).',
   },
   {
+    key: 'pyodide-load',
+    test: /Failed to fetch dynamically imported module|pyodide|NetworkError when attempting to fetch|Failed to load .*wasm/i,
+    title: () => 'Không tải được môi trường chạy Python.',
+    why: 'Bài Python được chấm bằng CPython thật biên dịch sang WebAssembly (Pyodide), và bộ đó được tải từ '
+      + 'Internet ở **lần chạy đầu tiên của mỗi phiên**. Không có mạng — hoặc mạng chặn CDN — thì không tải được. '
+      + 'Bài JavaScript không cần Internet nên vẫn chạy bình thường.',
+    fix: 'Kiểm tra kết nối mạng rồi bấm chạy lại (lần sau trình duyệt đã lưu cache nên nhanh hơn nhiều). '
+      + 'Đang offline thì chuyển công tắc sang **🟨 JavaScript** để học tiếp — toàn bộ bài thuật toán đều có bản JavaScript.',
+  },
+  {
     key: 'entry-missing',
     test: /Không tìm thấy hàm/,
     title: () => 'Hệ thống chấm bài không tìm thấy hàm cần nộp.',

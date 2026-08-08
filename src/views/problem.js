@@ -717,13 +717,21 @@ function errorBlock(message, errorLine, lang, problemId, code) {
   if (ex) store.logError(ex.key, problemId);
   const srcLine = lineOf(code, errorLine);
 
+  // Không nhận ra loại lỗi và cũng không biết dòng nào -> chỉ có thông báo gốc để hiện,
+  // mà nơi gọi đã nói "❌ Lỗi khi chạy" rồi. Đừng lặp lại tiêu đề đó lần nữa.
+  if (!ex && !errorLine) {
+    return `<div class="card err-explain" style="margin-top:10px">
+      <pre class="mono small" style="white-space:pre-wrap;margin:0;color:var(--bad)">${esc(message)}</pre>
+    </div>`;
+  }
+
   return `<div class="card err-explain" style="margin-top:10px">
     ${ex ? `
       <div class="row"><strong>🧭 Lỗi này nghĩa là gì?</strong></div>
       <p class="small" style="margin:6px 0 10px">${md(ex.title).replace(/^<p>|<\/p>$/g, '')}</p>
       <div class="hint"><strong>Vì sao xảy ra.</strong> ${md(ex.why).replace(/^<p>|<\/p>$/g, '')}</div>
       <div class="hint" style="border-left-color:var(--ok)"><strong>Sửa thế nào.</strong> ${md(ex.fix).replace(/^<p>|<\/p>$/g, '')}</div>`
-      : '<div class="row"><strong>❌ Lỗi khi chạy</strong></div>'}
+      : ''}
     ${errorLine ? `
       <div class="err-line">
         <button class="btn ghost tiny" data-goto-line="${errorLine}">Nhảy tới dòng ${errorLine}</button>
