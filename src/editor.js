@@ -362,6 +362,21 @@ export function createEditor({ mount, value = '', lang = 'python', onChange, onR
     get value() { return ta.value; },
     set value(v) { replaceRange(0, ta.value.length, v, 0); },
     focus() { ta.focus(); },
+    /** Đưa con trỏ về đầu phần code của dòng thứ n (1-based) và cuộn tới đó.
+     *  Dùng khi bấm "Nhảy tới dòng N" ở thẻ giải thích lỗi. */
+    gotoLine(n) {
+      const lines = ta.value.split('\n');
+      const row = Math.max(1, Math.min(lines.length, Math.floor(n))) - 1;
+      let pos = 0;
+      for (let i = 0; i < row; i++) pos += lines[i].length + 1;
+      pos += indentOf(lines[row] || '').length;   // bỏ qua phần thụt lề, con trỏ vào đúng chữ đầu
+      ta.focus();
+      ta.setSelectionRange(pos, pos);
+      // đưa dòng đó vào khoảng giữa vùng nhìn thấy
+      ta.scrollTop = Math.max(0, (row + 0.5) * LINE_H - ta.clientHeight / 2);
+      syncScroll();
+      updatePos();
+    },
     /** Chèn một mẫu code tại con trỏ (dùng cho bảng "Cú pháp thường dùng"). */
     insertSnippet(text) {
       ta.focus();

@@ -80,6 +80,7 @@ const PY_BUILTINS = [
   item('chr', 'fn', 'chr(97) -> "a"', 'Mã Unicode -> ký tự', 'chr($|)'),
   item('input', 'fn', 'input(prompt)', 'Đọc một dòng từ bàn phím', 'input($|)'),
   item('float("inf")', 'fn', 'float("inf") | float("-inf")', 'Vô cực — giá trị khởi tạo cho bài tìm min/max'),
+  item('trace', 'fn', 'trace(i=i, l=l, r=r)', 'Theo dõi biến: mỗi lần gọi ghi một bước vào bảng "Theo dõi biến" bên dưới kết quả', 'trace($|)'),
 ];
 
 const PY_MODULES = [
@@ -200,6 +201,14 @@ const PY_SNIPPETS = [
       item('sắp xếp theo khoá', 'snip', 'arr.sort(key=lambda x: x[1])', 'Sắp xếp theo trường bất kỳ, đảo bằng reverse=True', 'sort(key=lambda x: $|)'),
     ],
   },
+  {
+    group: 'Gỡ lỗi',
+    items: [
+      item('theo dõi biến', 'snip', 'trace(i=i, l=l, r=r)', 'Ghi lại giá trị các biến ở bước này — hiện thành bảng bên dưới kết quả chạy', 'trace($|)'),
+      item('theo dõi có nhãn', 'snip', 'trace("sau khi dịch", l=l, r=r)', 'Đặt tên cho bước để dễ đọc bảng theo dõi', 'trace("$|", )'),
+      item('in ra để xem', 'snip', 'print(x)', 'Log của mỗi test được hiện riêng, không trộn lẫn', 'print($|)'),
+    ],
+  },
 ];
 
 /* ============================== JAVASCRIPT ============================== */
@@ -227,6 +236,7 @@ const JS_BUILTINS = [
   item('Map', 'fn', 'new Map()', 'Bảng băm giữ mọi kiểu khoá', 'new Map($|)'),
   item('Set', 'fn', 'new Set()', 'Tập hợp không trùng lặp', 'new Set($|)'),
   item('Array.from', 'fn', 'Array.from({length: n}, () => 0)', 'Tạo mảng có sẵn giá trị', 'Array.from({ length: $| }, () => 0)'),
+  item('trace', 'fn', 'trace({ i, l, r })', 'Theo dõi biến: mỗi lần gọi ghi một bước vào bảng "Theo dõi biến" bên dưới kết quả', 'trace({ $| })'),
 ];
 
 const JS_MEMBERS = [
@@ -264,6 +274,14 @@ const JS_SNIPPETS = [
       item('mảng khởi tạo', 'snip', 'new Array(n).fill(0)', 'Mảng n phần tử', 'new Array($|).fill(0)'),
       item('mảng 2 chiều', 'snip', 'Array.from({length: n}, () => Array(m).fill(0))', 'Không dùng fill([]) — chung tham chiếu!', 'Array.from({ length: $| }, () => new Array(m).fill(0))'),
       item('đếm bằng Map', 'snip', 'cnt.set(x, (cnt.get(x) ?? 0) + 1)', 'Đếm tần suất', 'cnt.set($|, (cnt.get($|) ?? 0) + 1)'),
+    ],
+  },
+  {
+    group: 'Gỡ lỗi',
+    items: [
+      item('theo dõi biến', 'snip', 'trace({ i, l, r })', 'Ghi lại giá trị các biến ở bước này — hiện thành bảng bên dưới kết quả chạy', 'trace({ $| })'),
+      item('theo dõi có nhãn', 'snip', 'trace("sau khi dịch", { l, r })', 'Đặt tên cho bước để dễ đọc bảng theo dõi', 'trace("$|", {  })'),
+      item('in ra để xem', 'snip', 'console.log(x)', 'Log của mỗi test được hiện riêng, không trộn lẫn', 'console.log($|)'),
     ],
   },
 ];

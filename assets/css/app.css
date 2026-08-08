@@ -340,6 +340,64 @@ pre.hl .cl:hover { background: color-mix(in srgb, var(--accent) 7%, transparent)
 .test.fail { border-color: color-mix(in srgb, var(--bad) 55%, transparent); }
 .test .k { color: var(--muted); font-size: 12px; }
 .test pre { margin: 4px 0 0; font-family: var(--mono); font-size: 12.5px; white-space: pre-wrap; word-break: break-word; }
+.test.running { opacity: .55; }
+.test.just-ran { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
+
+/* ---------- Gỡ lỗi: chạy 1 test · chạy thử · log · theo dõi biến ---------- */
+.btn.tiny { padding: 2px 8px; font-size: 11.5px; border-radius: 8px; font-weight: 650; }
+
+.note-area {
+  width: 100%; box-sizing: border-box; resize: vertical; min-height: 90px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px; font-family: var(--sans); font-size: 13.5px;
+  line-height: 1.55;
+}
+.note-area.mono { font-family: var(--mono); font-size: 12.5px; min-height: 0; }
+.note-area:focus { outline: none; border-color: var(--accent); }
+
+.scratch-pane > summary, .cheat-pane > summary { cursor: pointer; }
+.out-val { margin: 8px 0 0 !important; padding: 8px 10px; background: var(--bg); border-radius: 8px; white-space: pre-wrap; word-break: break-word; }
+
+/* log của riêng một test */
+.logs { margin-top: 8px; border-top: 1px dashed var(--border); padding-top: 6px; }
+.logs .k { color: var(--muted); font-size: 11.5px; }
+.logs pre {
+  margin: 3px 0 0; font-family: var(--mono); font-size: 12px; white-space: pre-wrap;
+  word-break: break-word; max-height: 150px; overflow: auto; color: var(--t-str);
+}
+
+/* bảng theo dõi biến */
+.trace-card { margin-top: 10px; }
+.trace-wrap { max-height: 320px; overflow: auto; margin-top: 8px; border: 1px solid var(--border); border-radius: 10px; }
+table.trace { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+table.trace th, table.trace td {
+  padding: 3px 8px; text-align: left; border-bottom: 1px solid var(--border);
+  white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis;
+}
+table.trace thead th {
+  position: sticky; top: 0; z-index: 1; background: var(--panel-2);
+  color: var(--accent); font-weight: 700; font-size: 11.5px;
+}
+table.trace tbody tr:hover td { background: var(--panel-2); }
+table.trace .step, table.trace th.step { width: 34px; color: var(--muted); text-align: right; }
+table.trace .lbl { color: var(--muted); font-family: var(--sans); }
+table.trace td.chg { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--text); font-weight: 650; }
+.chg-demo { background: color-mix(in srgb, var(--warn) 22%, transparent); padding: 0 4px; border-radius: 4px; }
+
+/* thẻ giải thích lỗi tiếng Việt */
+.err-explain { border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
+.err-line {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px;
+  padding: 7px 10px; background: var(--bg); border-radius: 9px; border: 1px solid var(--border);
+}
+.err-line code { font-family: var(--mono); font-size: 12.5px; color: var(--t-kw); overflow-x: auto; }
+.raw-err { margin-top: 10px; }
+.raw-err > summary { cursor: pointer; }
+.raw-err pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; color: var(--bad); }
+
+/* đánh dấu bài + điều hướng trước/sau */
+.mark-btn.marked { border-color: var(--warn); color: var(--warn); }
+.prob-nav { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--border); }
 
 .hint {
   border: 1px solid var(--border); border-left: 3px solid var(--accent-2);
