@@ -12,7 +12,9 @@ import { renderQuiz, mountQuiz } from './views/quiz.js';
 import { renderReview, renderStats, mountStats, renderGuide } from './views/misc.js';
 import { renderPythonHome } from './views/python.js';
 import { renderNotebook, mountNotebook } from './views/notebook.js';
+import { renderCheatsheet, mountCheatsheet, renderDrill, mountDrill } from './views/reference.js';
 import { buildIndex, searchIndex } from './search.js';
+import { dueCount } from './drill.js';
 
 /** 18 chủ đề thuật toán + 5 module Python nằm CHUNG một không gian id (mỗi bài tập/chủ
  *  đề thuật toán có thể mang thêm field "...Py" để trở thành song ngữ — xem lang.js).
@@ -91,6 +93,8 @@ const routes = [
   { re: /^\/quiz\/([\w-]+)$/, render: (m) => renderQuiz(m[1], DETAIL_DOMAIN), mount: (m) => mountQuiz(m[1], DETAIL_DOMAIN) },
   { re: /^\/review$/, render: () => renderReview() },
   { re: /^\/notebook$/, render: () => renderNotebook(), mount: () => mountNotebook(document) },
+  { re: /^\/cheatsheet$/, render: () => renderCheatsheet(), mount: () => mountCheatsheet() },
+  { re: /^\/drill$/, render: () => renderDrill(), mount: () => mountDrill() },
   { re: /^\/stats$/, render: () => renderStats(), mount: () => mountStats(document) },
   { re: /^\/guide$/, render: () => renderGuide() },
 ];
@@ -275,6 +279,11 @@ function updateChrome(path) {
   const badge = $('#due-badge');
   badge.textContent = due;
   badge.classList.toggle('hidden', due === 0);
+
+  const cards = dueCount(st);
+  const cardBadge = $('#card-badge');
+  cardBadge.textContent = cards;
+  cardBadge.classList.toggle('hidden', cards === 0);
 
   $$('#nav a').forEach((a) => {
     const route = a.dataset.route;

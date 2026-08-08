@@ -9,6 +9,7 @@ import { resolveLang, pick } from '../lang.js';
 import { createEditor } from '../editor.js';
 import { HINTS } from '../syntax-hints.js';
 import { explainError, explainTimeout } from '../error-vi.js';
+import { syntaxSectionsHtml } from './reference.js';
 
 const JS_DOMAIN = { problemById: jsProblemById, topicById: jsTopicById, basePath: '' };
 
@@ -57,8 +58,26 @@ export function renderProblem(id, domain = JS_DOMAIN) {
       ${rec.srs?.due ? `<span class="badge">${nextDueLabel(rec.srs)}</span>` : ''}
       <button class="btn ghost small mark-btn${marked ? ' marked' : ''}" id="mark-btn"
               title="Đánh dấu để xem lại — xuất hiện trong mục Sổ tay">${marked ? '⭐ Đã đánh dấu' : '☆ Đánh dấu'}</button>
+      <button class="btn ghost small" id="ref-btn" title="Mở bảng tra cứu cú pháp mà không rời bài">🔎 Tra cứu</button>
       <span class="spacer"></span>
       <span class="muted small" id="timer">00:00</span>
+    </div>
+
+    <div id="ref-drawer" class="ref-drawer hidden" aria-label="Tra cứu cú pháp">
+      <div class="ref-panel">
+        <div class="pane-head">
+          <strong>🔎 Tra cứu cú pháp ${langLabel}</strong>
+          <span class="spacer"></span>
+          <button class="btn ghost small" id="ref-close">Đóng ✕</button>
+        </div>
+        <div class="pane-body">
+          <input id="ref-q" class="search-input" type="search" autocomplete="off"
+                 placeholder="🔍 Gõ không dấu: &quot;dem tan suat&quot;, &quot;hang doi&quot;, &quot;sap xep&quot;…" />
+          <div id="ref-body" style="margin-top:12px"></div>
+          <p class="muted small">Cần cả bảng cấu trúc dữ liệu và đối chiếu JS ↔ Python:
+            <a href="#/cheatsheet">mở trang Tra cứu nhanh</a>.</p>
+        </div>
+      </div>
     </div>
 
     <h1 style="margin-top:12px">${esc(p.title)}</h1>
@@ -246,6 +265,23 @@ export function mountProblem(id, domain = JS_DOMAIN) {
     markBtn.textContent = on ? '⭐ Đã đánh dấu' : '☆ Đánh dấu';
     toast(on ? 'Đã đánh dấu — xem lại ở mục 📔 Sổ tay.' : 'Đã bỏ đánh dấu.');
   });
+
+  /* ----- panel tra cứu trượt ra, không phải rời bài ----- */
+  const drawer = $('#ref-drawer');
+  const refBody = $('#ref-body');
+  const refQ = $('#ref-q');
+  const drawRef = () => { refBody.innerHTML = syntaxSectionsHtml(lang, refQ.value); };
+
+  $('#ref-btn').addEventListener('click', () => {
+    drawer.classList.remove('hidden');
+    if (!refBody.innerHTML) drawRef();
+    refQ.focus();
+  });
+  const closeRef = () => drawer.classList.add('hidden');
+  $('#ref-close').addEventListener('click', closeRef);
+  drawer.addEventListener('mousedown', (e) => { if (e.target === drawer) closeRef(); });
+  refQ.addEventListener('input', drawRef);
+  refQ.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeRef(); });
 
   /* ----- ghi chú ----- */
   const noteEl = $('#note');

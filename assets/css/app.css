@@ -462,6 +462,68 @@ table.trace td.chg { background: color-mix(in srgb, var(--warn) 22%, transparent
   background: var(--bg-soft); color: var(--muted); font-size: 11.5px;
 }
 
+/* ---------- Tra cứu nhanh ---------- */
+.cs-table-wrap { overflow-x: auto; }
+table.cs-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.cs-table th, table.cs-table td {
+  padding: 7px 10px; text-align: left; vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+table.cs-table thead th {
+  color: var(--accent); font-size: 11.5px; font-weight: 750;
+  text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+}
+table.cs-table tbody tr:last-child td { border-bottom: 0; }
+table.cs-table tbody tr:hover td { background: var(--panel-2); }
+table.cs-table code {
+  font-family: var(--mono); font-size: 12.5px; color: var(--t-prop);
+  word-break: break-word;
+}
+.big-o {
+  font-family: var(--mono); font-size: 12.5px; font-weight: 700; color: var(--warn); white-space: nowrap;
+}
+table.cs-table.xlang td:nth-child(1) { min-width: 150px; }
+table.cs-table.syn .syn-name code { color: var(--t-fn); font-weight: 650; white-space: nowrap; }
+table.cs-table.syn .syn-sig code { color: var(--t-str); }
+/* đủ rộng cho chữ "✅ Đã sao chép" để dòng không bị giãn cao khi bấm */
+table.cs-table.syn .syn-copy { width: 104px; text-align: right; }
+table.cs-table.syn .syn-copy .code-copy { white-space: nowrap; font-size: 11.5px; }
+
+.cs-ds > summary { cursor: pointer; display: flex; align-items: center; gap: 10px; }
+.cs-ds > summary::marker { color: var(--muted); }
+.cs-ds h4 { margin: 14px 0 6px; font-size: 13.5px; }
+.cs-pitfalls { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.65; }
+.cs-pitfalls li { margin: 5px 0; }
+
+/* panel tra cứu trượt ra trong trang làm bài */
+.ref-drawer { position: fixed; inset: 0; z-index: 80; background: rgba(0, 0, 0, .45); display: flex; justify-content: flex-end; }
+.ref-panel {
+  width: min(560px, 100%); height: 100%; overflow-y: auto;
+  background: var(--panel); border-left: 1px solid var(--accent);
+  box-shadow: -18px 0 44px rgba(0, 0, 0, .4);
+}
+.ref-panel .pane-head { position: sticky; top: 0; z-index: 1; background: var(--panel); }
+.ref-panel h2 { font-size: 16px; margin: 18px 0 6px; }
+.ref-panel h3 { font-size: 13.5px; margin: 14px 0 6px; }
+
+/* ---------- Luyện nhớ (thẻ ghi nhớ) ---------- */
+.deck-card { cursor: pointer; transition: border-color .12s ease, transform .12s ease; }
+.deck-card:hover { transform: translateY(-2px); }
+.deck-card.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+
+.flashcard { padding: 22px 24px; }
+.fc-front { font-size: 17px; line-height: 1.6; margin: 18px 0 4px; }
+.fc-front em { color: var(--accent); font-style: normal; font-weight: 600; }
+.fc-back { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border); }
+.fc-answer { margin-bottom: 10px; }
+.fc-answer code {
+  font-family: var(--mono); font-size: 20px; font-weight: 700; color: var(--t-fn);
+  background: var(--bg); padding: 5px 12px; border-radius: 9px; display: inline-block;
+}
+.fc-back .md p:first-child { margin-top: 0; }
+.fc-grades { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+.fc-grades .btn:hover { border-color: var(--accent); }
+
 /* ---------- Sổ tay ---------- */
 .err-stat { border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
 .note-card { display: flex; flex-direction: column; }
