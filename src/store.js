@@ -1,12 +1,20 @@
 /**
  * Lưu trữ tiến độ học tập trong localStorage.
  * Toàn bộ dữ liệu nằm dưới 1 key duy nhất -> dễ export/import.
+ *
+ * Cấu hình đồng bộ đa máy (địa chỉ Worker + mã đồng bộ) nằm ở một key RIÊNG:
+ * nó mang tính bí mật và gắn với từng máy, nên không được lẫn vào tiến độ khi
+ * xuất file hay đẩy lên máy chủ.
  */
+import { mergeState, summarizeMerge } from './sync-merge.js';
+
 const KEY = 'neetcode30:v1';
+const SYNC_KEY = 'neetcode30:sync:v1';
 
 const EMPTY = () => ({
   version: 1,
   createdAt: Date.now(),
+  updatedAt: Date.now(),    // lần sửa gần nhất — dùng khi gộp dữ liệu giữa các máy
   startedAt: null,          // ngày bắt đầu lộ trình 30 ngày
   xp: 0,
   streak: { count: 0, lastDay: null },
@@ -38,11 +46,27 @@ function load() {
 
 let saveTimer = null;
 function persist() {
+  state.updatedAt = Date.now();
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* quota */ }
   }, 120);
 }
+
+/** Báo cho thanh bên (và bộ đồng bộ tự động) rằng tiến độ vừa đổi. */
+function notifyChanged() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('progress-changed'));
+}
+
+function loadSyncConfig() {
+  try {
+    return { url: '', code: '', auto: true, lastAt: null, version: 0, ...JSON.parse(localStorage.getItem(SYNC_KEY) || '{}') };
+  } catch {
+    return { url: '', code: '', auto: true, lastAt: null, version: 0 };
+  }
+}
+
+let syncConfig = loadSyncConfig();
 
 export const store = {
   get: () => state,
@@ -116,7 +140,7 @@ export const store = {
     this.touchStreak();
     persist();
     // báo cho thanh bên cập nhật ngay, không đợi chuyển trang
-    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('progress-changed'));
+    notifyChanged();
     return state.xp;
   },
 
@@ -168,10 +192,48 @@ export const store = {
 
   export() { return JSON.stringify(state, null, 2); },
 
-  import(json) {
-    const parsed = JSON.parse(json);
-    state = { ...EMPTY(), ...parsed };
+  /** Bản sao state để đẩy lên máy chủ đồng bộ (không kèm cấu hình sync). */
+  snapshot() { return JSON.parse(JSON.stringify(state)); },
+
+  /**
+   * Nhập tiến độ từ nơi khác.
+   * Mặc định là GỘP: giữ lại mọi thứ tốt nhất của cả hai bên. Chỉ dùng
+   * mode 'replace' khi người dùng cố ý muốn ghi đè (ví dụ khôi phục bản sao lưu).
+   */
+  import(json, { mode = 'merge' } = {}) {
+    const parsed = typeof json === 'string' ? JSON.parse(json) : json;
+    if (!parsed || typeof parsed !== 'object') throw new Error('Dữ liệu không hợp lệ');
+    if (mode === 'replace') {
+      state = { ...EMPTY(), ...parsed };
+      persist();
+      notifyChanged();
+      return { newProblems: 0, newSolved: 0, xpGained: 0 };
+    }
+    return this.mergeRemote(parsed);
+  },
+
+  /** Gộp một bản state đến từ máy khác vào state hiện tại. */
+  mergeRemote(remote) {
+    const before = this.snapshot();
+    state = mergeState({ ...EMPTY(), ...state }, { ...EMPTY(), ...remote });
     persist();
+    notifyChanged();
+    return summarizeMerge(before, state);
+  },
+
+  /* ----------------------- cấu hình đồng bộ đa máy ----------------------- */
+
+  sync: {
+    get: () => ({ ...syncConfig }),
+    set(patch) {
+      syncConfig = { ...syncConfig, ...patch };
+      try { localStorage.setItem(SYNC_KEY, JSON.stringify(syncConfig)); } catch { /* quota */ }
+      return { ...syncConfig };
+    },
+    clear() {
+      syncConfig = { url: '', code: '', auto: true, lastAt: null, version: 0 };
+      try { localStorage.removeItem(SYNC_KEY); } catch { /* ignore */ }
+    },
   },
 
   setTheme(t) { state.theme = t; persist(); },

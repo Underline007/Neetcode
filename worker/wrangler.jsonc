@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "neetcode30-sync",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-07",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Tạo namespace rồi dán id vào đây:
+  //   npx wrangler kv namespace create PROGRESS
+  "kv_namespaces": [
+    {
+      "binding": "PROGRESS",
+      "id": "<DÁN_KV_NAMESPACE_ID_VÀO_ĐÂY>"
+    }
+  ],
+
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 }
+  }
+}

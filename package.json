@@ -6,7 +6,8 @@
   "scripts": {
     "start": "python -m http.server 8000",
     "dev": "python -m http.server 8000",
-    "verify": "node tools/verify.mjs"
+    "verify": "node tools/verify.mjs",
+    "test:sync": "node tools/test-merge.mjs && node tools/test-sync-worker.mjs && node tools/test-sync-e2e.mjs"
   },
   "keywords": ["algorithms", "neetcode", "leetcode", "interview", "vietnamese"],
   "license": "MIT"

@@ -15,6 +15,7 @@ import { renderNotebook, mountNotebook } from './views/notebook.js';
 import { renderCheatsheet, mountCheatsheet, renderDrill, mountDrill } from './views/reference.js';
 import { buildIndex, searchIndex } from './search.js';
 import { dueCount } from './drill.js';
+import { startAutoSync } from './sync.js';
 
 /** 18 chủ đề thuật toán + 5 module Python nằm CHUNG một không gian id (mỗi bài tập/chủ
  *  đề thuật toán có thể mang thêm field "...Py" để trở thành song ngữ — xem lang.js).
@@ -294,4 +295,19 @@ function updateChrome(path) {
 
 window.addEventListener('hashchange', router);
 window.addEventListener('progress-changed', () => updateChrome(currentPath()));
+
+/* --------------------- đồng bộ tiến độ giữa nhiều máy --------------------- */
+window.addEventListener('sync-applied', (e) => {
+  const { newSolved = 0, xpGained = 0 } = e.detail || {};
+  const parts = [];
+  if (newSolved > 0) parts.push(`${newSolved} bài đã giải`);
+  if (xpGained > 0) parts.push(`+${xpGained} điểm`);
+  toast(parts.length ? `Đã nhận tiến độ từ máy khác: ${parts.join(' · ')}.` : 'Đã đồng bộ tiến độ.');
+
+  // Vẽ lại trang để số liệu khớp ngay — trừ trang làm bài, vì render lại sẽ
+  // xoá mất code người học đang gõ dở.
+  if (!currentPath().startsWith('/problem/')) router();
+});
+
 router();
+startAutoSync();

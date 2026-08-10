@@ -4,6 +4,7 @@ import { store } from '../store.js';
 import { topicMastery, BASE_POINTS, grade } from '../scoring.js';
 import { dueItems, nextDueLabel } from '../srs.js';
 import { bar, esc, diffClass, diffLabel, fmtDate, toast } from '../ui.js';
+import { generateCode, syncManually, syncStatus, CODE_PATTERN } from '../sync.js';
 
 /** Ôn tập & thống kê gộp chung CẢ HAI lộ trình (JS + Python) — cùng một hệ thống điểm/SRS.
  *  Link dùng đường dẫn phẳng #/topic|problem/:id — router tự nhận domain theo id. */
@@ -61,6 +62,7 @@ export function renderReview() {
 /* ------------------------------ THỐNG KÊ ------------------------------ */
 export function renderStats() {
   const st = store.get();
+  const cfg = store.sync.get();
   const solved = ALL_PROBLEMS.filter((p) => st.problems[p.id]?.solved);
   const totalPossible = ALL_PROBLEMS.reduce((s, p) => s + BASE_POINTS[p.difficulty], 0);
   const earned = ALL_PROBLEMS.reduce((s, p) => s + (st.problems[p.id]?.best || 0), 0);
@@ -128,17 +130,73 @@ export function renderStats() {
         }).join('')}
       </div>` : ''}
 
+    <h2>Đồng bộ nhiều máy</h2>
+    <div class="card">
+      <p class="muted small" style="margin-top:0">
+        Học ở máy nào cũng tiếp tục được đúng chỗ đang dở. Tiến độ hai bên được <strong>gộp</strong>
+        chứ không ghi đè, nên không máy nào mất bài. Cần triển khai một Cloudflare Worker
+        (làm một lần, ~3 phút — xem <code>worker/README.md</code>).
+      </p>
+
+      <label class="field-label" for="sync-url">Địa chỉ máy chủ</label>
+      <input class="field" id="sync-url" type="url" spellcheck="false" placeholder="https://neetcode30-sync.ten-cua-ban.workers.dev" value="${esc(cfg.url || '')}">
+
+      <label class="field-label" for="sync-code">Mã đồng bộ <span class="muted">(dùng CHUNG cho mọi máy của bạn — coi như mật khẩu)</span></label>
+      <div class="row">
+        <input class="field" id="sync-code" type="text" spellcheck="false" autocomplete="off" placeholder="16–64 ký tự" value="${esc(cfg.code || '')}" style="flex:1;min-width:240px">
+        <button class="btn ghost small" data-action="gen-code">🎲 Tạo mã ngẫu nhiên</button>
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <label class="row" style="gap:6px;cursor:pointer">
+          <input type="checkbox" id="sync-auto" ${cfg.auto === false ? '' : 'checked'}>
+          <span class="small">Tự động đồng bộ khi mở app và sau mỗi thay đổi</span>
+        </label>
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <button class="btn small" data-action="sync-now">🔄 Lưu & đồng bộ ngay</button>
+        <button class="btn ghost small" data-action="sync-forget">Quên cấu hình máy này</button>
+        <span class="spacer"></span>
+        <span class="muted small" id="sync-status">${esc(syncStatusText())}</span>
+      </div>
+
+      <p class="muted small" style="margin-bottom:0">
+        ⚠️ Ai biết mã đồng bộ thì đọc và ghi được tiến độ của bạn. Hãy dùng nút tạo mã ngẫu nhiên
+        thay vì tự đặt mã dễ đoán.
+      </p>
+    </div>
+
     <h2>Dữ liệu học tập</h2>
     <div class="card">
-      <p class="muted small" style="margin-top:0">Tiến độ được lưu trong trình duyệt này (localStorage). Xuất ra file để sao lưu hoặc chuyển sang máy khác.</p>
+      <p class="muted small" style="margin-top:0">Tiến độ được lưu trong trình duyệt này (localStorage). Xuất ra file để sao lưu, hoặc chuyển thủ công sang máy khác khi không dùng đồng bộ tự động.</p>
       <div class="row">
         <button class="btn ghost small" data-action="export">⬇ Xuất tiến độ (JSON)</button>
-        <button class="btn ghost small" data-action="import">⬆ Nhập tiến độ</button>
+        <button class="btn ghost small" data-action="import">⬆ Nhập &amp; gộp</button>
+        <button class="btn ghost small" data-action="import-replace">Khôi phục (ghi đè)</button>
         <button class="btn danger small" data-action="reset">Xoá toàn bộ tiến độ</button>
       </div>
+      <p class="muted small" style="margin-bottom:0">
+        <strong>Nhập &amp; gộp</strong> giữ lại phần tốt nhất của cả hai bên — dùng cái này khi chuyển máy.
+        <strong>Khôi phục</strong> xoá sạch tiến độ hiện tại rồi thay bằng nội dung file — chỉ dùng khi bạn thật sự muốn quay về một bản sao lưu.
+      </p>
     </div>
   `;
 }
+
+/** Câu mô tả ngắn trạng thái đồng bộ, hiển thị cạnh nút. */
+function syncStatusText() {
+  const s = syncStatus();
+  if (!s.configured) return 'Chưa cấu hình';
+  if (s.running) return 'Đang đồng bộ…';
+  if (s.lastError) return `Lỗi: ${s.lastError}`;
+  if (!s.lastAt) return 'Chưa đồng bộ lần nào';
+  const d = new Date(s.lastAt);
+  return `Đồng bộ lúc ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} ${fmtDate(s.lastAt)}`;
+}
+
+/** Listener cập nhật dòng trạng thái đồng bộ — giữ tham chiếu để gỡ khi mount lại. */
+let statusListener = null;
 
 export function mountStats(root) {
   root.querySelector('[data-action="export"]')?.addEventListener('click', () => {
@@ -150,23 +208,91 @@ export function mountStats(root) {
     URL.revokeObjectURL(a.href);
   });
 
-  root.querySelector('[data-action="import"]')?.addEventListener('click', () => {
+  const pickFile = (mode) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'application/json';
     input.onchange = async () => {
       try {
-        store.import(await input.files[0].text());
-        toast('Đã nhập tiến độ.');
-        setTimeout(() => location.reload(), 600);
+        const summary = store.import(await input.files[0].text(), { mode });
+        toast(mode === 'replace'
+          ? 'Đã khôi phục tiến độ từ file.'
+          : `Đã gộp: +${summary.newSolved} bài đã giải, +${summary.xpGained} điểm.`);
+        setTimeout(() => location.reload(), 900);
       } catch { toast('File không hợp lệ.'); }
     };
     input.click();
+  };
+
+  root.querySelector('[data-action="import"]')?.addEventListener('click', () => pickFile('merge'));
+
+  root.querySelector('[data-action="import-replace"]')?.addEventListener('click', () => {
+    if (!confirm('Ghi đè sẽ XOÁ tiến độ hiện tại trên máy này và thay bằng nội dung file. Nếu bạn chỉ muốn chuyển máy, hãy dùng "Nhập & gộp". Tiếp tục?')) return;
+    pickFile('replace');
   });
 
   root.querySelector('[data-action="reset"]')?.addEventListener('click', () => {
     if (!confirm('Xoá toàn bộ tiến độ, điểm số và code đã lưu? Không thể hoàn tác.')) return;
     store.reset();
+    location.reload();
+  });
+
+  /* -------------------------- đồng bộ nhiều máy -------------------------- */
+  const urlInput = root.querySelector('#sync-url');
+  const codeInput = root.querySelector('#sync-code');
+  const autoInput = root.querySelector('#sync-auto');
+  const statusEl = root.querySelector('#sync-status');
+
+  const refreshStatus = () => { if (statusEl) statusEl.textContent = syncStatusText(); };
+  // Trang Thống kê được mount lại mỗi lần điều hướng tới -> gỡ listener cũ, tránh rò rỉ.
+  if (statusListener) window.removeEventListener('sync-status', statusListener);
+  statusListener = refreshStatus;
+  window.addEventListener('sync-status', refreshStatus);
+
+  /** Lưu cấu hình đang gõ; trả về false kèm thông báo nếu chưa hợp lệ. */
+  function saveConfig() {
+    const url = urlInput.value.trim();
+    const code = codeInput.value.trim();
+    if (!url || !code) { toast('Hãy điền cả địa chỉ máy chủ và mã đồng bộ.'); return false; }
+    try {
+      new URL(url);
+    } catch { toast('Địa chỉ máy chủ không hợp lệ.'); return false; }
+    if (!CODE_PATTERN.test(code)) {
+      toast('Mã đồng bộ phải dài 16–64 ký tự, chỉ gồm chữ, số, "-" hoặc "_".');
+      return false;
+    }
+    store.sync.set({ url, code, auto: autoInput.checked });
+    return true;
+  }
+
+  root.querySelector('[data-action="gen-code"]')?.addEventListener('click', () => {
+    codeInput.value = generateCode();
+    toast('Đã tạo mã mới. Hãy dùng ĐÚNG mã này trên mọi máy của bạn.');
+  });
+
+  autoInput?.addEventListener('change', () => store.sync.set({ auto: autoInput.checked }));
+
+  root.querySelector('[data-action="sync-now"]')?.addEventListener('click', async (e) => {
+    if (!saveConfig()) return;
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      const { summary } = await syncManually();
+      toast(summary.newSolved || summary.xpGained
+        ? `Đã đồng bộ: +${summary.newSolved} bài đã giải, +${summary.xpGained} điểm từ máy khác.`
+        : 'Đã đồng bộ. Mọi máy đang khớp nhau.');
+      if (summary.newSolved || summary.xpGained || summary.newProblems) setTimeout(() => location.reload(), 900);
+    } catch (err) {
+      toast(`Đồng bộ thất bại: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+      refreshStatus();
+    }
+  });
+
+  root.querySelector('[data-action="sync-forget"]')?.addEventListener('click', () => {
+    if (!confirm('Xoá địa chỉ máy chủ và mã đồng bộ khỏi MÁY NÀY? Tiến độ đã học vẫn được giữ nguyên, và dữ liệu trên máy chủ không bị xoá.')) return;
+    store.sync.clear();
     location.reload();
   });
 }

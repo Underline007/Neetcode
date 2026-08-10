@@ -139,6 +139,8 @@ assets/css/app.css         giao diện, hỗ trợ chế độ sáng/tối
 src/
   main.js                  router theo hash, khởi tạo, bảng lệnh Ctrl+K
   store.js                 lưu tiến độ trong localStorage (xuất/nhập được)
+  sync-merge.js            gộp tiến độ từ hai máy mà không mất dữ liệu
+  sync.js                  đồng bộ nền: tải về → gộp → đẩy lên, khoá theo version
   scoring.js               công thức tính điểm, xếp hạng, mức thành thạo
   srs.js                   lịch ôn tập ngắt quãng (SM-2 rút gọn) — dùng chung cho bài tập và thẻ nhớ
   search.js                tìm kiếm bỏ dấu tiếng Việt (bộ lọc · bảng lệnh · tra cứu)
@@ -158,6 +160,10 @@ src/
     reference.js           cấu trúc dữ liệu, bảng chọn cấu trúc, đối chiếu JS↔Python, thẻ nhớ
     python/                15 module Python thuần tuý
 tools/verify.mjs           kiểm chứng: chạy mọi lời giải mẫu qua mọi test case + dữ liệu tra cứu
+tools/test-merge.mjs       kiểm chứng bộ gộp tiến độ đa máy
+tools/test-sync-worker.mjs kiểm chứng Worker đồng bộ (KV giả, không cần deploy)
+tools/test-sync-e2e.mjs    kiểm chứng đồng bộ đầu-cuối: hai máy + Worker giả
+worker/                    Cloudflare Worker + KV làm hộp thư đồng bộ (tuỳ chọn)
 ```
 
 Một nguyên tắc xuyên suốt: **mỗi dữ liệu chỉ có một nguồn**. `syntax-hints.js` vừa nuôi bảng gợi ý
@@ -197,8 +203,34 @@ chạy lời giải mẫu qua toàn bộ test, và xác nhận mọi bài đều
 
 ## Tiến độ của bạn
 
-Lưu trong `localStorage` của trình duyệt. Trong mục **Thống kê** có nút xuất/nhập JSON
-để sao lưu hoặc chuyển sang máy khác.
+Lưu trong `localStorage` của trình duyệt. Mục **Thống kê** có nút xuất/nhập JSON để sao lưu.
+
+### Học trên nhiều máy
+
+Bật đồng bộ trong **Thống kê → Đồng bộ nhiều máy**. Cần triển khai một Cloudflare Worker
+một lần (~3 phút, gói miễn phí — xem [`worker/README.md`](worker/README.md)), sau đó điền
+địa chỉ Worker và **cùng một mã đồng bộ** trên mọi máy.
+
+Điểm quan trọng: tiến độ hai bên được **gộp**, không ghi đè. Nếu máy A giải bài X còn máy B
+giải bài Y thì sau khi đồng bộ, cả hai máy đều có cả X lẫn Y. Quy tắc gộp:
+
+| Dữ liệu | Cách gộp |
+|---|---|
+| Điểm mỗi bài, quiz | lấy giá trị **cao hơn** |
+| Đã giải · đã xem lời giải | chỉ cần **một bên** đúng |
+| Code đang gõ, lịch ôn tập | lấy bản **mới hơn** (theo lần chạy gần nhất / số lần ôn) |
+| Bài giảng đã đọc, ngày đã xong | hợp nhất, giữ mốc **sớm nhất** |
+| Tổng điểm | tính lại từ nhật ký đã khử trùng, **không bao giờ giảm** |
+
+Hai máy ghi cùng lúc được xử lý bằng khoá lạc quan theo version: máy đến sau nhận `409`,
+gộp thêm bản mới nhất rồi ghi lại — không bên nào mất dữ liệu.
+
+Không muốn dựng Worker? Vẫn dùng được **Xuất tiến độ** ở máy này và **Nhập & gộp** ở máy kia;
+nút này chạy đúng bộ gộp trên, chỉ là bạn tự chuyển file.
+
+```bash
+npm run test:sync    # kiểm chứng bộ gộp + logic Worker (không cần tài khoản Cloudflare)
+```
 
 ---
 
