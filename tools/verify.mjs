@@ -149,9 +149,58 @@ for (const p of PROBLEMS) {
   if (!planProblems.has(p.id)) { console.error(`❌ Bài "${p.id}" không được xếp vào ngày nào trong lộ trình`); failures++; }
 }
 
+/* ---- kiểm tra dữ liệu tra cứu & thẻ ghi nhớ ---- */
+const { DS_REFERENCE, PICK_TABLE, XLANG, DS_CARDS } = await import('../src/data/reference.js');
+const problemIds = new Set(PROBLEMS.map((p) => p.id));
+
+for (const d of DS_REFERENCE) {
+  for (const field of ['id', 'name', 'en', 'icon', 'when']) {
+    if (!d[field]) { console.error(`❌ reference ${d.id}: thiếu trường "${field}"`); failures++; }
+  }
+  if (!d.ops || d.ops.length < 3) { console.error(`❌ reference ${d.id}: cần ít nhất 3 thao tác`); failures++; }
+  for (const o of d.ops || []) {
+    if (!o.op || !o.big || !o.js || !o.py) {
+      console.error(`❌ reference ${d.id}: thao tác "${o.op}" thiếu chi phí hoặc cú pháp một ngôn ngữ`); failures++;
+    }
+  }
+  if (!d.pitfalls?.length) { console.error(`❌ reference ${d.id}: cần ít nhất 1 bẫy thường gặp`); failures++; }
+  for (const pid of d.problems || []) {
+    if (!problemIds.has(pid)) { console.error(`❌ reference ${d.id}: liên kết tới bài không tồn tại "${pid}"`); failures++; }
+  }
+}
+
+for (const r of PICK_TABLE) {
+  if (!r.need || !r.structure || !r.why) { console.error(`❌ PICK_TABLE: dòng "${r.need}" thiếu nội dung`); failures++; }
+}
+for (const g of XLANG) {
+  if (!g.group || !g.rows?.length) { console.error(`❌ XLANG: nhóm "${g.group}" rỗng`); failures++; }
+  for (const row of g.rows || []) {
+    if (!row.what || !row.js || !row.py) { console.error(`❌ XLANG "${g.group}": dòng "${row.what}" thiếu cột`); failures++; }
+  }
+}
+
+const cardIds = new Set();
+for (const c of DS_CARDS) {
+  if (cardIds.has(c.id)) { console.error(`❌ DS_CARDS: TRÙNG ID "${c.id}"`); failures++; }
+  cardIds.add(c.id);
+  if (!c.front || !c.back || !c.tag) { console.error(`❌ DS_CARDS ${c.id}: thiếu front/back/tag`); failures++; }
+}
+
+/* ---- thẻ ghi nhớ sinh tự động từ từ điển cú pháp ---- */
+const { allCards } = await import('../src/drill.js');
+const cards = allCards();
+const genIds = new Set();
+for (const c of cards) {
+  if (genIds.has(c.id)) { console.error(`❌ thẻ ghi nhớ: TRÙNG ID "${c.id}"`); failures++; }
+  genIds.add(c.id);
+  if (!c.front || !c.back) { console.error(`❌ thẻ ghi nhớ ${c.id}: thiếu mặt trước/sau`); failures++; }
+}
+
 console.log('');
 console.log(`Chủ đề : ${TOPICS.length}`);
 console.log(`Bài tập: ${PROBLEMS.length}`);
 console.log(`Test   : ${totalTests}`);
+console.log(`Tra cứu: ${DS_REFERENCE.length} cấu trúc · ${PICK_TABLE.length} dấu hiệu · ${XLANG.reduce((s, g) => s + g.rows.length, 0)} dòng đối chiếu`);
+console.log(`Thẻ nhớ: ${cards.length}`);
 console.log(failures === 0 ? '✅ TẤT CẢ ĐỀU ĐẠT' : `❌ ${failures} lỗi`);
 process.exit(failures === 0 ? 0 : 1);

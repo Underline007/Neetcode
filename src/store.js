@@ -15,6 +15,10 @@ const EMPTY = () => ({
   lessons: {},              // topicId -> { readAt }
   days: {},                 // dayNumber -> { doneAt }
   log: [],                  // { at, type, ref, points }
+  notes: {},                // problemId -> { text, updatedAt }
+  bookmarks: {},            // problemId -> true
+  cards: {},                // cardId -> { due, interval, ease, reps }  (thẻ luyện nhớ, dùng chung srs.js)
+  errorStats: {},           // errorKey -> { count, lastAt, lastProblem }
   theme: 'dark',
   lang: 'javascript',       // ngôn ngữ đang chọn để duyệt/học: 'javascript' | 'python'
 });
@@ -63,6 +67,44 @@ export const store = {
   quiz(topicId) {
     if (!state.quizzes[topicId]) state.quizzes[topicId] = { best: 0, attempts: 0, lastAt: null };
     return state.quizzes[topicId];
+  },
+
+  /* ------------------------- ghi chú & đánh dấu ------------------------- */
+  noteText(problemId) { return state.notes[problemId]?.text || ''; },
+
+  setNote(problemId, text) {
+    const t = String(text ?? '');
+    if (!t.trim()) delete state.notes[problemId];
+    else state.notes[problemId] = { text: t, updatedAt: Date.now() };
+    persist();
+  },
+
+  isBookmarked(problemId) { return !!state.bookmarks[problemId]; },
+
+  /** Bật/tắt đánh dấu, trả về trạng thái MỚI */
+  toggleBookmark(problemId) {
+    if (state.bookmarks[problemId]) delete state.bookmarks[problemId];
+    else state.bookmarks[problemId] = true;
+    persist();
+    return !!state.bookmarks[problemId];
+  },
+
+  /* --------------------------- thẻ luyện nhớ --------------------------- */
+  card(cardId) {
+    if (!state.cards[cardId]) state.cards[cardId] = { due: null, interval: 0, ease: 2.5, reps: 0 };
+    return state.cards[cardId];
+  },
+
+  /* ------------------------- thống kê lỗi hay mắc ------------------------- */
+  /** Ghi nhận một loại lỗi vừa mắc phải — dùng để dựng mục "Lỗi bạn hay mắc" ở Sổ tay. */
+  logError(key, problemId) {
+    if (!key) return;
+    const e = state.errorStats[key] || { count: 0, lastAt: null, lastProblem: null };
+    e.count++;
+    e.lastAt = Date.now();
+    e.lastProblem = problemId || e.lastProblem;
+    state.errorStats[key] = e;
+    persist();
   },
 
   addXp(points, entry) {

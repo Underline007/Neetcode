@@ -24,12 +24,19 @@
       <button class="btn ghost small" data-lang="python" style="flex:1">🐍 Python</button>
     </div>
 
+    <button id="pal-open" class="btn ghost small pal-open">🔍 Tìm bài, chủ đề… <span class="kbd">Ctrl</span><span class="kbd">K</span></button>
+
     <nav id="nav">
       <a href="#/" data-route="/">🏠 Bảng điều khiển</a>
       <a href="#/plan" data-route="/plan">🗓️ Lộ trình</a>
       <a href="#/topics" data-route="/topics">📚 Thư viện chủ đề</a>
       <a href="#/problems" data-route="/problems">⌨️ Ngân hàng bài tập</a>
       <a href="#/review" data-route="/review">🔁 Ôn tập ngắt quãng <span id="due-badge" class="badge hidden">0</span></a>
+      <div class="nav-sep">Ghi nhớ</div>
+      <a href="#/notebook" data-route="/notebook">📔 Sổ tay</a>
+      <a href="#/cheatsheet" data-route="/cheatsheet">🔎 Tra cứu nhanh</a>
+      <a href="#/drill" data-route="/drill">🧠 Luyện nhớ <span id="card-badge" class="badge hidden">0</span></a>
+      <div class="nav-sep">Theo dõi</div>
       <a href="#/stats" data-route="/stats">📈 Thống kê &amp; điểm</a>
       <a href="#/guide" data-route="/guide">🧭 Cách dùng app</a>
     </nav>
@@ -47,6 +54,20 @@
 </div>
 
 <div id="toast" class="toast hidden"></div>
+
+<!-- Bảng lệnh Ctrl+K: nằm NGOÀI #view nên không bị xoá mỗi lần đổi trang -->
+<div id="palette" class="palette hidden" role="dialog" aria-modal="true" aria-label="Tìm nhanh">
+  <div class="pal-box">
+    <input id="pal-q" class="pal-input" type="text" autocomplete="off" spellcheck="false"
+           placeholder="Tìm bài tập, chủ đề, trang… (gõ không dấu cũng được)" aria-label="Từ khoá tìm kiếm" />
+    <div id="pal-list" class="pal-list"></div>
+    <div class="pal-foot">
+      <span><span class="kbd">↑</span><span class="kbd">↓</span> chọn</span>
+      <span><span class="kbd">Enter</span> mở</span>
+      <span><span class="kbd">Esc</span> đóng</span>
+    </div>
+  </div>
+</div>
 
 <script type="module" src="./src/main.js"></script>
 </body>

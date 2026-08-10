@@ -8,7 +8,7 @@ Không phải một danh sách bài tập. Đây là một **khoá học có c�
 kèm bài tập chấm điểm tự động, gợi ý theo bậc, chẩn đoán lỗi và lịch ôn tập ngắt quãng.
 
 ```
-18 chủ đề  ·  64 bài tập  ·  401 test case  ·  72 câu quiz khái niệm  ·  lộ trình 30 ngày
+18 chủ đề · 64 bài tập · 401 test case · 72 câu quiz · 277 thẻ ghi nhớ · lộ trình 30 ngày
 ```
 
 ---
@@ -85,6 +85,34 @@ Hệ thống phân tích code + kết quả test để chỉ ra *loại lỗi*, 
 >
 > 🔍 Chỉ **một** test sai ("Chuỗi rỗng") — gần như chắc chắn là trường hợp biên. Hãy chạy tay đúng test đó thay vì sửa mò toàn bộ thuật toán.
 
+**Lỗi được giải thích bằng tiếng Việt, kèm số dòng.**
+`TypeError: Cannot read properties of undefined (reading 'next')` là một bức tường với người mới.
+App dịch 23 loại lỗi hay gặp của JavaScript và Python thành ba câu trả lời — *nghĩa là gì · vì sao
+thường xảy ra · sửa thế nào* — chỉ đúng **dòng** gây lỗi và có nút nhảy tới dòng đó.
+Thông báo gốc vẫn giữ lại để đối chiếu.
+
+**Bốn công cụ gỡ lỗi, không phải một nút "chạy".**
+
+| | |
+|---|---|
+| 🔍 **Theo dõi biến** | Gọi `trace({ i, l, r })` (hoặc `trace(i=i, l=l)` trong Python) là app hiện bảng giá trị các biến **qua từng bước**, ô vừa đổi giá trị được tô sáng. Thuật toán thôi là hộp đen. |
+| ▶ **Chạy lại một test** | Chỉ chạy đúng test đang sai. Không tính lượt thử, không ảnh hưởng điểm. |
+| 🧪 **Chạy thử** | Tự nhập dữ liệu bất kỳ, xem hàm trả về gì. Không chấm điểm. |
+| 📄 **Log theo từng test** | `console.log` / `print` của mỗi test hiện riêng trong thẻ test đó, không trộn chung. |
+
+**Tra cứu và ghi nhớ cú pháp.**
+*🔎 Tra cứu nhanh*: bảng "đề bài nói thế này → dùng cấu trúc nào", chi phí thao tác của 11 cấu trúc
+dữ liệu kèm cú pháp **cả hai ngôn ngữ**, bảng đối chiếu JavaScript ↔ Python, và toàn bộ bảng cú pháp
+có nút chép. *🧠 Luyện nhớ*: 277 thẻ ghi nhớ chạy trên đúng thuật toán ôn ngắt quãng của bài tập.
+Mọi ô tìm kiếm đều **bỏ dấu** — gõ `hai con tro` ra "Hai con trỏ".
+
+**Sổ tay giữ lại thứ bạn rút ra được.**
+Ghi chú theo từng bài, đánh dấu bài cần xem lại, và mục **"Lỗi bạn hay mắc"** xếp hạng những loại lỗi
+bạn lặp lại nhiều nhất kèm cách sửa — một loại lỗi lặp đi lặp lại là lỗ hổng kiến thức, không phải sự vô ý.
+
+**Tìm gì cũng nhanh.** `Ctrl + K` mở bảng lệnh nhảy tới bất kỳ bài tập / chủ đề / trang nào;
+ngân hàng bài tập có bộ lọc theo độ khó, trạng thái và chủ đề.
+
 **Test hiệu năng như phỏng vấn thật.**
 Nhiều bài có test tới 200.000 phần tử với giới hạn 6 giây. Lời giải đúng logic nhưng sai độ phức tạp
 **sẽ trượt** — và hệ thống nói rõ rằng vấn đề nằm ở độ phức tạp chứ không phải logic.
@@ -106,23 +134,35 @@ Từ `git diff` (dãy con chung dài nhất) tới rate limiter (cửa sổ trư
 ## Cấu trúc mã nguồn
 
 ```
-index.html                 khung ứng dụng (sidebar + vùng nội dung)
+index.html                 khung ứng dụng (sidebar + vùng nội dung + bảng lệnh Ctrl+K)
 assets/css/app.css         giao diện, hỗ trợ chế độ sáng/tối
 src/
-  main.js                  router theo hash, khởi tạo
+  main.js                  router theo hash, khởi tạo, bảng lệnh Ctrl+K
   store.js                 lưu tiến độ trong localStorage (xuất/nhập được)
   scoring.js               công thức tính điểm, xếp hạng, mức thành thạo
-  srs.js                   lịch ôn tập ngắt quãng (SM-2 rút gọn)
-  runner.js                cầu nối tới worker chấm bài, có timeout 6 giây
-  sandbox.worker.js        chạy code người học trong luồng riêng (ListNode/TreeNode có sẵn)
+  srs.js                   lịch ôn tập ngắt quãng (SM-2 rút gọn) — dùng chung cho bài tập và thẻ nhớ
+  search.js                tìm kiếm bỏ dấu tiếng Việt (bộ lọc · bảng lệnh · tra cứu)
+  error-vi.js              dịch & giải thích lỗi runtime sang tiếng Việt
+  drill.js                 sinh bộ thẻ ghi nhớ (tự động từ syntax-hints + viết tay)
+  runner.js                cầu nối tới worker chấm bài, có timeout
+  sandbox.worker.js        chạy code người học trong luồng riêng (ListNode/TreeNode/trace() có sẵn)
+  sandbox.worker.py.js     chạy Python thật qua Pyodide, cùng bộ tiện ích
+  editor.js                trình soạn thảo tự viết: tô màu, gợi ý cú pháp, thụt lề thông minh
+  syntax-hints.js          từ điển cú pháp JS/Python — nguồn dữ liệu cho gợi ý, tra cứu VÀ thẻ nhớ
   markdown.js              bộ render Markdown tối giản, không phụ thuộc thư viện
   ui.js                    tiện ích giao diện
-  views/                   dashboard · lists · problem · quiz · misc
+  views/                   dashboard · lists · problem · quiz · misc · notebook · reference · python
   data/
     part1..part6.js        toàn bộ bài giảng, quiz, bài tập, test, gợi ý, lời giải
     index.js               gộp dữ liệu + lộ trình 30 ngày + sinh test hiệu năng
-tools/verify.mjs           kiểm chứng: chạy mọi lời giải mẫu qua mọi test case
+    reference.js           cấu trúc dữ liệu, bảng chọn cấu trúc, đối chiếu JS↔Python, thẻ nhớ
+    python/                15 module Python thuần tuý
+tools/verify.mjs           kiểm chứng: chạy mọi lời giải mẫu qua mọi test case + dữ liệu tra cứu
 ```
+
+Một nguyên tắc xuyên suốt: **mỗi dữ liệu chỉ có một nguồn**. `syntax-hints.js` vừa nuôi bảng gợi ý
+trong trình soạn thảo, vừa nuôi trang Tra cứu nhanh, vừa sinh thẻ ghi nhớ — sửa một chỗ là cả ba
+cùng đổi. `srs.js` xếp lịch cho cả bài tập lẫn thẻ nhớ, không có hệ thống thứ hai.
 
 **Không phụ thuộc thư viện ngoài. Không có bước build.** Toàn bộ là ES modules thuần.
 

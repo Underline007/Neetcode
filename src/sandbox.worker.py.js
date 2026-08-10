@@ -14,7 +14,7 @@ const PYODIDE_BASE = 'https://cdn.jsdelivr.net/pyodide/v0.28.3/full/';
 /** Driver Python: nạp một lần, sau đó chỉ GỌI HÀM __neetcode_run cho mỗi lượt chấm.
  *  Nhận toàn bộ đầu vào qua tham số (không nội suy chuỗi) để tránh lỗi escape ký tự. */
 const DRIVER_SRC = `
-import json, time, math, builtins
+import json, time, math, builtins, collections, traceback
 
 class ListNode:
     def __init__(self, val=0, next=None):
@@ -98,12 +98,89 @@ def treeToArray(root):
         out.pop()
     return out
 
+def __neetcode_repr(v):
+    """Mô tả các giá trị json.dumps không xử lý được — set và deque là hai thứ
+    người học dùng suốt trong bài thuật toán."""
+    try:
+        if isinstance(v, (set, frozenset)):
+            if not v:
+                return 'set()'
+            return 'set{' + ', '.join(str(x) for x in sorted(v, key=str)) + '}'
+        if isinstance(v, collections.deque):
+            return list(v)
+        if callable(v):
+            return '<hàm ' + getattr(v, '__name__', 'ẩn danh') + '>'
+        return str(v)
+    except Exception:
+        return '<không hiển thị được>'
+
 def __neetcode_preview(value, max_len=260):
     try:
-        s = json.dumps(value, default=str, ensure_ascii=False)
+        s = json.dumps(value, default=__neetcode_repr, ensure_ascii=False)
     except Exception:
         s = str(value)
+    # __neetcode_repr trả về chuỗi -> json bọc thêm dấu nháy. Bỏ nháy đó đi
+    # (giá trị gốc không phải chuỗi thì không có lý gì hiện dấu nháy).
+    if not isinstance(value, str) and len(s) >= 2 and s[0] == '"' and s[-1] == '"':
+        s = s[1:-1].replace('\\\\"', '"')
     return s if len(s) <= max_len else s[:max_len] + ' …'
+
+def __neetcode_error_line(exc):
+    """Số dòng trong code NGƯỜI HỌC gây ra lỗi (exec dùng filename '<string>')."""
+    try:
+        lineno = getattr(exc, 'lineno', None)
+        frames = traceback.extract_tb(exc.__traceback__)
+        for frame in reversed(frames):
+            if frame.filename == '<string>':
+                return frame.lineno
+        return lineno
+    except Exception:
+        return None
+
+# ---------- Theo dõi biến: hàm trace() dành cho người học ----------
+__NEETCODE_TRACE_CAP = 200
+__neetcode_trace_rows = []
+__neetcode_trace_calls = [0]
+
+def __neetcode_trace_reset():
+    del __neetcode_trace_rows[:]
+    __neetcode_trace_calls[0] = 0
+
+def __neetcode_trace(*args, **kwargs):
+    """trace(i=i, l=l, r=r)  ·  trace('sau khi dịch', l=l, r=r)  ·  trace({'i': i})"""
+    __neetcode_trace_calls[0] += 1
+    if len(__neetcode_trace_rows) >= __NEETCODE_TRACE_CAP:
+        return
+    label = None
+    values = {}
+    positional = []
+    for a in args:
+        if isinstance(a, str) and label is None and not values:
+            label = a
+        elif isinstance(a, dict):
+            values.update(a)
+        else:
+            positional.append(a)
+    values.update(kwargs)
+    if not values and positional:
+        if len(positional) == 1:
+            values = {'giá trị': positional[0]}
+        else:
+            for idx, v in enumerate(positional):
+                values['giá trị ' + str(idx + 1)] = v
+    __neetcode_trace_rows.append({
+        'label': label,
+        'values': {str(k): __neetcode_preview(v, 60) for k, v in values.items()},
+    })
+
+def __neetcode_take_trace():
+    if not __neetcode_trace_rows:
+        return None
+    return {
+        'rows': list(__neetcode_trace_rows),
+        'total': __neetcode_trace_calls[0],
+        'truncated': __neetcode_trace_calls[0] > len(__neetcode_trace_rows),
+    }
 
 def __neetcode_deep_equal(a, b):
     if isinstance(a, bool) or isinstance(b, bool):
@@ -142,7 +219,7 @@ def __neetcode_run(code, entry, tests_json, harness_src, checker_src):
     real_print = builtins.print
 
     def fake_print(*args, **kwargs):
-        if len(logs) < 60:
+        if len(logs) < 40:
             logs.append(' '.join(str(a) for a in args))
     builtins.print = fake_print
 
@@ -155,62 +232,81 @@ def __neetcode_run(code, entry, tests_json, harness_src, checker_src):
             'buildCycleList': buildCycleList,
             'buildTree': buildTree,
             'treeToArray': treeToArray,
+            'trace': __neetcode_trace,
         }
         try:
             exec(code, user_globals)
         except Exception as e:
-            return json.dumps({'ok': False, 'phase': 'compile', 'error': f'{type(e).__name__}: {e}', 'logs': logs})
+            return json.dumps({
+                'ok': False, 'phase': 'compile', 'error': f'{type(e).__name__}: {e}',
+                'logs': list(logs), 'errorLine': __neetcode_error_line(e),
+            })
+        setup_logs = list(logs)
+        del logs[:]
 
         fn = user_globals.get(entry)
         if not callable(fn):
             return json.dumps({
                 'ok': False, 'phase': 'compile',
                 'error': f'Không tìm thấy hàm "{entry}". Hãy giữ nguyên tên hàm trong khung code mẫu.',
-                'logs': logs,
+                'logs': setup_logs,
             })
 
         try:
             harness = __neetcode_make_callable(harness_src, user_globals, 'harness') or (lambda f, args, t: f(*args))
             checker = __neetcode_make_callable(checker_src, user_globals, 'checker')
         except Exception as e:
-            return json.dumps({'ok': False, 'phase': 'harness', 'error': f'{type(e).__name__}: {e}', 'logs': logs})
+            return json.dumps({'ok': False, 'phase': 'harness', 'error': f'{type(e).__name__}: {e}', 'logs': setup_logs})
 
         try:
             tests = json.loads(tests_json)
         except Exception as e:
-            return json.dumps({'ok': False, 'phase': 'harness', 'error': f'Dữ liệu test lỗi: {e}', 'logs': logs})
+            return json.dumps({'ok': False, 'phase': 'harness', 'error': f'Dữ liệu test lỗi: {e}', 'logs': setup_logs})
 
         results = []
         t0 = time.perf_counter()
         for i, t in enumerate(tests):
             hidden = bool(t.get('hidden'))
+            scratch = bool(t.get('scratch'))
             try:
                 args = json.loads(json.dumps(t.get('args')))
             except Exception:
                 args = t.get('args')
+
+            # log & trace của MỖI test được giữ riêng, không trộn vào nhau
+            del logs[:]
+            __neetcode_trace_reset()
+
             start = time.perf_counter()
             try:
                 got = harness(fn, args, t)
                 ms = (time.perf_counter() - start) * 1000
                 expected = t.get('expected')
-                pass_ = bool(checker(got, expected, t.get('args'))) if checker else __neetcode_deep_equal(got, expected)
+                if scratch:
+                    # "Chạy thử": không có đáp án để so, chỉ hiện giá trị trả về
+                    pass_ = True
+                else:
+                    pass_ = bool(checker(got, expected, t.get('args'))) if checker else __neetcode_deep_equal(got, expected)
                 results.append({
-                    'i': i, 'name': t.get('name'), 'hidden': hidden, 'pass': pass_,
+                    'i': i, 'name': t.get('name'), 'hidden': hidden, 'scratch': scratch, 'pass': pass_,
                     'ms': round(ms, 2),
                     'args': None if hidden else __neetcode_preview(t.get('args')),
-                    'expected': None if hidden else __neetcode_preview(expected),
+                    'expected': None if (hidden or scratch) else __neetcode_preview(expected),
                     'got': None if hidden else __neetcode_preview(got),
+                    'logs': list(logs), 'trace': __neetcode_take_trace(),
                 })
             except Exception as e:
                 results.append({
-                    'i': i, 'name': t.get('name'), 'hidden': hidden, 'pass': False,
+                    'i': i, 'name': t.get('name'), 'hidden': hidden, 'scratch': scratch, 'pass': False,
                     'ms': round((time.perf_counter() - start) * 1000, 2),
                     'args': None if hidden else __neetcode_preview(t.get('args')),
-                    'expected': None if hidden else __neetcode_preview(t.get('expected')),
+                    'expected': None if (hidden or scratch) else __neetcode_preview(t.get('expected')),
                     'got': None, 'error': f'{type(e).__name__}: {e}',
+                    'errorLine': __neetcode_error_line(e),
+                    'logs': list(logs), 'trace': __neetcode_take_trace(),
                 })
         total_ms = (time.perf_counter() - t0) * 1000
-        return json.dumps({'ok': True, 'results': results, 'totalMs': round(total_ms, 2), 'logs': logs})
+        return json.dumps({'ok': True, 'results': results, 'totalMs': round(total_ms, 2), 'logs': setup_logs})
     finally:
         builtins.print = real_print
 `;

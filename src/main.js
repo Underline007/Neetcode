@@ -3,14 +3,18 @@ import { TOPICS, PROBLEMS } from './data/index.js';
 import { PY_TOPICS, PY_PROBLEMS } from './data/python/index.js';
 import { topicHasPython } from './lang.js';
 import { dueItems } from './srs.js';
-import { $, $$, toast } from './ui.js';
+import { $, $$, esc, toast } from './ui.js';
 
 import { renderDashboard } from './views/dashboard.js';
-import { renderPlan, renderTopics, renderTopic, renderProblems } from './views/lists.js';
+import { renderPlan, renderTopics, renderTopic, renderProblems, mountProblems } from './views/lists.js';
 import { renderProblem, mountProblem } from './views/problem.js';
 import { renderQuiz, mountQuiz } from './views/quiz.js';
 import { renderReview, renderStats, mountStats, renderGuide } from './views/misc.js';
 import { renderPythonHome } from './views/python.js';
+import { renderNotebook, mountNotebook } from './views/notebook.js';
+import { renderCheatsheet, mountCheatsheet, renderDrill, mountDrill } from './views/reference.js';
+import { buildIndex, searchIndex } from './search.js';
+import { dueCount } from './drill.js';
 
 /** 18 chủ đề thuật toán + 5 module Python nằm CHUNG một không gian id (mỗi bài tập/chủ
  *  đề thuật toán có thể mang thêm field "...Py" để trở thành song ngữ — xem lang.js).
@@ -84,10 +88,13 @@ const routes = [
   { re: /^\/plan$/, render: () => (store.get().lang === 'python' ? renderPythonHome() : renderPlan()) },
   { re: /^\/topics$/, render: () => renderTopics(currentDomain()) },
   { re: /^\/topic\/([\w-]+)$/, render: (m) => renderTopic(m[1], DETAIL_DOMAIN) },
-  { re: /^\/problems$/, render: () => renderProblems(currentDomain()) },
+  { re: /^\/problems$/, render: () => renderProblems(currentDomain()), mount: () => mountProblems(currentDomain()) },
   { re: /^\/problem\/([\w-]+)$/, render: (m) => renderProblem(m[1], DETAIL_DOMAIN), mount: (m) => mountProblem(m[1], DETAIL_DOMAIN) },
   { re: /^\/quiz\/([\w-]+)$/, render: (m) => renderQuiz(m[1], DETAIL_DOMAIN), mount: (m) => mountQuiz(m[1], DETAIL_DOMAIN) },
   { re: /^\/review$/, render: () => renderReview() },
+  { re: /^\/notebook$/, render: () => renderNotebook(), mount: () => mountNotebook(document) },
+  { re: /^\/cheatsheet$/, render: () => renderCheatsheet(), mount: () => mountCheatsheet() },
+  { re: /^\/drill$/, render: () => renderDrill(), mount: () => mountDrill() },
   { re: /^\/stats$/, render: () => renderStats(), mount: () => mountStats(document) },
   { re: /^\/guide$/, render: () => renderGuide() },
 ];
@@ -131,6 +138,127 @@ document.addEventListener('click', async (e) => {
   }
 });
 
+/* ------------------------- bảng lệnh Ctrl+K ------------------------- */
+const PAGES = [
+  { icon: '🏠', label: 'Bảng điều khiển', hash: '#/' },
+  { icon: '🗓️', label: 'Lộ trình 30 ngày', hash: '#/plan' },
+  { icon: '📚', label: 'Thư viện chủ đề', hash: '#/topics' },
+  { icon: '⌨️', label: 'Ngân hàng bài tập', hash: '#/problems' },
+  { icon: '🔁', label: 'Ôn tập ngắt quãng', hash: '#/review' },
+  { icon: '📔', label: 'Sổ tay', hash: '#/notebook' },
+  { icon: '🔎', label: 'Tra cứu nhanh (cú pháp & cấu trúc dữ liệu)', hash: '#/cheatsheet' },
+  { icon: '🧠', label: 'Luyện nhớ (thẻ ghi nhớ)', hash: '#/drill' },
+  { icon: '📈', label: 'Thống kê & điểm', hash: '#/stats' },
+  { icon: '🧭', label: 'Cách dùng app', hash: '#/guide' },
+];
+
+/** Một chỉ mục duy nhất cho mọi thứ điều hướng được. Dựng một lần, dùng suốt phiên. */
+const palIndex = [
+  ...buildIndex(PAGES, (x) => ({ fields: [x.label], kind: 'Trang', icon: x.icon, label: x.label, hash: x.hash, sub: '' })),
+  ...buildIndex(ALL_TOPICS, (t) => ({
+    fields: [t.name, t.en, t.id], kind: 'Chủ đề', icon: t.icon, label: t.name,
+    hash: `#/topic/${t.id}`, sub: t.en,
+  })),
+  ...buildIndex(ALL_PROBLEMS, (p) => ({
+    fields: [p.title, p.en, p.id, p.topicName], kind: 'Bài tập', icon: '⌨️', label: p.title,
+    hash: `#/problem/${p.id}`, sub: `${p.en} · ${p.topicIcon} ${p.topicName}`, difficulty: p.difficulty, id: p.id,
+  })),
+];
+
+const DIFF_VI = { Easy: 'Dễ', Medium: 'TB', Hard: 'Khó' };
+const pal = { open: false, items: [], sel: 0 };
+
+function palRender() {
+  const st = store.get();
+  const list = $('#pal-list');
+  if (!pal.items.length) {
+    list.innerHTML = '<div class="pal-empty">Không tìm thấy gì khớp. Thử gõ ít chữ hơn, hoặc gõ tên tiếng Anh của bài.</div>';
+    return;
+  }
+  list.innerHTML = pal.items.map((it, i) => `
+    <div class="pal-item${i === pal.sel ? ' sel' : ''}" data-i="${i}">
+      <span class="pal-icon">${it.icon}</span>
+      <span class="pal-main">
+        <span class="pal-label">${esc(it.label)}</span>
+        ${it.sub ? `<span class="pal-sub">${esc(it.sub)}</span>` : ''}
+      </span>
+      ${it.id && st.problems[it.id]?.solved ? '<span class="pal-tag ok">đã giải</span>' : ''}
+      ${it.difficulty ? `<span class="pal-tag ${it.difficulty.toLowerCase()}">${DIFF_VI[it.difficulty]}</span>` : ''}
+      <span class="pal-kind">${it.kind}</span>
+    </div>`).join('');
+  const sel = list.querySelector('.sel');
+  if (sel) {
+    const top = sel.offsetTop, bottom = top + sel.offsetHeight;
+    if (top < list.scrollTop) list.scrollTop = top;
+    else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
+  }
+}
+
+function palSearch(q) {
+  pal.items = searchIndex(palIndex, q, 40);
+  pal.sel = 0;
+  palRender();
+}
+
+function palOpen() {
+  if (pal.open) return;
+  pal.open = true;
+  $('#palette').classList.remove('hidden');
+  const input = $('#pal-q');
+  input.value = '';
+  input.focus();
+  palSearch('');
+}
+
+function palClose() {
+  if (!pal.open) return;
+  pal.open = false;
+  $('#palette').classList.add('hidden');
+}
+
+function palGo(i) {
+  const it = pal.items[i];
+  if (!it) return;
+  palClose();
+  window.location.hash = it.hash.replace(/^#/, '');
+}
+
+$('#pal-open').addEventListener('click', palOpen);
+$('#pal-q').addEventListener('input', (e) => palSearch(e.target.value));
+$('#pal-list').addEventListener('mousedown', (e) => {
+  const el = e.target.closest('.pal-item');
+  if (!el) return;
+  e.preventDefault();
+  palGo(Number(el.dataset.i));
+});
+// bấm ra ngoài hộp thì đóng
+$('#palette').addEventListener('mousedown', (e) => { if (e.target.id === 'palette') palClose(); });
+
+document.addEventListener('keydown', (e) => {
+  // Ctrl/⌘ + K: mở/đóng ở bất cứ đâu, kể cả khi con trỏ đang trong editor
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    pal.open ? palClose() : palOpen();
+    return;
+  }
+
+  if (!pal.open) {
+    // "/" là lối tắt quen thuộc, nhưng KHÔNG được cướp phím khi đang gõ text
+    const t = e.target;
+    const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+    if (e.key === '/' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      palOpen();
+    }
+    return;
+  }
+
+  if (e.key === 'Escape') { e.preventDefault(); palClose(); return; }
+  if (e.key === 'ArrowDown') { e.preventDefault(); pal.sel = (pal.sel + 1) % Math.max(1, pal.items.length); palRender(); return; }
+  if (e.key === 'ArrowUp') { e.preventDefault(); pal.sel = (pal.sel - 1 + pal.items.length) % Math.max(1, pal.items.length); palRender(); return; }
+  if (e.key === 'Enter') { e.preventDefault(); palGo(pal.sel); }
+});
+
 function bindGlobalActions(root) {
   $$('[data-action="start-plan"]', root).forEach((btn) =>
     btn.addEventListener('click', () => {
@@ -151,6 +279,11 @@ function updateChrome(path) {
   const badge = $('#due-badge');
   badge.textContent = due;
   badge.classList.toggle('hidden', due === 0);
+
+  const cards = dueCount(st);
+  const cardBadge = $('#card-badge');
+  cardBadge.textContent = cards;
+  cardBadge.classList.toggle('hidden', cards === 0);
 
   $$('#nav a').forEach((a) => {
     const route = a.dataset.route;

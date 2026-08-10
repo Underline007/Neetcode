@@ -182,7 +182,7 @@ export function renderGuide() {
       <ol>
         <li><strong>Đọc bài giảng (20–25 phút).</strong> Đừng đọc lướt. Phần quan trọng nhất là <em>"Ý tưởng cốt lõi"</em> và <em>"Dấu hiệu nhận biết"</em> — đó là thứ giúp bạn giải bài <em>chưa từng thấy</em>.</li>
         <li><strong>Tự nghĩ 10 phút trước khi mở gợi ý.</strong> Khoảng thời gian bế tắc chính là lúc bộ não học được nhiều nhất. Mở gợi ý quá sớm là cách nhanh nhất để "học mà không nhớ".</li>
-        <li><strong>Code và chạy test.</strong> Sai thì đọc phần <em>chẩn đoán tự động</em> — nó chỉ ra <em>loại lỗi</em> bạn mắc, không chỉ chỗ sai.</li>
+        <li><strong>Code và chạy test.</strong> Sai thì đọc phần <em>chẩn đoán tự động</em> và thẻ <em>"Lỗi này nghĩa là gì?"</em> — chúng chỉ ra <em>loại lỗi</em> bạn mắc, không chỉ chỗ sai.</li>
         <li><strong>Trả lời câu hỏi độ phức tạp.</strong> Giải được mà không biết nó tốn bao nhiêu thì chưa xong việc.</li>
         <li><strong>Đọc phần "Phân tích &amp; lời giải" kể cả khi đã giải đúng.</strong> Nó nói về <em>mẫu hình</em>, thứ sẽ quay lại ở các bài khó hơn.</li>
         <li><strong>Làm quiz và các bài đến hạn ôn.</strong></li>
@@ -204,6 +204,63 @@ export function renderGuide() {
       <p>Xếp hạng: <strong>S</strong> ≥115% · <strong>A</strong> ≥100% · <strong>B</strong> ≥80% · <strong>C</strong> ≥60% · <strong>D</strong> còn lại (bắt buộc làm lại).</p>
       <p>Mức thành thạo mỗi chủ đề = 70% từ điểm bài tập + 30% từ quiz. <strong>Đạt 80% mới nên coi là xong một chủ đề.</strong></p>
 
+      <h2>Khi code chạy sai — bốn công cụ gỡ lỗi</h2>
+      <p>Phần lớn thời gian học code là thời gian <em>tìm xem mình sai ở đâu</em>. Bốn thứ dưới đây rút ngắn nó lại:</p>
+      <table>
+        <thead><tr><th>Công cụ</th><th>Dùng khi nào</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>🧭 Thẻ giải thích lỗi</strong></td>
+            <td>Tự hiện khi code ném lỗi. Nói rõ <em>lỗi này nghĩa là gì · vì sao thường xảy ra · sửa thế nào</em> bằng tiếng Việt, kèm <strong>số dòng</strong> gây lỗi và nút nhảy thẳng tới dòng đó. Thông báo gốc tiếng Anh vẫn giữ trong phần gập lại.</td>
+          </tr>
+          <tr>
+            <td><strong>🔍 Theo dõi biến</strong></td>
+            <td>Gọi <code>trace({ i, l, r })</code> (JavaScript) hoặc <code>trace(i=i, l=l, r=r)</code> (Python) ở bất cứ đâu trong code. App hiện bảng giá trị các biến <strong>qua từng bước</strong>, ô nào vừa đổi giá trị thì tô sáng. Đây là cách nhanh nhất để thuật toán thôi là "hộp đen".</td>
+          </tr>
+          <tr>
+            <td><strong>▶ Chạy lại một test</strong></td>
+            <td>Nút trên mỗi dòng test. Chỉ chạy đúng test đó — nhanh hơn nhiều so với chạy cả bộ, và <strong>không tính lượt thử, không ảnh hưởng điểm</strong>.</td>
+          </tr>
+          <tr>
+            <td><strong>🧪 Chạy thử</strong></td>
+            <td>Ô dưới trình soạn thảo: tự nhập dữ liệu bất kỳ và xem hàm trả về gì. Không chấm điểm. Ô đã điền sẵn ví dụ đúng định dạng để bạn sửa cho nhanh.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p><code>console.log</code> / <code>print</code> của <strong>mỗi test hiện riêng trong thẻ test đó</strong>, không trộn chung — nên bạn luôn biết dòng log nào là của test nào.</p>
+
+      <h2>Nhớ cú pháp và cấu trúc dữ liệu</h2>
+      <p>Hai mục phục vụ hai lúc khác nhau:</p>
+      <ul>
+        <li><strong>🔎 Tra cứu nhanh</strong> — dùng <em>khi đang cần</em>. Có bảng "đề bài nói thế này → dùng cấu trúc nào",
+          bảng chi phí thao tác của 11 cấu trúc dữ liệu (kèm cú pháp cả JavaScript lẫn Python), bảng đối chiếu
+          <strong>JS ↔ Python</strong> và toàn bộ bảng cú pháp có nút chép. Gõ không dấu cũng tìm được.
+          Trong trang làm bài, nút <strong>🔎 Tra cứu</strong> mở ngay panel này mà không phải rời bài.</li>
+        <li><strong>🧠 Luyện nhớ</strong> — dùng <em>để lần sau khỏi phải tra</em>. Thẻ ghi nhớ hai mặt, tự chấm
+          Quên / Khó / Dễ, xếp lịch bằng đúng thuật toán ôn ngắt quãng của bài tập.
+          <strong>Nghĩ ra câu trả lời trong đầu trước khi lật thẻ</strong> — đoán rồi kiểm tra mới là lúc trí nhớ được củng cố.</li>
+      </ul>
+
+      <h2>Sổ tay: giữ lại thứ bạn rút ra được</h2>
+      <p>Mỗi trang bài tập có pane <strong>📝 Ghi chú của bạn</strong> (tự lưu) và nút <strong>☆ Đánh dấu</strong>.
+        Mục <strong>📔 Sổ tay</strong> gom tất cả lại, cộng thêm mục <strong>⚠️ Lỗi bạn hay mắc</strong> —
+        xếp hạng các loại lỗi bạn lặp lại nhiều nhất kèm cách sửa. Một loại lỗi lặp lại nhiều lần là
+        <em>lỗ hổng kiến thức</em>, không phải sự vô ý.</p>
+      <p class="muted">Mẹo viết ghi chú cho đáng: đừng chép lại lời giải (đã có sẵn rồi). Hãy viết
+        <em>"mẫu hình của bài này là gì"</em> và <em>"lần sau nhìn dấu hiệu nào để nhận ra"</em>.</p>
+
+      <h2>Đi lại trong app cho nhanh</h2>
+      <table>
+        <thead><tr><th>Phím / nút</th><th>Tác dụng</th></tr></thead>
+        <tbody>
+          <tr><td>Ctrl + K (hoặc ⌘ + K)</td><td>Mở bảng lệnh — gõ vài chữ là nhảy tới bất kỳ bài tập, chủ đề hay trang nào. Dùng được cả khi con trỏ đang trong ô code.</td></tr>
+          <tr><td>/</td><td>Cũng mở bảng lệnh (khi bạn không đang gõ trong ô nhập nào).</td></tr>
+          <tr><td>↑ ↓ · Enter · Esc</td><td>Chọn · mở · đóng bảng lệnh</td></tr>
+          <tr><td>Ô lọc ở Ngân hàng bài tập</td><td>Lọc theo độ khó, trạng thái (chưa giải / đã giải / đến hạn ôn / đã đánh dấu) và chủ đề</td></tr>
+        </tbody>
+      </table>
+      <p>Mọi ô tìm kiếm trong app đều <strong>bỏ dấu</strong>: gõ <code>hai con tro</code> ra "Hai con trỏ", gõ <code>dem tan suat</code> ra mục đếm tần suất.</p>
+
       <h2>Trình soạn thảo &amp; gợi ý cú pháp</h2>
       <p>Ô viết code có tô màu cú pháp, đánh số dòng và <strong>bảng gợi ý</strong> kèm chữ ký hàm + giải thích tiếng Việt — đang học Python mà chưa thuộc <code>enumerate</code>, <code>defaultdict</code> hay <code>heappush</code> thì cứ gõ vài ký tự đầu là ra. Bên dưới ô code còn có bảng <em>"Cú pháp thường dùng"</em>: bấm một mẫu là chèn thẳng vào chỗ con trỏ.</p>
       <table>
@@ -211,6 +268,7 @@ export function renderGuide() {
         <tbody>
           <tr><td>Ctrl + Enter</td><td>Chạy &amp; chấm điểm</td></tr>
           <tr><td>Ctrl + Space</td><td>Mở bảng gợi ý cú pháp bất cứ lúc nào</td></tr>
+          <tr><td>Ctrl + Z</td><td>Hoàn tác — vẫn hoạt động bình thường như trình duyệt</td></tr>
           <tr><td>Tab / Enter</td><td>Chọn gợi ý đang sáng · Esc để đóng bảng</td></tr>
           <tr><td>Tab / Shift + Tab</td><td>Thụt vào / thụt ra (Python 4 dấu cách, JS 2) — bôi đen nhiều dòng thì áp dụng cả khối</td></tr>
           <tr><td>Enter</td><td>Tự giữ thụt lề; sau dấu <code>:</code> tự thụt vào, sau <code>return</code>/<code>break</code>/<code>continue</code> tự thụt ra</td></tr>
