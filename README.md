@@ -161,9 +161,9 @@ src/
     python/                15 module Python thuần tuý
 tools/verify.mjs           kiểm chứng: chạy mọi lời giải mẫu qua mọi test case + dữ liệu tra cứu
 tools/test-merge.mjs       kiểm chứng bộ gộp tiến độ đa máy
-tools/test-sync-worker.mjs kiểm chứng Worker đồng bộ (KV giả, không cần deploy)
+tools/test-sync-worker.mjs kiểm chứng Worker đồng bộ (Durable Object giả, không cần deploy)
 tools/test-sync-e2e.mjs    kiểm chứng đồng bộ đầu-cuối: hai máy + Worker giả
-worker/                    Cloudflare Worker + KV làm hộp thư đồng bộ (tuỳ chọn)
+worker/                    Cloudflare Worker + Durable Object làm hộp thư đồng bộ (tuỳ chọn)
 ```
 
 Một nguyên tắc xuyên suốt: **mỗi dữ liệu chỉ có một nguồn**. `syntax-hints.js` vừa nuôi bảng gợi ý

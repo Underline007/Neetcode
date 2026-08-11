@@ -1,5 +1,5 @@
 /**
- * Đồng bộ tiến độ giữa nhiều máy qua một Cloudflare Worker + KV (xem thư mục worker/).
+ * Đồng bộ tiến độ giữa nhiều máy qua một Cloudflare Worker + Durable Object (xem thư mục worker/).
  *
  * Nguyên tắc: máy chủ chỉ là HỘP THƯ, không hiểu dữ liệu và không tự gộp. Mọi
  * việc gộp đều làm ở client bằng sync-merge.js, nên dù hai máy cùng học lệch

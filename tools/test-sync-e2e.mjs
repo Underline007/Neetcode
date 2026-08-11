@@ -8,7 +8,7 @@
  *
  *   node tools/test-sync-e2e.mjs
  */
-import worker from '../worker/src/index.js';
+import worker, { SyncRoom } from '../worker/src/index.js';
 
 /* ----------------------- giả lập môi trường trình duyệt ----------------------- */
 const storage = new Map();
@@ -20,15 +20,24 @@ globalThis.localStorage = {
 globalThis.window = new EventTarget();
 
 /* --------------------- giả lập mạng: trỏ thẳng vào Worker --------------------- */
-const kv = new Map();
+/** ctx.storage giả: cùng shape get/put với Durable Object storage thật. */
+function makeDoStorage() {
+  const map = new Map();
+  return {
+    async get(key) { return map.has(key) ? map.get(key) : undefined; },
+    async put(key, value) { map.set(key, value); },
+  };
+}
+
+// Mỗi mã đồng bộ (id) ánh xạ tới đúng một instance SyncRoom, như Durable Object thật.
+const rooms = new Map();
 const env = {
-  PROGRESS: {
-    async get(key, opts) {
-      const raw = kv.get(key);
-      if (raw === undefined) return null;
-      return opts?.type === 'json' ? JSON.parse(raw) : raw;
+  SYNC_ROOM: {
+    idFromName: (name) => name,
+    get(id) {
+      if (!rooms.has(id)) rooms.set(id, new SyncRoom({ storage: makeDoStorage() }));
+      return rooms.get(id);
     },
-    async put(key, value) { kv.set(key, value); },
   },
 };
 
@@ -113,7 +122,8 @@ check('đồng bộ lặp lại không làm hỏng dữ liệu', JSON.stringify(
 
   /** Máy C ghi thẳng vào Worker (không qua fetch giả nên không tính vào requestCount). */
   async function writeFromMachineC() {
-    const doc = JSON.parse(kv.get(code));
+    const getRes = await worker.fetch(new Request(`https://sync.test/p/${code}`), env);
+    const doc = await getRes.json();
     const fromC = JSON.parse(JSON.stringify(doc.state));
     fromC.problems['best-time-to-buy'] = {
       best: 120, attempts: 1, solved: true, hintsUsed: 0, revealed: false,
@@ -157,7 +167,8 @@ check('đồng bộ lặp lại không làm hỏng dữ liệu', JSON.stringify(
   check('tổng cộng 5 bài sau khi gộp xung đột', solvedIds().length === 5, solvedIds().join(','));
 
   // Bản trên máy chủ phải phản ánh đúng kết quả gộp.
-  const finalDoc = JSON.parse(kv.get(code));
+  const finalRes = await worker.fetch(new Request(`https://sync.test/p/${code}`), env);
+  const finalDoc = await finalRes.json();
   check('máy chủ lưu đủ 5 bài', Object.values(finalDoc.state.problems).filter((p) => p.solved).length === 5);
   check('máy chủ giữ code của máy C', finalDoc.state.problems['best-time-to-buy'].code === '// tu may C');
 }

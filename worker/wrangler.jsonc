@@ -5,13 +5,16 @@
   "compatibility_date": "2026-08-07",
   "compatibility_flags": ["nodejs_compat"],
 
-  // Tạo namespace rồi dán id vào đây:
-  //   npx wrangler kv namespace create PROGRESS
-  "kv_namespaces": [
-    {
-      "binding": "PROGRESS",
-      "id": "<DÁN_KV_NAMESPACE_ID_VÀO_ĐÂY>"
-    }
+  // Durable Object (SQLite storage) làm hộp thư: mỗi mã đồng bộ = một instance,
+  // Cloudflare tự tuần tự hoá request cùng mã nên đọc-rồi-ghi là atomic thật.
+  // Có sẵn ở gói Workers Free, không cần nâng cấp trả phí.
+  "durable_objects": {
+    "bindings": [
+      { "name": "SYNC_ROOM", "class_name": "SyncRoom" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["SyncRoom"] }
   ],
 
   "observability": {

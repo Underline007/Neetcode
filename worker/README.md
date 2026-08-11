@@ -1,8 +1,13 @@
-# Máy chủ đồng bộ tiến độ (Cloudflare Worker + KV)
+# Máy chủ đồng bộ tiến độ (Cloudflare Worker + Durable Object)
 
 Cho phép học trên nhiều máy mà tiến độ vẫn khớp nhau. Worker này chỉ là **hộp thư**:
 nó giữ một khối JSON theo "mã đồng bộ" và đánh số version. Toàn bộ việc **gộp** dữ liệu
 diễn ra ở trình duyệt (`src/sync-merge.js`), nên không máy nào ghi đè mất công sức của máy kia.
+
+Lưu bằng **Durable Object** (SQLite storage), không dùng KV: mỗi mã đồng bộ ứng với đúng
+một instance, Cloudflare tự xử lý tuần tự mọi request tới cùng instance đó, nên khoá version
+bên dưới là so-sánh-rồi-ghi nguyên tử thật — không có khe hở để hai lần ghi gần như đồng thời
+cùng đọc trúng version cũ rồi đè lên nhau. Vẫn nằm trong gói **Workers Free**, không cần trả phí.
 
 ## Triển khai (làm một lần, ~3 phút)
 
@@ -10,18 +15,13 @@ diễn ra ở trình duyệt (`src/sync-merge.js`), nên không máy nào ghi đ
 cd worker
 npm install -g wrangler        # nếu chưa có
 wrangler login
-
-# 1) Tạo KV namespace, rồi dán id nhận được vào wrangler.jsonc
-wrangler kv namespace create PROGRESS
-
-# 2) Đưa Worker lên
-wrangler deploy
+wrangler deploy                # migrations trong wrangler.jsonc tự tạo Durable Object
 ```
 
 Lệnh `deploy` in ra địa chỉ dạng `https://neetcode30-sync.<tên-tài-khoản>.workers.dev`.
 Chép địa chỉ đó vào app: **Thống kê → Đồng bộ nhiều máy → Địa chỉ máy chủ**.
 
-Chi phí: gói miễn phí của Workers/KV thừa sức cho việc này (100.000 request/ngày;
+Chi phí: gói miễn phí của Workers thừa sức cho việc này (100.000 request/ngày;
 việc học một người tạo vài chục request mỗi ngày).
 
 ## API
@@ -53,11 +53,9 @@ trước Worker, hoặc thu hẹp `access-control-allow-origin` về đúng orig
 ## Giới hạn đã biết
 
 - **Kích thước**: tối đa 2 MB mỗi mã (đủ cho tiến độ + code đã gõ ở mọi bài).
-- **KV nhất quán cuối (eventual consistency)**: sau khi máy A ghi, máy B có thể mất tới ~60
-  giây mới đọc được bản mới nếu ở khu vực địa lý khác. Không thành vấn đề khi bạn chuyển máy
-  cách nhau hàng giờ. Nếu cần đọc-ghi tức thì từ nhiều máy cùng lúc, hãy đổi KV sang
-  [Durable Objects](https://developers.cloudflare.com/durable-objects/) — API của Worker giữ nguyên,
-  chỉ thay chỗ lưu.
+- **Một instance là một điểm lưu duy nhất**: Durable Object không nhân bản dữ liệu ra nhiều khu
+  vực địa lý như KV, nên máy ở xa vị trí instance được tạo có thể có độ trễ mạng cao hơn đôi
+  chút. Đổi lại, đọc-ghi luôn nhất quán ngay lập tức — không còn độ trễ lan truyền như KV.
 
 ## Chạy thử tại chỗ
 

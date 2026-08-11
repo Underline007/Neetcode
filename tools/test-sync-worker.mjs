@@ -1,5 +1,6 @@
 /**
- * Kiểm chứng Worker đồng bộ (worker/src/index.js) bằng một KV giả trong bộ nhớ.
+ * Kiểm chứng Worker đồng bộ (worker/src/index.js) bằng một Durable Object giả
+ * trong bộ nhớ (giả lập ctx.storage.get/put, không phải KV).
  *
  * Không cần tài khoản Cloudflare, không cần deploy: Worker chỉ là một hàm
  * fetch(Request, env) nên gọi thẳng được từ Node. Phần đáng kiểm tra nhất là
@@ -7,7 +8,7 @@
  *
  *   node tools/test-sync-worker.mjs
  */
-import worker from '../worker/src/index.js';
+import worker, { SyncRoom } from '../worker/src/index.js';
 
 const CODE = 'abcdefghijklmnop';           // đúng 16 ký tự, hợp lệ
 const URL_BASE = 'https://sync.example.dev';
@@ -20,16 +21,25 @@ function check(name, condition, detail = '') {
   failures.push(`${name}${detail ? ` — ${detail}` : ''}`);
 }
 
-function makeEnv() {
-  const kv = new Map();
+/** ctx.storage giả: cùng shape get/put với Durable Object storage thật. */
+function makeStorage() {
+  const map = new Map();
   return {
-    PROGRESS: {
-      async get(key, opts) {
-        const raw = kv.get(key);
-        if (raw === undefined) return null;
-        return opts?.type === 'json' ? JSON.parse(raw) : raw;
+    async get(key) { return map.has(key) ? map.get(key) : undefined; },
+    async put(key, value) { map.set(key, value); },
+  };
+}
+
+/** Namespace giả: mỗi mã đồng bộ (id) ánh xạ tới đúng một instance SyncRoom, như thật. */
+function makeEnv() {
+  const rooms = new Map();
+  return {
+    SYNC_ROOM: {
+      idFromName: (name) => name,
+      get(id) {
+        if (!rooms.has(id)) rooms.set(id, new SyncRoom({ storage: makeStorage() }));
+        return rooms.get(id);
       },
-      async put(key, value) { kv.set(key, value); },
     },
   };
 }
@@ -122,12 +132,15 @@ try {
 
   /* --------- lỗi hạ tầng phải trả 500 có cấu trúc, không nuốt --------- */
   {
-    const broken = { PROGRESS: { async get() { throw new Error('KV sập'); }, async put() {} } };
+    const brokenRoom = new SyncRoom({
+      storage: { async get() { throw new Error('storage sập'); }, async put() {} },
+    });
+    const broken = { SYNC_ROOM: { idFromName: (name) => name, get: () => brokenRoom } };
     const realError = console.error;
     console.error = () => {};
     const res = await call(broken, 'GET', `/p/${CODE}`);
     console.error = realError;
-    check('KV lỗi -> 500', res.status === 500, `nhận ${res.status}`);
+    check('storage lỗi -> 500', res.status === 500, `nhận ${res.status}`);
     check('500 vẫn là JSON có trường error', (await res.json()).error !== undefined);
     check('500 vẫn kèm header CORS', res.headers.get('access-control-allow-origin') === '*');
   }
