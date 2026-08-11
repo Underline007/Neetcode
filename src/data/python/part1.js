@@ -9,7 +9,7 @@ export default [
   name: 'Cú pháp nền tảng & Kiểu dữ liệu',
   en: 'Python Fundamentals & Data Types',
   icon: '🐣',
-  summary: 'Bạn đã biết lập trình qua JavaScript — module này dịch trực tiếp phản xạ JS sang "phong cách Python" (Pythonic), không dạy lại từ số 0.',
+  summary: 'Bắt đầu từ số 0: phần "Cú pháp cần biết trước" dạy cách viết một dòng Python hợp lệ, sau đó bài giảng đi vào thứ quyết định chất lượng code — phân biệt kiểu bất biến và biến đổi được.',
   lesson: `
 ## 1. Vấn đề gốc
 

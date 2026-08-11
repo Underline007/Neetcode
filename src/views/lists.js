@@ -106,6 +106,7 @@ export function renderTopic(id, domain = JS_DOMAIN) {
   const st = store.get();
   const lang = curLang();
   const lesson = pick(t, 'lesson', lang);
+  const syntax = pick(t, 'syntax', lang);
   const quizQs = pick(t, 'quiz', lang);
   const list = PROBLEMS.filter((p) => p.topic === t.id);
   const quiz = st.quizzes[t.id];
@@ -121,6 +122,15 @@ export function renderTopic(id, domain = JS_DOMAIN) {
 
     <h1 style="margin-top:14px">${t.icon} ${esc(t.name)}</h1>
     <p class="sub">${esc(t.en)} — ${esc(t.summary)}</p>
+
+    ${syntax ? `
+      <details class="card syntax-primer" open>
+        <summary>
+          <strong>📖 Cú pháp cần biết trước</strong>
+          <span class="muted small">Dành cho người chưa từng viết Python — đọc phần này trước bài giảng</span>
+        </summary>
+        <div class="md">${md(syntax)}</div>
+      </details>` : ''}
 
     <div class="card md">${md(lesson)}</div>
 

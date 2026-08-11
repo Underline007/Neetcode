@@ -60,6 +60,12 @@ Mỗi bài giảng bắt đầu từ câu hỏi *"vấn đề gốc là gì?"* v
 Ví dụ: chương Tìm kiếm nhị phân không dạy "mảng đã sắp xếp" mà dạy **tính đơn điệu của vị từ** —
 nhờ đó bạn mở khoá được kỹ thuật *binary search on answer*.
 
+**Lộ trình Python dạy từ số 0.**
+Mỗi module Python mở đầu bằng mục **📖 Cú pháp cần biết trước** — giải thích từng ký hiệu (dấu `:`,
+thụt đầu dòng, `self`, `@decorator`, `yield`, `->`…) cho người chưa từng viết một dòng Python, kèm
+bảng tra nhanh và bảng "lỗi cú pháp người mới hay gặp → sửa thế nào". Bài giảng phía sau mới đi vào
+tư duy và bẫy thực chiến, nên không ai bị bỏ lại ở khâu đọc hiểu code.
+
 **Chấm điểm theo mức độ tự lực.**
 Ai cũng copy được lời giải; điểm số thì nói thật.
 
@@ -159,6 +165,10 @@ src/
     index.js               gộp dữ liệu + lộ trình 30 ngày + sinh test hiệu năng
     reference.js           cấu trúc dữ liệu, bảng chọn cấu trúc, đối chiếu JS↔Python, thẻ nhớ
     python/                15 module Python thuần tuý
+      part1..part15.js     bài giảng (tư duy), quiz, bài tập của từng module
+      syntax1..3.js        phần "Cú pháp cần biết trước" — dạy cú pháp Python từ số 0
+      syntax.js            gộp 3 file trên thành map theo id module
+      index.js             ghép syntax vào từng module rồi xuất PY_TOPICS/PY_PROBLEMS
 tools/verify.mjs           kiểm chứng: chạy mọi lời giải mẫu qua mọi test case + dữ liệu tra cứu
 tools/test-merge.mjs       kiểm chứng bộ gộp tiến độ đa máy
 tools/test-sync-worker.mjs kiểm chứng Worker đồng bộ (Durable Object giả, không cần deploy)

@@ -13,15 +13,19 @@ import part12 from './part12.js';
 import part13 from './part13.js';
 import part14 from './part14.js';
 import part15 from './part15.js';
+import { PY_SYNTAX } from './syntax.js';
 
 /** Các module của lộ trình Python — học theo thứ tự module, không theo ngày cố định.
  *  Trang chi tiết (/topic/:id, /problem/:id) tự nhận domain theo id (xem main.js) nên
- *  không cần tiền tố đường dẫn riêng — mọi link đều dùng đường dẫn phẳng #/topic/..., #/problem/... */
+ *  không cần tiền tố đường dẫn riêng — mọi link đều dùng đường dẫn phẳng #/topic/..., #/problem/...
+ *
+ *  Mỗi module được gắn thêm field `syntax` (xem syntax.js): phần dạy cú pháp Python từ số 0,
+ *  hiển thị TRƯỚC bài giảng cho người mới hoàn toàn với ngôn ngữ này. */
 export const PY_TOPICS = [
   ...part1, ...part2, ...part3, ...part4, ...part5,
   ...part6, ...part7, ...part8, ...part9, ...part10,
   ...part11, ...part12, ...part13, ...part14, ...part15,
-];
+].map((t) => (PY_SYNTAX[t.id] ? { ...t, syntax: PY_SYNTAX[t.id] } : t));
 
 /** Toàn bộ bài tập Python, gắn thông tin module + đánh dấu ngôn ngữ. */
 export const PY_PROBLEMS = PY_TOPICS.flatMap((t) =>
