@@ -4,7 +4,8 @@ import { computeScore, grade, BASE_POINTS, HINT_PENALTY } from '../scoring.js';
 import { qualityFromScore, schedule, nextDueLabel } from '../srs.js';
 import { runTests } from '../runner.js';
 import { md } from '../markdown.js';
-import { $, $$, esc, toast, diffClass, diffLabel } from '../ui.js';
+import { $, $$, esc, inlineMd, toast, diffClass, diffLabel } from '../ui.js';
+import { questionHtml } from '../quiz-format.js';
 import { resolveLang, pick } from '../lang.js';
 import { createEditor } from '../editor.js';
 import { HINTS } from '../syntax-hints.js';
@@ -340,7 +341,7 @@ export function mountProblem(id, domain = JS_DOMAIN) {
       <h3>Lời giải tham khảo (${isPy ? 'Python' : 'JavaScript'})</h3>
       <div class="md">${md('```' + (isPy ? 'python' : 'js') + '\n' + primarySolution + '\n```')}</div>
       ${otherLangBlock}
-      <div class="hint"><strong>🌍 Ứng dụng thực tế.</strong> ${esc(p.realWorld)}</div>`;
+      <div class="hint md"><strong>🌍 Ứng dụng thực tế.</strong> ${inlineMd(p.realWorld)}</div>`;
   });
 
   /* ------------------- chạy thử với dữ liệu tự nhập ------------------- */
@@ -586,14 +587,14 @@ export function mountProblem(id, domain = JS_DOMAIN) {
 
         const g = grade(rec.best, p.difficulty);
         box.insertAdjacentHTML('beforeend', `
-          <div class="hint"><strong>Giải thích.</strong> ${esc(p.complexity.why)}</div>
+          <div class="hint md"><strong>Giải thích.</strong> ${inlineMd(p.complexity.why)}</div>
           <div class="row" style="margin-top:10px">
             <span class="badge ${g.color}">Xếp hạng ${g.letter}</span>
             <span class="muted small">${esc(g.text)} · ${rec.best}/${BASE_POINTS[p.difficulty]} điểm</span>
             <span class="spacer"></span>
             <span class="badge">${nextDueLabel(rec.srs)}</span>
           </div>
-          <div class="hint" style="border-left-color:var(--ok)"><strong>🌍 Ứng dụng thực tế.</strong> ${esc(p.realWorld)}</div>
+          <div class="hint md" style="border-left-color:var(--ok)"><strong>🌍 Ứng dụng thực tế.</strong> ${inlineMd(p.realWorld)}</div>
           ${rec.revealed ? '' : '<p class="small muted">Chưa xem phần <strong>Phân tích &amp; lời giải</strong>? Giờ là lúc nên đọc — nó nói về <em>mẫu hình</em> đằng sau bài này, thứ sẽ quay lại ở các bài khó hơn. (Đọc sau khi đã giải xong không bị trừ điểm nữa.)</p>'}
         `);
         // đã giải xong -> mở lời giải miễn phí
@@ -608,9 +609,11 @@ export function mountProblem(id, domain = JS_DOMAIN) {
 function complexityCard(p) {
   return `
     <div class="quiz-q">
-      <strong>🧠 Câu hỏi cuối: ${esc(p.complexity.question)}</strong>
+      <div class="q-text md">${questionHtml(p.complexity.question, { lang: resolveLang(p, store.get().lang), prefix: '**🧠 Câu hỏi cuối:**' })}</div>
       <p class="muted small" style="margin:6px 0 10px">Trả lời đúng được cộng thêm 10% điểm. Giải được bài mà không biết nó tốn bao nhiêu thì chưa xong việc.</p>
-      ${p.complexity.options.map((o, i) => `<div class="opt" data-i="${i}"><span>${'ABCD'[i]}.</span><span>${esc(o)}</span></div>`).join('')}
+      <div class="opts">
+        ${p.complexity.options.map((o, i) => `<div class="opt" data-i="${i}"><span class="opt-k">${'ABCD'[i]}.</span><span>${inlineMd(o)}</span></div>`).join('')}
+      </div>
     </div>`;
 }
 

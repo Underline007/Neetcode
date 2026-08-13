@@ -1,11 +1,19 @@
 import { topicById as jsTopicById } from '../data/index.js';
+import { pyTopicById } from '../data/python/index.js';
 import { store } from '../store.js';
-import { $, $$, esc, toast } from '../ui.js';
+import { $, $$, esc, inlineMd, toast } from '../ui.js';
 import { md } from '../markdown.js';
+import { questionHtml } from '../quiz-format.js';
 import { pick } from '../lang.js';
 
 const JS_DOMAIN = { topicById: jsTopicById, basePath: '' };
 const curLang = () => store.get().lang || 'javascript';
+
+/** Ngôn ngữ dùng để tô màu code trong đề bài: theo đúng bộ câu hỏi đang được hiển thị. */
+function quizCodeLang(t) {
+  if (pyTopicById.has(t.id)) return 'python'; // module ngôn ngữ Python: đề bài luôn là Python
+  return curLang() === 'python' && t.quizPy !== undefined ? 'python' : 'javascript';
+}
 
 export function renderQuiz(topicId, domain = JS_DOMAIN) {
   const { topicById, basePath } = domain;
@@ -13,6 +21,7 @@ export function renderQuiz(topicId, domain = JS_DOMAIN) {
   if (!t) return '<h1>Không tìm thấy quiz</h1>';
   const rec = store.quiz(t.id);
   const quizQs = pick(t, 'quiz', curLang());
+  const codeLang = quizCodeLang(t);
 
   return `
     <div class="row">
@@ -28,9 +37,9 @@ export function renderQuiz(topicId, domain = JS_DOMAIN) {
     <div id="quiz">
       ${quizQs.map((q, i) => `
         <div class="quiz-q" data-q="${i}">
-          <strong>Câu ${i + 1}. ${esc(q.q).replace(/\n/g, '<br>')}</strong>
-          <div style="margin-top:8px">
-            ${q.options.map((o, j) => `<div class="opt" data-i="${j}"><span>${'ABCD'[j]}.</span><span>${esc(o)}</span></div>`).join('')}
+          <div class="q-text md">${questionHtml(q.q, { lang: codeLang, prefix: `**Câu ${i + 1}.**` })}</div>
+          <div class="opts">
+            ${q.options.map((o, j) => `<div class="opt" data-i="${j}"><span class="opt-k">${'ABCD'[j]}.</span><span>${inlineMd(o)}</span></div>`).join('')}
           </div>
           <div class="explain"></div>
         </div>`).join('')}
@@ -78,7 +87,7 @@ export function mountQuiz(topicId, domain = JS_DOMAIN) {
       });
       if (answers[qi] === q.answer) correct++;
       $('.explain', qEl).innerHTML =
-        `<div class="hint"><strong>${answers[qi] === q.answer ? '✅ Đúng.' : '❌ Chưa đúng.'}</strong> ${md(q.why).replace(/^<p>|<\/p>$/g, '')}</div>`;
+        `<div class="hint md"><strong>${answers[qi] === q.answer ? '✅ Đúng.' : '❌ Chưa đúng.'}</strong> ${md(q.why).replace(/^<p>|<\/p>$/g, '')}</div>`;
     });
 
     const pct = Math.round((correct / quizQs.length) * 100);

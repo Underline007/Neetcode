@@ -555,8 +555,23 @@ table.cs-table.syn .syn-copy .code-copy { white-space: nowrap; font-size: 11.5px
 
 /* ---------- Quiz ---------- */
 .quiz-q { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; background: var(--panel); margin: 12px 0; }
+
+/* Đề bài: câu dẫn in đậm cho dễ quét, còn khối code giữ đúng dáng code (mono, thụt lề,
+   không in đậm) — đề có code sẽ không bị đọc lẫn thành một câu văn. */
+.quiz-q .q-text > p { font-weight: 600; margin: 0 0 8px; }
+.quiz-q .q-text > p:last-child { margin-bottom: 0; }
+.quiz-q .q-text .code-block { margin: 10px 0; font-weight: 400; }
+.quiz-q .q-text > p code { font-weight: 500; }
+.quiz-q .opts { margin-top: 10px; }
+
 .opt { display: flex; gap: 10px; align-items: flex-start; padding: 9px 12px; border: 1px solid var(--border);
   border-radius: 10px; margin: 6px 0; cursor: pointer; background: var(--panel-2); }
+.opt .opt-k { font-weight: 650; color: var(--muted); }
+/* Đáp án nằm ngoài vùng .md nên cần luật riêng cho `code` trong đáp án. */
+.opt code {
+  font-family: var(--mono); font-size: 13px; background: var(--panel);
+  padding: 1px 5px; border-radius: 6px; border: 1px solid var(--border);
+}
 .opt:hover { border-color: var(--accent); }
 .opt.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .opt.correct { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, var(--panel-2)); }
