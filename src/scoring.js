@@ -3,7 +3,12 @@
  *
  * Triết lý: điểm phản ánh *mức độ tự lực* chứ không chỉ "chạy đúng test".
  * Ai cũng có thể copy lời giải — nhưng điểm sẽ nói thật.
+ *
+ * "Chạy đúng test" cũng chưa phải xong việc: một lời giải đúng nhưng chậm gấp
+ * chục lần vẫn là lời giải sai độ phức tạp. Vì thế có thêm mức thưởng hiệu
+ * năng, đo bằng cách so với lời giải tham chiếu (xem perf.js).
  */
+import { perfTier } from './perf.js';
 
 export const BASE_POINTS = { Easy: 100, Medium: 160, Hard: 220 };
 
@@ -17,8 +22,13 @@ export const BONUS = {
   firstTry: 0.15,       // pass toàn bộ test ngay lần chạy đầu tiên
   complexity: 0.10,     // trả lời đúng câu hỏi độ phức tạp
   speed: 0.10,          // giải trong thời gian mục tiêu
+  perf: 0.10,           // chạy nhanh ngang lời giải tham chiếu
 };
 
+/**
+ * @param {number|null} perfRatio thời gian chạy của người học / của lời giải tham chiếu.
+ *   null = chưa đo (không thưởng, cũng không phạt).
+ */
 export function computeScore({
   difficulty = 'Medium',
   hintsUsed = 0,
@@ -27,6 +37,7 @@ export function computeScore({
   elapsedMs = null,
   targetMinutes = null,
   complexityCorrect = false,
+  perfRatio = null,
 } = {}) {
   const base = BASE_POINTS[difficulty] ?? 150;
   const penalty = HINT_PENALTY[Math.min(hintsUsed, 3)] ?? 0.34;
@@ -41,6 +52,15 @@ export function computeScore({
   const speedOk = elapsedMs != null && targetMinutes != null && elapsedMs <= targetMinutes * 60000;
   if (speedOk) { mult += BONUS.speed; parts.push({ label: `Giải trong ${targetMinutes} phút`, delta: BONUS.speed }); }
 
+  // Hiệu năng: chỉ THƯỞNG, không trừ. Chậm thì mất phần thưởng đó — đủ để thấy
+  // rõ trong bảng điểm, mà không xoá công của người vừa tự giải xong một bài.
+  if (perfRatio != null) {
+    const tier = perfTier(perfRatio);
+    const delta = BONUS.perf * tier.credit;
+    mult += delta;
+    parts.push({ label: `Hiệu năng: ${tier.label}`, delta });
+  }
+
   let score = Math.max(0, Math.round(base * mult));
   if (revealed) {
     const capped = Math.round(base * REVEAL_CAP);
@@ -49,7 +69,8 @@ export function computeScore({
       score = capped;
     }
   }
-  return { score, base, parts, max: Math.round(base * (1 + BONUS.firstTry + BONUS.complexity + BONUS.speed)) };
+  const maxMult = 1 + BONUS.firstTry + BONUS.complexity + BONUS.speed + BONUS.perf;
+  return { score, base, parts, max: Math.round(base * maxMult) };
 }
 
 /** Xếp hạng chữ cho một điểm số so với base */

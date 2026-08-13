@@ -36,15 +36,19 @@ function earlierTime(a, b) {
   return Math.min(a, b);
 }
 
-/** Hợp nhất hai map id -> object bằng một hàm gộp cho từng cặp. */
+/**
+ * Hợp nhất hai map id -> object bằng một hàm gộp cho từng cặp.
+ *
+ * Bản ghi chỉ có ở MỘT bên vẫn đi qua hàm gộp (bên kia coi như object rỗng) chứ
+ * không được sao chép nguyên xi: nhờ vậy kết quả luôn có đúng bộ field hiện tại
+ * và lần gộp thứ hai không còn gì để sửa nữa. Nếu sao chép nguyên xi, một bản
+ * ghi cũ (thiếu field mới thêm) sẽ được "bổ sung field" ở lần đồng bộ SAU —
+ * tiến độ vẫn đúng, nhưng mỗi lần đồng bộ lại sinh ra một bản khác nhau.
+ */
 function mergeMaps(a = {}, b = {}, mergeOne) {
   const out = {};
   for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
-    const left = a[key];
-    const right = b[key];
-    if (!left) out[key] = right;
-    else if (!right) out[key] = left;
-    else out[key] = mergeOne(left, right);
+    out[key] = mergeOne(a[key] || {}, b[key] || {});
   }
   return out;
 }
@@ -73,6 +77,15 @@ function mergeSrs(a, b) {
   return num(a.interval) >= num(b.interval) ? a : b;
 }
 
+/** Tỉ lệ hiệu năng: nhỏ hơn là nhanh hơn; null nghĩa là chưa đo bên đó. */
+function betterRatio(a, b) {
+  const va = typeof a === 'number' && a > 0 ? a : null;
+  const vb = typeof b === 'number' && b > 0 ? b : null;
+  if (va == null) return vb;
+  if (vb == null) return va;
+  return Math.min(va, vb);
+}
+
 function mergeProblem(a, b) {
   // Bản "mới hơn" quyết định những thứ không cộng dồn được: code đang gõ, kết quả chạy gần nhất.
   const newer = num(a.lastRun) >= num(b.lastRun) ? a : b;
@@ -86,8 +99,17 @@ function mergeProblem(a, b) {
     solved: Boolean(a.solved || b.solved),
     hintsUsed: maxNum(a.hintsUsed, b.hintsUsed),
     revealed: Boolean(a.revealed || b.revealed),
+    // "đang hiện trên màn hình" — luôn ≥ phần phải trả điểm, xem unlock.js
+    hintsOpen: Math.max(maxNum(a.hintsOpen, b.hintsOpen), maxNum(a.hintsUsed, b.hintsUsed)),
+    solutionSeen: Boolean(a.solutionSeen || b.solutionSeen || a.revealed || b.revealed),
+    // hiệu năng: giữ kết quả ĐO TỐT NHẤT (tỉ lệ càng nhỏ càng nhanh)
+    perfRatio: betterRatio(a.perfRatio, b.perfRatio),
+    perfAt: laterTime(a.perfAt, b.perfAt),
     firstTry: mergeFirstTry(a.firstTry, b.firstTry),
     code: newer.code ?? older.code ?? null,
+    // code Python được gõ ở một field riêng (bài song ngữ) — không có dòng này thì
+    // đồng bộ giữa hai máy sẽ xoá mất code Python đang gõ dở.
+    codePy: newer.codePy ?? older.codePy ?? null,
     lastRun: laterTime(a.lastRun, b.lastRun),
     srs: mergeSrs(a.srs, b.srs),
   };

@@ -309,30 +309,188 @@ def __neetcode_run(code, entry, tests_json, harness_src, checker_src):
         return json.dumps({'ok': True, 'results': results, 'totalMs': round(total_ms, 2), 'logs': setup_logs})
     finally:
         builtins.print = real_print
+
+# ---------- Đo hiệu năng: code của người học vs lời giải tham chiếu ----------
+# Cùng một lượt, cùng một máy, cùng dữ liệu -> tỉ lệ thời gian giữa hai bên là con số
+# so sánh được (xem src/perf.js). Lấy lượt NHANH NHẤT trong nhiều lượt: nhiễu từ hệ
+# điều hành / bộ dọn rác chỉ có thể làm chậm đi, không làm nhanh lên.
+__NEETCODE_BENCH = {
+    'target_pass_ms': 12.0,
+    'calibrate_ms': 500.0,
+    'min_total_ms': 150.0,
+    'hard_ms': 1500.0,
+    'max_passes': 40,
+    'max_inner': 100000,
+    'max_clone_bytes': 4000000,
+    'second_round_if_under_ms': 900.0,
+}
+
+def __neetcode_bench_mutates(fn, harness, tests, arg_srcs):
+    """Hàm có sửa thẳng vào đầu vào không (list.sort(), append...)?
+
+    Nếu không thì mỗi lượt đo chỉ cần một bản sao dùng lại nhiều lần: số lần lặp
+    không còn bị bộ nhớ chặn, phép đo dài ra và chính xác hơn. Nếu có thì phải sao
+    chép cho từng lần gọi, nếu không lần gọi sau sẽ chạy trên dữ liệu đã bị hỏng."""
+    for i in range(len(tests)):
+        args = json.loads(arg_srcs[i])
+        try:
+            harness(fn, args, tests[i])
+        except Exception:
+            return True
+        try:
+            if json.dumps(args) != arg_srcs[i]:
+                return True
+        except Exception:
+            return True
+    return False
+
+def __neetcode_bench_pass(fn, harness, tests, arg_srcs, inner, reuse):
+    """Một lượt đo = "inner" lần chạy hết bộ test. Bản sao đầu vào được chuẩn bị TRƯỚC
+    khi bấm đồng hồ: chi phí sao chép không phải lỗi của người học."""
+    calls = []
+    if reuse:
+        shared = [json.loads(s) for s in arg_srcs]
+        for _ in range(inner):
+            for i in range(len(tests)):
+                calls.append((shared[i], tests[i]))
+    else:
+        for _ in range(inner):
+            for i in range(len(tests)):
+                calls.append((json.loads(arg_srcs[i]), tests[i]))
+    t0 = time.perf_counter()
+    for args, t in calls:
+        harness(fn, args, t)
+    return (time.perf_counter() - t0) * 1000
+
+def __neetcode_bench_inner(fn, harness, tests, arg_srcs, nbytes, reuse):
+    """Tăng dần số lần lặp cho tới khi một lượt đo đủ dài để đồng hồ nói được điều gì.
+    Không tính một lần từ phép đo đầu tiên: phép đo đó có thể ra 0 với hàm rất nhỏ."""
+    cfg = __NEETCODE_BENCH
+    cap = cfg['max_inner'] if reuse else max(1, min(cfg['max_inner'], int(cfg['max_clone_bytes'] // max(nbytes, 1))))
+    until = time.perf_counter() + cfg['calibrate_ms'] / 1000.0
+    inner = 1
+    ms = __neetcode_bench_pass(fn, harness, tests, arg_srcs, inner, reuse)
+    while ms < cfg['target_pass_ms'] and inner < cap and time.perf_counter() < until:
+        grow = int(math.ceil(cfg['target_pass_ms'] / ms)) if ms > 0 else 16
+        inner = min(cap, inner * min(max(grow, 2), 64))
+        ms = __neetcode_bench_pass(fn, harness, tests, arg_srcs, inner, reuse)
+    return inner
+
+def __neetcode_bench_side(fn, harness, tests, arg_srcs, inner, reuse):
+    cfg = __NEETCODE_BENCH
+    best = float('inf')
+    passes = 0
+    t0 = time.perf_counter()
+    while True:
+        ms = __neetcode_bench_pass(fn, harness, tests, arg_srcs, inner, reuse)
+        if ms < best:
+            best = ms
+        passes += 1
+        elapsed = (time.perf_counter() - t0) * 1000
+        if passes >= cfg['max_passes'] or elapsed >= cfg['hard_ms']:
+            break
+        if elapsed >= cfg['min_total_ms'] and passes >= 3:
+            break
+    return {'ms': best / inner, 'passMs': round(best, 3), 'inner': inner, 'passes': passes}
+
+def __neetcode_bench_globals(code):
+    g = {
+        'ListNode': ListNode,
+        'TreeNode': TreeNode,
+        'buildList': buildList,
+        'listToArray': listToArray,
+        'buildCycleList': buildCycleList,
+        'buildTree': buildTree,
+        'treeToArray': treeToArray,
+        # đang đo thuật toán, không đo chi phí gỡ lỗi -> trace() thành hàm rỗng
+        'trace': lambda *a, **k: None,
+    }
+    exec(code, g)
+    return g
+
+def __neetcode_bench(code, ref_code, entry, tests_json, harness_src):
+    real_print = builtins.print
+    builtins.print = lambda *a, **k: None
+    try:
+        tests = [t for t in json.loads(tests_json) if not t.get('scratch')]
+        if not tests:
+            return json.dumps({'ok': False, 'phase': 'bench', 'error': 'Không có test nào để đo.'})
+
+        our_globals = __neetcode_bench_globals(code)
+        ref_globals = __neetcode_bench_globals(ref_code)
+        fn = our_globals.get(entry)
+        ref_fn = ref_globals.get(entry)
+        if not callable(fn) or not callable(ref_fn):
+            return json.dumps({'ok': False, 'phase': 'bench', 'error': 'Không tìm thấy hàm "%s".' % entry})
+
+        # harness phải dựng trong ĐÚNG không gian tên của từng bên: nó có thể gọi tới
+        # lớp/hàm phụ do chính code bên đó định nghĩa.
+        def default_harness(f, args, t):
+            return f(*args)
+        our_harness = __neetcode_make_callable(harness_src, our_globals, 'harness') or default_harness
+        ref_harness = __neetcode_make_callable(harness_src, ref_globals, 'harness') or default_harness
+
+        arg_srcs = [json.dumps(t.get('args')) for t in tests]
+        nbytes = sum(len(s) for s in arg_srcs)
+        # Mỗi bên tự dò số lần lặp của mình: dùng chung một con số thì bên nhanh sẽ đo
+        # ra 0 (nếu lấy theo bên chậm) hoặc bên chậm chạy hàng chục giây (nếu lấy theo
+        # bên nhanh). Kết quả đã chia lại theo số lần lặp nên tỉ lệ vẫn so được.
+        reuse_ours = not __neetcode_bench_mutates(fn, our_harness, tests, arg_srcs)
+        reuse_ref = not __neetcode_bench_mutates(ref_fn, ref_harness, tests, arg_srcs)
+        inner_ours = __neetcode_bench_inner(fn, our_harness, tests, arg_srcs, nbytes, reuse_ours)
+        inner_ref = __neetcode_bench_inner(ref_fn, ref_harness, tests, arg_srcs, nbytes, reuse_ref)
+
+        t0 = time.perf_counter()
+        a = __neetcode_bench_side(fn, our_harness, tests, arg_srcs, inner_ours, reuse_ours)
+        b = __neetcode_bench_side(ref_fn, ref_harness, tests, arg_srcs, inner_ref, reuse_ref)
+        # Vòng đo thứ hai (nếu còn thời gian) để loại bớt ảnh hưởng của thứ tự đo.
+        if (time.perf_counter() - t0) * 1000 < __NEETCODE_BENCH['second_round_if_under_ms']:
+            b2 = __neetcode_bench_side(ref_fn, ref_harness, tests, arg_srcs, inner_ref, reuse_ref)
+            a2 = __neetcode_bench_side(fn, our_harness, tests, arg_srcs, inner_ours, reuse_ours)
+            if a2['ms'] < a['ms']:
+                a = a2
+            if b2['ms'] < b['ms']:
+                b = b2
+
+        return json.dumps({
+            'ok': True, 'mode': 'bench', 'ours': a, 'ref': b,
+            'ratio': (a['ms'] / b['ms']) if b['ms'] > 0 else None,
+            'tests': len(tests),
+            'onBigData': any(t.get('perf') for t in tests),
+        })
+    except Exception as e:
+        return json.dumps({'ok': False, 'phase': 'bench', 'error': '%s: %s' % (type(e).__name__, e)})
+    finally:
+        builtins.print = real_print
 `;
 
 let pyodidePromise = null;
-let runTestsFn = null;
+let pyFns = null;
 
-async function getRunner() {
+async function getFns() {
   if (!pyodidePromise) {
     pyodidePromise = (async () => {
       const { loadPyodide } = await import(/* webpackIgnore: true */ `${PYODIDE_BASE}pyodide.mjs`);
       const pyodide = await loadPyodide({ indexURL: PYODIDE_BASE });
       pyodide.runPython(DRIVER_SRC);
-      runTestsFn = pyodide.globals.get('__neetcode_run');
+      pyFns = {
+        run: pyodide.globals.get('__neetcode_run'),
+        bench: pyodide.globals.get('__neetcode_bench'),
+      };
       return pyodide;
     })();
   }
   await pyodidePromise;
-  return runTestsFn;
+  return pyFns;
 }
 
 self.onmessage = async (e) => {
-  const { code, entry, tests, harnessSrc, checkerSrc } = e.data;
+  const { mode, code, refCode, entry, tests, harnessSrc, checkerSrc } = e.data;
   try {
-    const run = await getRunner();
-    const resultJson = run(code, entry, JSON.stringify(tests), harnessSrc || null, checkerSrc || null);
+    const fns = await getFns();
+    const resultJson = mode === 'bench'
+      ? fns.bench(code, refCode, entry, JSON.stringify(tests), harnessSrc || null)
+      : fns.run(code, entry, JSON.stringify(tests), harnessSrc || null, checkerSrc || null);
     self.postMessage(JSON.parse(resultJson));
   } catch (err) {
     self.postMessage({

@@ -396,6 +396,19 @@ table.trace .lbl { color: var(--muted); font-family: var(--sans); }
 table.trace td.chg { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--text); font-weight: 650; }
 .chg-demo { background: color-mix(in srgb, var(--warn) 22%, transparent); padding: 0 4px; border-radius: 4px; }
 
+/* thẻ hiệu năng: code của người học so với lời giải tham chiếu */
+.perf-card { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.perf-rows { display: flex; flex-direction: column; gap: 7px; margin: 12px 0 4px; }
+.perf-row { display: grid; grid-template-columns: 140px 1fr 78px; align-items: center; gap: 10px; }
+.perf-row .who { font-size: 12.5px; color: var(--muted); }
+.perf-row .t { font-size: 12.5px; text-align: right; }
+.perf-row:first-child .bar > i { background: linear-gradient(90deg, var(--warn), var(--accent-2)); }
+.perf-verdict { font-size: 13.5px; margin: 10px 0 0; }
+@media (max-width: 560px) {
+  .perf-row { grid-template-columns: 1fr 66px; }
+  .perf-row .who { grid-column: 1 / -1; }
+}
+
 /* thẻ giải thích lỗi tiếng Việt */
 .err-explain { border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
 .err-line {
@@ -495,11 +508,37 @@ table.cs-table code {
   font-family: var(--mono); font-size: 12.5px; font-weight: 700; color: var(--warn); white-space: nowrap;
 }
 table.cs-table.xlang td:nth-child(1) { min-width: 150px; }
-table.cs-table.syn .syn-name code { color: var(--t-fn); font-weight: 650; white-space: nowrap; }
-table.cs-table.syn .syn-sig code { color: var(--t-str); }
-/* đủ rộng cho chữ "✅ Đã sao chép" để dòng không bị giãn cao khi bấm */
-table.cs-table.syn .syn-copy { width: 104px; text-align: right; }
-table.cs-table.syn .syn-copy .code-copy { white-space: nowrap; font-size: 11.5px; }
+/* một mục cú pháp: tên + chữ ký + giải thích + ví dụ kèm kết quả */
+.syn-grid { gap: 10px; margin-bottom: 18px; }
+.syn-item { display: flex; flex-direction: column; gap: 6px; }
+.syn-item .syn-name {
+  font-family: var(--mono); font-size: 13.5px; font-weight: 700; color: var(--t-fn);
+  word-break: break-word;
+}
+.syn-item .syn-sig {
+  font-family: var(--mono); font-size: 12.5px; color: var(--t-str);
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 5px 8px; word-break: break-word; white-space: pre-wrap;
+}
+.syn-item .syn-doc { margin: 0; font-size: 13px; line-height: 1.6; }
+.syn-item .code-copy { white-space: nowrap; font-size: 11.5px; }
+.syn-ex { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.syn-ex li {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  font-family: var(--mono); font-size: 12px; line-height: 1.5;
+}
+.syn-ex .ex-code { color: var(--t-prop); white-space: pre-wrap; }
+.syn-ex .ex-pair { display: inline-flex; align-items: baseline; gap: 8px; }
+.syn-ex .ex-arrow { color: var(--accent); font-weight: 700; }
+.syn-ex .ex-out { color: var(--ok); white-space: pre-wrap; }
+/* ví dụ nhiều dòng: kết quả xuống hàng riêng, thụt vào cho thấy nó là kết quả của cả khối */
+.syn-ex li.multi { flex-direction: column; align-items: stretch; gap: 2px; }
+.syn-ex li.multi .ex-pair { padding-left: 14px; }
+
+/* ví dụ trong bảng gợi ý của trình soạn thảo */
+.ac-doc .ac-ex {
+  display: block; margin-top: 4px; font-family: var(--mono); font-size: 11.5px; color: var(--ok);
+}
 
 .cs-ds > summary { cursor: pointer; display: flex; align-items: center; gap: 10px; }
 .cs-ds > summary::marker { color: var(--muted); }

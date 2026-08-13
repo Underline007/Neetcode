@@ -1,13 +1,26 @@
 /** Cầu nối tới worker chấm bài: có timeout để bắt vòng lặp vô hạn / thuật toán quá chậm. */
 
 export function runTests({ code, entry, tests, harnessSrc, checkerSrc, timeoutMs = 6000, lang = 'javascript' }) {
+  const msg = { code, entry, tests, harnessSrc, checkerSrc };
   return lang === 'python'
-    ? runPyTests({ code, entry, tests, harnessSrc, checkerSrc, timeoutMs: Math.max(timeoutMs, 20000) })
-    : runJsTests({ code, entry, tests, harnessSrc, checkerSrc, timeoutMs });
+    ? askPy(msg, Math.max(timeoutMs, 20000))
+    : askJs(msg, timeoutMs);
+}
+
+/**
+ * Đo hiệu năng: chạy code của người học VÀ lời giải tham chiếu trong cùng một lượt
+ * rồi trả về tỉ lệ thời gian (xem src/perf.js và phần bench trong hai worker).
+ * Chỉ nên gọi sau khi bài đã pass hết test — đo một lời giải sai thì vô nghĩa.
+ */
+export function benchmark({ code, refCode, entry, tests, harnessSrc, lang = 'javascript' }) {
+  const msg = { mode: 'bench', code, refCode, entry, tests, harnessSrc };
+  // Mỗi phía tự dừng khi đã đo đủ, nhưng code rất chậm vẫn có thể ăn hết trần cứng
+  // của cả hai vòng đo -> cho hạn rộng hơn lượt chấm thường.
+  return lang === 'python' ? askPy(msg, 60000) : askJs(msg, 30000);
 }
 
 /** JavaScript: một worker MỚI cho mỗi lượt chạy — cô lập hoàn toàn, khởi động tức thì. */
-function runJsTests({ code, entry, tests, harnessSrc, checkerSrc, timeoutMs }) {
+function askJs(msg, timeoutMs) {
   return new Promise((resolve) => {
     let worker;
     try {
@@ -37,7 +50,7 @@ function runJsTests({ code, entry, tests, harnessSrc, checkerSrc, timeoutMs }) {
       resolve({ ok: false, phase: 'runtime', error: err.message || String(err), results: [], logs: [] });
     };
 
-    worker.postMessage({ code, entry, tests, harnessSrc, checkerSrc });
+    worker.postMessage(msg);
   });
 }
 
@@ -45,7 +58,7 @@ function runJsTests({ code, entry, tests, harnessSrc, checkerSrc, timeoutMs }) {
  *  chỉ nên trả phí đó một lần cho mỗi phiên). Nếu timeout/lỗi, worker bị huỷ và tạo lại ở lượt sau. */
 let pyWorker = null;
 
-function runPyTests({ code, entry, tests, harnessSrc, checkerSrc, timeoutMs }) {
+function askPy(msg, timeoutMs) {
   return new Promise((resolve) => {
     let worker;
     try {
@@ -79,6 +92,6 @@ function runPyTests({ code, entry, tests, harnessSrc, checkerSrc, timeoutMs }) {
       resolve({ ok: false, phase: 'runtime', error: err.message || String(err), results: [], logs: [] });
     };
 
-    worker.postMessage({ code, entry, tests, harnessSrc, checkerSrc });
+    worker.postMessage(msg);
   });
 }

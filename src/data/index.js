@@ -4,13 +4,20 @@ import part3 from './part3.js';
 import part4 from './part4.js';
 import part5 from './part5.js';
 import part6 from './part6.js';
+import { PERF_BENCH } from './perf-bench.js';
 
 /** 18 chủ đề theo đúng lộ trình neetcode.io/roadmap */
 export const TOPICS = [...part1, ...part2, ...part3, ...part4, ...part5, ...part6];
 
-/** Toàn bộ bài tập, đã gắn thông tin chủ đề */
+/** Toàn bộ bài tập, đã gắn thông tin chủ đề và (nếu có) dữ liệu lớn để đo hiệu năng. */
 export const PROBLEMS = TOPICS.flatMap((t) =>
-  t.problems.map((p) => ({ ...p, topic: t.id, topicName: t.name, topicIcon: t.icon }))
+  t.problems.map((p) => ({
+    ...p,
+    topic: t.id,
+    topicName: t.name,
+    topicIcon: t.icon,
+    ...(PERF_BENCH[p.id] ? { perfBench: PERF_BENCH[p.id] } : null),
+  }))
 );
 
 export const topicById = new Map(TOPICS.map((t) => [t.id, t]));

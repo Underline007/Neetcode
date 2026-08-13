@@ -56,7 +56,8 @@ function base(patch = {}) {
 function problem(patch = {}) {
   return {
     best: 0, attempts: 0, solved: false, hintsUsed: 0, revealed: false,
-    firstTry: null, code: null, lastRun: null,
+    hintsOpen: 0, solutionSeen: false, perfRatio: null, perfAt: null,
+    firstTry: null, code: null, codePy: null, lastRun: null,
     srs: { due: null, interval: 0, ease: 2.5, reps: 0 },
     ...patch,
   };
@@ -70,6 +71,16 @@ function problem(patch = {}) {
   eq('bài của máy A còn nguyên', m.problems['two-sum'].best, 100);
   eq('bài của máy B được thêm vào', m.problems['valid-anagram'].best, 90);
   eq('không mất bài nào', Object.keys(m.problems).length, 2);
+
+  // Bài chỉ có ở một bên cũng phải ra đúng bộ field hiện tại, để lần gộp thứ hai
+  // không còn gì để sửa (nếu không, mỗi lần đồng bộ lại sinh một bản khác nhau).
+  const solo = base({ problems: { x: { best: 70, solved: true, lastRun: 9 } } });
+  const m2 = mergeState(solo, base());
+  eq('bài chỉ có ở một bên được chuẩn hoá đủ field', Object.keys(m2.problems.x).sort().join(','),
+    Object.keys(problem()).sort().join(','));
+  eq('gộp lần hai không đổi gì nữa', JSON.stringify(mergeState(m2, base()).problems), JSON.stringify(m2.problems));
+  eq('chuẩn hoá không làm mất điểm', m2.problems.x.best, 70);
+  eq('chuẩn hoá không làm mất trạng thái đã giải', m2.problems.x.solved, true);
 }
 
 /* --------- 2. Cùng một bài, hai máy làm khác nhau --------- */
@@ -84,6 +95,33 @@ function problem(patch = {}) {
   eq('revealed chỉ cần một bên đúng', m.revealed, true);
 }
 
+/* --------- 2b. Mở khoá gợi ý/lời giải & kết quả đo hiệu năng --------- */
+{
+  // Máy A đã giải xong nên mở thêm gợi ý MIỄN PHÍ (hintsOpen 3 > hintsUsed 1);
+  // gộp không được biến phần miễn phí đó thành phần bị trừ điểm.
+  const a = base({ problems: { x: problem({ solved: true, hintsUsed: 1, hintsOpen: 3, solutionSeen: true }) } });
+  const b = base({ problems: { x: problem({ hintsUsed: 1, hintsOpen: 1 }) } });
+  const m = mergeState(a, b).problems.x;
+  eq('hintsOpen lấy max', m.hintsOpen, 3);
+  eq('phần bị trừ điểm KHÔNG bị kéo theo phần mở miễn phí', m.hintsUsed, 1);
+  eq('solutionSeen chỉ cần một bên đúng', m.solutionSeen, true);
+
+  // Bản ghi cũ (chưa từng có hintsOpen) không được tụt xuống dưới hintsUsed.
+  const old = base({ problems: { x: { best: 50, attempts: 1, solved: true, hintsUsed: 2, revealed: true, lastRun: 5 } } });
+  const merged = mergeState(old, base({ problems: { x: problem({ hintsUsed: 0 }) } })).problems.x;
+  eq('bản ghi cũ: hintsOpen suy ra ít nhất bằng hintsUsed', merged.hintsOpen, 2);
+  eq('bản ghi cũ: đã xem lời giải nghĩa là lời giải đang hiện', merged.solutionSeen, true);
+
+  // Hiệu năng: tỉ lệ càng NHỎ càng nhanh -> giữ kết quả tốt nhất của hai máy.
+  const fast = base({ problems: { x: problem({ perfRatio: 1.2, perfAt: 10 }) } });
+  const slow = base({ problems: { x: problem({ perfRatio: 4.5, perfAt: 90 }) } });
+  eq('perfRatio giữ kết quả đo tốt nhất', mergeState(fast, slow).problems.x.perfRatio, 1.2);
+  eq('đổi chiều vẫn giữ kết quả tốt nhất', mergeState(slow, fast).problems.x.perfRatio, 1.2);
+  eq('perfAt lấy mốc đo gần nhất', mergeState(fast, slow).problems.x.perfAt, 90);
+  eq('một bên chưa đo thì lấy bên đã đo',
+    mergeState(base({ problems: { x: problem() } }), slow).problems.x.perfRatio, 4.5);
+}
+
 /* --------- 3. Code đang gõ: lấy bản chạy gần nhất --------- */
 {
   const a = base({ problems: { x: problem({ code: 'ban cu', lastRun: 100 }) } });
@@ -94,6 +132,12 @@ function problem(patch = {}) {
   const c = base({ problems: { x: problem({ code: null, lastRun: 900 }) } });
   const d = base({ problems: { x: problem({ code: 'co code', lastRun: 100 }) } });
   eq('bản mới hơn không có code thì lấy code của bản cũ', mergeState(c, d).problems.x.code, 'co code');
+
+  // Bài song ngữ giữ code Python ở field riêng — gộp không được xoá nó.
+  const e = base({ problems: { x: problem({ codePy: 'def f(): pass', lastRun: 100 }) } });
+  const f = base({ problems: { x: problem({ code: 'function f(){}', lastRun: 500 }) } });
+  eq('code Python không bị mất khi gộp', mergeState(e, f).problems.x.codePy, 'def f(): pass');
+  eq('code JS vẫn theo bản mới hơn', mergeState(e, f).problems.x.code, 'function f(){}');
 }
 
 /* --------- 4. Lịch ôn tập: lấy nguyên cụm của bên đã ôn nhiều hơn --------- */

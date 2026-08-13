@@ -12,7 +12,7 @@
  */
 
 import { highlightLines } from './highlight.js';
-import { HINTS, KIND_LABEL, completionsFor } from './syntax-hints.js';
+import { HINTS, KIND_LABEL, completionsFor } from './hints/index.js';
 import { esc } from './ui.js';
 
 const LINE_H = 21;      // phải khớp với --ed-line trong CSS
@@ -157,8 +157,12 @@ export function createEditor({ mount, value = '', lang = 'python', onChange, onR
         <span class="ac-label">${esc(it.label)}</span>
       </div>`).join('');
     const cur = pop.items[pop.sel];
+    // Ví dụ kèm kết quả là thứ giải thích nhanh nhất -> hiện ngay trong bảng gợi ý,
+    // không bắt người học rời trang đi tra.
     acDoc.innerHTML = cur
-      ? `<code>${esc(cur.detail || cur.label)}</code>${cur.doc ? `<span>${esc(cur.doc)}</span>` : ''}`
+      ? `<code>${esc(cur.detail || cur.label)}</code>`
+        + (cur.doc ? `<span>${esc(cur.doc)}</span>` : '')
+        + (cur.ex?.length ? `<span class="ac-ex">${esc(cur.ex[0])}</span>` : '')
       : '';
     // tự cuộn danh sách (không dùng scrollIntoView để trang phía sau không bị nhảy)
     const sel = acList.querySelector('.sel');
@@ -196,8 +200,11 @@ export function createEditor({ mount, value = '', lang = 'python', onChange, onR
     const start = end - pop.prefix.length;
     const base = indentOf(ta.value.slice(lineStartOf(start), start));
     let body = text.replace(/\n/g, '\n' + base);
+    // "$|" là chỗ đặt con trỏ. Mẫu code có thể ghi nhiều chỗ (ví dụ mẫu đếm tần suất
+    // nhắc lại tên biến ba lần) -> con trỏ đặt ở chỗ ĐẦU TIÊN, các dấu còn lại phải
+    // được xoá hết, nếu không chúng nằm lại trong code của người học.
     let caret = body.indexOf('$|');
-    body = body.replace('$|', '');
+    body = body.split('$|').join('');
     if (caret < 0) caret = body.length;
     closePopup();
     replaceRange(start, end, body, start + caret);

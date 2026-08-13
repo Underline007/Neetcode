@@ -1,14 +1,19 @@
 import { problemById as jsProblemById, topicById as jsTopicById, buildTests } from '../data/index.js';
 import { store } from '../store.js';
-import { computeScore, grade, BASE_POINTS, HINT_PENALTY } from '../scoring.js';
+import { computeScore, grade, BASE_POINTS, BONUS, HINT_PENALTY } from '../scoring.js';
 import { qualityFromScore, schedule, nextDueLabel } from '../srs.js';
-import { runTests } from '../runner.js';
+import { runTests, benchmark } from '../runner.js';
+import { measureTests, perfTier, perfLabel, perfAdvice, perfScope, perfShaky, fmtMs, fmtRatio } from '../perf.js';
+import {
+  openHint, hintButton, hintPaneNote, needsRevealConfirm, revealSolution,
+  revealButtonLabel, revealNote,
+} from '../unlock.js';
 import { md } from '../markdown.js';
-import { $, $$, esc, inlineMd, toast, diffClass, diffLabel } from '../ui.js';
+import { $, $$, esc, inlineMd, toast, diffClass, diffLabel, bar } from '../ui.js';
 import { questionHtml } from '../quiz-format.js';
 import { resolveLang, pick } from '../lang.js';
 import { createEditor } from '../editor.js';
-import { HINTS } from '../syntax-hints.js';
+import { HINTS } from '../hints/index.js';
 import { explainError, explainTimeout } from '../error-vi.js';
 import { syntaxSectionsHtml } from './reference.js';
 
@@ -56,6 +61,7 @@ export function renderProblem(id, domain = JS_DOMAIN) {
       <span class="badge ${diffClass(p.difficulty)}">${diffLabel(p.difficulty)}</span>
       <span class="badge">🎯 mục tiêu ${p.targetMinutes} phút</span>
       ${rec.solved ? `<span class="badge ok">Đã giải · ${rec.best} điểm</span>` : ''}
+      ${rec.perfRatio ? `<span class="badge ${perfTier(rec.perfRatio).tone}" title="Thời gian chạy tốt nhất của bạn so với lời giải tham chiếu">⚡ ${fmtRatio(rec.perfRatio)} lời giải mẫu</span>` : ''}
       ${rec.srs?.due ? `<span class="badge">${nextDueLabel(rec.srs)}</span>` : ''}
       <button class="btn ghost small mark-btn${marked ? ' marked' : ''}" id="mark-btn"
               title="Đánh dấu để xem lại — xuất hiện trong mục Sổ tay">${marked ? '⭐ Đã đánh dấu' : '☆ Đánh dấu'}</button>
@@ -96,7 +102,7 @@ export function renderProblem(id, domain = JS_DOMAIN) {
           <div class="pane-head">
             <strong>💡 Gợi ý theo bậc</strong>
             <span class="spacer"></span>
-            <span class="muted small">mỗi bậc trừ điểm dần</span>
+            <span class="muted small" id="hint-note">${esc(hintPaneNote(rec))}</span>
           </div>
           <div class="pane-body">
             <div id="hints"></div>
@@ -107,8 +113,8 @@ export function renderProblem(id, domain = JS_DOMAIN) {
         <div class="pane" style="margin-top:14px">
           <div class="pane-head"><strong>📖 Phân tích &amp; lời giải</strong></div>
           <div class="pane-body">
-            <p class="muted small" style="margin-top:0">Xem lời giải sẽ giới hạn điểm tối đa của bài này ở <strong>30%</strong>. Hãy thử hết 3 bậc gợi ý trước.</p>
-            <button class="btn ghost small" id="reveal-btn">Xem phân tích &amp; lời giải</button>
+            <p class="muted small" style="margin-top:0" id="reveal-note">${inlineMd(revealNote(rec))}</p>
+            <button class="btn ghost small" id="reveal-btn">${revealButtonLabel(rec)}</button>
             <div id="solution"></div>
           </div>
         </div>
@@ -202,7 +208,7 @@ function cheatSheet(lang) {
             <div class="cheat-title">${esc(g.group)}</div>
             <div class="chips">
               ${g.items.map((it, ii) => `<button type="button" class="chip" data-g="${gi}" data-i="${ii}"
-                 title="${esc(it.detail || '')}${it.doc ? ' — ' + esc(it.doc) : ''}">${esc(it.label)}</button>`).join('')}
+                 title="${esc(it.detail || '')}${it.doc ? '\n' + esc(it.doc) : ''}${it.ex?.length ? '\n\nVí dụ: ' + esc(it.ex[0]) : ''}">${esc(it.label)}</button>`).join('')}
             </div>
           </div>`).join('')}
         <p class="muted small" style="margin:10px 0 0">Trong lúc gõ, bảng gợi ý tự hiện sau ký tự đầu tiên (hoặc bấm <span class="kbd">Ctrl</span>+<span class="kbd">Space</span>); <span class="kbd">Tab</span> để chọn, <span class="kbd">Esc</span> để đóng. Mỗi gợi ý kèm chữ ký hàm và giải thích ngắn.
@@ -222,6 +228,9 @@ export function mountProblem(id, domain = JS_DOMAIN) {
   const hints = pick(p, 'hints', lang);
   const diagnostics = pick(p, 'diagnostics', lang) || [];
   const rec = store.problem(p.id);
+  // Phiên của ĐÚNG lần mở bài này: việc chạy nền (đo hiệu năng) có thể trả kết quả
+  // sau khi người học đã sang bài khác — lúc đó không được ghi vào phiên mới.
+  const sess = session;
 
   const editor = createEditor({
     mount: $('#editor-mount'),
@@ -247,7 +256,7 @@ export function mountProblem(id, domain = JS_DOMAIN) {
   const timerEl = $('#timer');
   const tick = setInterval(() => {
     if (!document.body.contains(timerEl)) { clearInterval(tick); editor.destroy(); return; }
-    const s = Math.floor((Date.now() - session.startedAt) / 1000);
+    const s = Math.floor((Date.now() - sess.startedAt) / 1000);
     timerEl.textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   }, 1000);
 
@@ -271,7 +280,8 @@ export function mountProblem(id, domain = JS_DOMAIN) {
   const drawer = $('#ref-drawer');
   const refBody = $('#ref-body');
   const refQ = $('#ref-q');
-  const drawRef = () => { refBody.innerHTML = syntaxSectionsHtml(lang, refQ.value); };
+  // Truyền module của bài -> cú pháp của đúng module đang học được đưa lên đầu panel
+  const drawRef = () => { refBody.innerHTML = syntaxSectionsHtml(lang, refQ.value, p.topic); };
 
   $('#ref-btn').addEventListener('click', () => {
     drawer.classList.remove('hidden');
@@ -302,32 +312,32 @@ export function mountProblem(id, domain = JS_DOMAIN) {
   // ----- gợi ý -----
   renderHints();
   $('#hint-btn').addEventListener('click', () => {
-    if (rec.hintsUsed >= hints.length) return;
-    rec.hintsUsed++;
+    const { opened, level, free } = openHint(rec, hints.length);
+    if (!opened) return;
     store.save();
     renderHints();
-    toast(`Đã mở gợi ý ${rec.hintsUsed}/3 — điểm tối đa giảm còn ${Math.round((1 - HINT_PENALTY[rec.hintsUsed]) * 100)}%`);
+    toast(free
+      ? `Đã mở gợi ý ${level}/${hints.length} — miễn phí, điểm của bài không đổi.`
+      : `Đã mở gợi ý ${level}/${hints.length} — điểm tối đa giảm còn ${Math.round((1 - HINT_PENALTY[level]) * 100)}%`);
   });
 
   function renderHints() {
     const box = $('#hints');
-    box.innerHTML = hints.slice(0, rec.hintsUsed)
+    box.innerHTML = hints.slice(0, rec.hintsOpen)
       .map((h, i) => `<div class="hint"><strong>Gợi ý ${i + 1}.</strong> ${md(h).replace(/^<p>|<\/p>$/g, '')}</div>`)
       .join('');
     const btn = $('#hint-btn');
-    if (rec.hintsUsed >= hints.length) {
-      btn.textContent = 'Đã mở hết gợi ý';
-      btn.disabled = true;
-    } else {
-      const next = rec.hintsUsed + 1;
-      btn.textContent = `Mở gợi ý ${next}/3 (−${Math.round((HINT_PENALTY[next] - HINT_PENALTY[rec.hintsUsed]) * 100)}% điểm)`;
-    }
+    const state = hintButton(rec, hints.length);
+    btn.textContent = state.label;
+    btn.disabled = state.disabled;
+    $('#hint-note').textContent = hintPaneNote(rec);
   }
 
   // ----- lời giải -----
   $('#reveal-btn').addEventListener('click', () => {
-    if (!rec.revealed && !confirm('Xem lời giải sẽ giới hạn điểm bài này ở 30%. Tiếp tục?')) return;
-    rec.revealed = true;
+    if (needsRevealConfirm(rec)
+      && !confirm('Xem lời giải sẽ giới hạn điểm bài này ở 30%. Tiếp tục?\n\nMẹo: pass hết test trước thì phần này mở miễn phí.')) return;
+    revealSolution(rec);
     store.save();
     $('#reveal-btn').classList.add('hidden');
     const primarySolution = pick(p, 'solution', lang);
@@ -340,9 +350,38 @@ export function mountProblem(id, domain = JS_DOMAIN) {
       <div class="md">${md(p.approach)}</div>
       <h3>Lời giải tham khảo (${isPy ? 'Python' : 'JavaScript'})</h3>
       <div class="md">${md('```' + (isPy ? 'python' : 'js') + '\n' + primarySolution + '\n```')}</div>
+      ${yourCodeBlock()}
       ${otherLangBlock}
       <div class="hint md"><strong>🌍 Ứng dụng thực tế.</strong> ${inlineMd(p.realWorld)}</div>`;
   });
+
+  /** Đã giải xong -> đặt code của người học ngay cạnh lời giải tham chiếu để so từng dòng
+   *  (kèm thời gian đo được, nếu đã đo). Chưa giải thì không hiện: đang đọc gợi ý chứ
+   *  không phải đang so sánh. */
+  function yourCodeBlock() {
+    if (!rec.solved || !sess.code) return '';
+    const times = sess.perf
+      ? ` <span class="muted small">— của bạn ${fmtMs(sess.perf.ours.ms)} · tham chiếu ${fmtMs(sess.perf.ref.ms)}</span>`
+      : '';
+    return `<h3>Lời giải của bạn${times}</h3>
+      <div class="md">${md('```' + (isPy ? 'python' : 'js') + '\n' + sess.code + '\n```')}</div>`;
+  }
+
+  /** Sau khi pass hết test: gợi ý và lời giải chuyển sang chế độ miễn phí. */
+  function unlockPanes() {
+    renderHints();
+    const note = $('#reveal-note');
+    if (note) note.innerHTML = inlineMd(revealNote(rec));
+    const btn = $('#reveal-btn');
+    if (btn && !btn.classList.contains('hidden')) btn.textContent = revealButtonLabel(rec);
+  }
+
+  /** Mở (hoặc cuộn tới) khung lời giải — dùng cho nút trong thẻ hiệu năng. */
+  function showSolution() {
+    const btn = $('#reveal-btn');
+    if (btn && !btn.classList.contains('hidden')) btn.click();
+    $('#solution')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   /* ------------------- chạy thử với dữ liệu tự nhập ------------------- */
   $('#scratch-reset').addEventListener('click', () => { $('#scratch-input').value = sampleArgs(p); });
@@ -422,7 +461,7 @@ export function mountProblem(id, domain = JS_DOMAIN) {
     btn.disabled = false;
     btn.textContent = '▶ Chạy & chấm điểm';
 
-    session.attempts++;
+    sess.attempts++;
     rec.attempts++;
     rec.lastRun = Date.now();
     store.save();
@@ -482,6 +521,7 @@ export function mountProblem(id, domain = JS_DOMAIN) {
 
   function onFail(code, res) {
     const box = $('#results');
+    if (session !== sess || !box) return;   // đã rời trang trong lúc chạy
     let head = '';
 
     if (!res.ok) {
@@ -511,34 +551,113 @@ export function mountProblem(id, domain = JS_DOMAIN) {
   function onPass(code, res) {
     const first = rec.attempts === 1;
     if (first) rec.firstTry = true;
-    const elapsed = Date.now() - session.startedAt;
-    session.passedThisSession = true;
-    session.elapsed = elapsed;
+    sess.passedThisSession = true;
+    sess.elapsed = Date.now() - sess.startedAt;
+    sess.code = code;
 
-    const sc = computeScore({
-      difficulty: p.difficulty,
-      hintsUsed: rec.hintsUsed,
-      revealed: rec.revealed,
-      firstTry: !!rec.firstTry,
-      elapsedMs: elapsed,
-      targetMinutes: p.targetMinutes,
-      complexityCorrect: false,
-    });
-
+    const sc = scoreNow();
     applyScore(sc.score, 'solve');
 
-    $('#results').innerHTML = `
+    // Rời trang giữa lúc chạy (lượt Python mất vài giây) thì không còn chỗ để vẽ —
+    // nhưng điểm ở trên ĐÃ được ghi rồi, đó mới là thứ không được phép mất.
+    const box = $('#results');
+    if (session !== sess || !box) return;
+
+    box.innerHTML = `
       <div class="card" style="border-color:var(--ok)">
         <div class="row"><strong style="color:var(--ok)">✅ Toàn bộ ${res.results.length} test đều đạt!</strong>
           <span class="spacer"></span><span class="muted small">${res.totalMs} ms</span></div>
-        ${scoreBreakdown(sc, rec)}
+        <div id="score-card">${scoreBreakdown(sc, rec)}</div>
       </div>
+      <div id="perf" style="margin-top:12px">${perfCard({ state: 'running' })}</div>
       <div id="cx" style="margin-top:12px">${complexityCard(p)}</div>
       ${nextUpCard(p, domain)}
       ${testList(res, lang, isPy, p.id, code)}`;
 
+    unlockPanes();       // giải xong rồi -> gợi ý & lời giải miễn phí từ đây
     bindComplexity();
-    $('#results').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    measurePerf();
+  }
+
+  /** Điểm hiện tại của bài, tính lại từ đầu mỗi lần có thêm dữ kiện (hiệu năng,
+   *  câu hỏi độ phức tạp). Chỉ có MỘT chỗ dựng tham số để hai luồng không lệch nhau. */
+  function scoreNow() {
+    return computeScore({
+      difficulty: p.difficulty,
+      hintsUsed: rec.hintsUsed,
+      revealed: rec.revealed,
+      firstTry: !!rec.firstTry,
+      elapsedMs: sess.elapsed,
+      targetMinutes: p.targetMinutes,
+      complexityCorrect: !!sess.complexityCorrect,
+      perfRatio: sess.perfRatio ?? null,
+    });
+  }
+
+  /* --------------------------- đo hiệu năng --------------------------- */
+  /**
+   * Chạy code vừa pass CẠNH lời giải tham chiếu để lấy tỉ lệ thời gian, rồi cộng
+   * mức thưởng hiệu năng. Chạy nền: không chặn phần còn lại của màn hình kết quả.
+   */
+  async function measurePerf() {
+    const refCode = pick(p, 'solution', lang);
+    const tests = measureTests(p, buildTests(p));
+    if (!refCode || !tests.length) {
+      if (session === sess) $('#perf')?.remove();
+      return;
+    }
+
+    const res = await benchmark({
+      code: sess.code,
+      refCode,
+      entry: p.entry,
+      tests,
+      harnessSrc: pick(p, 'harnessSrc', lang),
+      lang,
+    });
+
+    if (session !== sess) return;            // người học đã sang bài khác
+    const box = $('#perf');
+    if (!box) return;
+
+    if (!res?.ok || !(res.ratio > 0)) {
+      // Hết giờ khi đo trên dữ liệu lớn CHÍNH LÀ câu trả lời: lời giải tham chiếu
+      // chạy xong bộ dữ liệu này trong vài mili-giây (đã kiểm tra ở tools/test-bench*),
+      // nên bên không chạy nổi là code của người học.
+      const tooSlow = res?.phase === 'timeout' && perfScope(tests).big;
+      box.innerHTML = perfCard({
+        state: tooSlow ? 'tooSlow' : 'error',
+        error: res?.error || 'Không đo được thời gian chạy.',
+        tests,
+      });
+      bindPerf();
+      return;
+    }
+
+    sess.perf = res;
+    sess.perfRatio = res.ratio;
+    rec.perfRatio = rec.perfRatio ? Math.min(rec.perfRatio, res.ratio) : res.ratio;
+    rec.perfAt = Date.now();
+
+    const sc = scoreNow();
+    applyScore(sc.score, 'perf');
+    const card = $('#score-card');
+    if (card) card.innerHTML = scoreBreakdown(sc, rec);
+    box.innerHTML = perfCard({ state: 'done', res, tests });
+    bindPerf();
+  }
+
+  function bindPerf() {
+    const box = $('#perf');
+    if (!box) return;
+    // Đo lại đúng đoạn code ĐÃ PASS, không lấy nội dung editor hiện tại: nếu không,
+    // chỉ cần sửa thành `return 0` rồi bấm đo lại là ăn thưởng hiệu năng bằng code sai.
+    box.querySelector('[data-perf-again]')?.addEventListener('click', () => {
+      box.innerHTML = perfCard({ state: 'running' });
+      measurePerf();
+    });
+    box.querySelector('[data-show-solution]')?.addEventListener('click', showSolution);
   }
 
   function applyScore(score, kind) {
@@ -570,16 +689,11 @@ export function mountProblem(id, domain = JS_DOMAIN) {
         });
 
         if (chosen === correct) {
-          const sc = computeScore({
-            difficulty: p.difficulty,
-            hintsUsed: rec.hintsUsed,
-            revealed: rec.revealed,
-            firstTry: !!rec.firstTry,
-            elapsedMs: session.elapsed,
-            targetMinutes: p.targetMinutes,
-            complexityCorrect: true,
-          });
+          sess.complexityCorrect = true;
+          const sc = scoreNow();
           applyScore(sc.score, 'complexity');
+          const card = $('#score-card');
+          if (card) card.innerHTML = scoreBreakdown(sc, rec);
           toast(`Chính xác! +10% thưởng phân tích độ phức tạp. Tổng điểm bài này: ${rec.best}`);
         } else {
           toast('Chưa đúng — đọc kỹ phần giải thích bên dưới nhé.');
@@ -595,10 +709,8 @@ export function mountProblem(id, domain = JS_DOMAIN) {
             <span class="badge">${nextDueLabel(rec.srs)}</span>
           </div>
           <div class="hint md" style="border-left-color:var(--ok)"><strong>🌍 Ứng dụng thực tế.</strong> ${inlineMd(p.realWorld)}</div>
-          ${rec.revealed ? '' : '<p class="small muted">Chưa xem phần <strong>Phân tích &amp; lời giải</strong>? Giờ là lúc nên đọc — nó nói về <em>mẫu hình</em> đằng sau bài này, thứ sẽ quay lại ở các bài khó hơn. (Đọc sau khi đã giải xong không bị trừ điểm nữa.)</p>'}
+          ${rec.solutionSeen ? '' : '<p class="small muted">Chưa xem phần <strong>Phân tích &amp; lời giải</strong>? Giờ là lúc nên đọc — nó nói về <em>mẫu hình</em> đằng sau bài này, thứ sẽ quay lại ở các bài khó hơn. Bạn đã pass hết test nên đọc <strong>không bị trừ điểm</strong>.</p>'}
         `);
-        // đã giải xong -> mở lời giải miễn phí
-        rec.revealed = rec.revealed || false;
         store.save();
       });
     });
@@ -634,14 +746,105 @@ function nextUpCard(p, domain) {
 }
 
 function scoreBreakdown(sc, rec) {
+  const tone = (d) => {
+    if (d === null) return 'var(--warn)';        // bị chặn trần
+    if (d > 0) return 'var(--ok)';
+    if (d === 0) return 'var(--muted)';          // có mục đó nhưng không được thưởng
+    return 'var(--bad)';
+  };
   return `
     <div style="margin-top:10px">
       <div class="row"><span class="muted small">Điểm nhận được</span><span class="spacer"></span><strong>${sc.score} / ${sc.base}</strong></div>
-      ${sc.parts.map((pt) => `<div class="row small" style="color:${pt.delta === null ? 'var(--warn)' : pt.delta > 0 ? 'var(--ok)' : 'var(--bad)'}">
+      ${sc.parts.map((pt) => `<div class="row small" style="color:${tone(pt.delta)}">
         <span>${esc(pt.label)}</span><span class="spacer"></span>
         <span>${pt.delta === null ? '↓ trần 30%' : (pt.delta > 0 ? '+' : '') + Math.round(pt.delta * 100) + '%'}</span></div>`).join('')}
       ${rec.best ? `<div class="row small muted"><span>Điểm cao nhất của bài này</span><span class="spacer"></span><span>${rec.best}</span></div>` : ''}
     </div>`;
+}
+
+/* ------------------------------ thẻ hiệu năng ------------------------------ */
+/**
+ * Giải đúng chưa phải là xong: thẻ này trả lời câu "code của mình có nhanh không?"
+ * bằng cách so trực tiếp với lời giải tham chiếu của chính bài đó (xem src/perf.js).
+ */
+function perfCard({ state, res = null, tests = [], error = '' }) {
+  if (state === 'running') {
+    return `<div class="card tight perf-card">
+      <div class="row"><strong>⚡ Đang đo hiệu năng…</strong>
+        <span class="spacer"></span><span class="muted small">chạy code của bạn cạnh lời giải tham chiếu</span></div>
+      <p class="muted small" style="margin:6px 0 0">Cả hai bên chạy nhiều lượt trên cùng dữ liệu rồi lấy lượt nhanh nhất — mất khoảng một giây.</p>
+    </div>`;
+  }
+
+  if (state === 'tooSlow') {
+    const big = tests.map((t) => t.name).filter(Boolean).join(', ');
+    return `<div class="card tight perf-card" style="border-color:var(--bad)">
+      <div class="row">
+        <strong>⚡ Hiệu năng</strong>
+        <span class="badge hard">Quá chậm để đo</span>
+        <span class="spacer"></span>
+        <span class="muted small">không có thưởng</span>
+      </div>
+      <p class="perf-verdict">Lời giải của bạn <strong>đúng</strong> trên bộ test của bài, nhưng không chạy nổi bộ dữ liệu lớn
+        ${big ? `(${esc(big)})` : ''} — trong khi lời giải tham chiếu xong nó trong vài mili-giây.</p>
+      <div class="hint md" style="border-left-color:var(--bad)">${inlineMd('Đây chính là câu trả lời cho câu hỏi "code của mình có nhanh không?": **độ phức tạp chưa đúng**, chứ không phải máy chậm. Với dữ liệu lớn, chênh lệch giữa O(n) và O(n²) không phải "chậm hơn vài lần" mà là "không bao giờ xong". Hãy đọc lại gợi ý và đổi cách tiếp cận.')}</div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn ghost small" data-perf-again="1" title="Đo lại đúng đoạn code vừa pass">⚡ Đo lại</button>
+        <button class="btn ghost small" data-show-solution="1">📖 Xem lời giải tham chiếu (miễn phí)</button>
+      </div>
+    </div>`;
+  }
+
+  if (state === 'error') {
+    return `<div class="card tight perf-card">
+      <div class="row"><strong>⚡ Hiệu năng: chưa đo được</strong>
+        <span class="spacer"></span>
+        <button class="btn ghost tiny" data-perf-again="1">Đo lại</button></div>
+      <p class="muted small" style="margin:6px 0 0">${esc(error)}</p>
+      <p class="muted small" style="margin:6px 0 0">Điểm của bạn không bị ảnh hưởng — mức thưởng hiệu năng chỉ là phần cộng thêm.</p>
+    </div>`;
+  }
+
+  const tier = perfTier(res.ratio);
+  const scope = perfScope(tests);
+  const worst = Math.max(res.ours.ms, res.ref.ms) || 1;
+  const shaky = perfShaky(res.ours.ms, res.ref.ms);
+  const faster = res.ratio < 1;
+  const gap = faster ? 1 / res.ratio : res.ratio;
+
+  return `<div class="card tight perf-card">
+    <div class="row">
+      <strong>⚡ Hiệu năng</strong>
+      <span class="badge ${tier.tone}">${esc(perfLabel(tier, scope.big))}</span>
+      <span class="spacer"></span>
+      <span class="muted small">${tier.credit > 0 ? `+${Math.round(BONUS.perf * tier.credit * 100)}% điểm` : 'không có thưởng'}</span>
+    </div>
+
+    <div class="perf-rows">
+      <div class="perf-row">
+        <span class="who">Code của bạn</span>
+        ${bar((res.ours.ms / worst) * 100, true)}
+        <span class="t mono">${fmtMs(res.ours.ms)}</span>
+      </div>
+      <div class="perf-row">
+        <span class="who">Lời giải tham chiếu</span>
+        ${bar((res.ref.ms / worst) * 100, true)}
+        <span class="t mono">${fmtMs(res.ref.ms)}</span>
+      </div>
+    </div>
+
+    <p class="perf-verdict">Code của bạn <strong>${faster ? 'nhanh hơn' : 'chậm hơn'} ${fmtRatio(gap)}</strong>
+      so với lời giải tham chiếu <span class="muted small">(${res.tests} test · mỗi bên chạy ${res.ours.inner * res.ours.passes} lượt, lấy lượt nhanh nhất)</span></p>
+
+    <div class="hint md" style="border-left-color:${tier.credit > 0 ? 'var(--ok)' : 'var(--warn)'}">${inlineMd(perfAdvice(tier, scope.big))}</div>
+    <p class="muted small" style="margin:8px 0 0">${inlineMd(scope.note)}</p>
+    ${shaky ? '<p class="muted small" style="margin:6px 0 0">Thời gian đo được ở mức micro-giây nên chênh lệch nhỏ chỉ là nhiễu — chỉ nên tin những khác biệt lớn.</p>' : ''}
+
+    <div class="row" style="margin-top:10px">
+      <button class="btn ghost small" data-perf-again="1" title="Đo lại đúng đoạn code vừa pass">⚡ Đo lại</button>
+      <button class="btn ghost small" data-show-solution="1">📖 Xem lời giải tham chiếu (miễn phí)</button>
+    </div>
+  </div>`;
 }
 
 const runOneBtn = (i) => `<button class="btn ghost tiny" data-run-one="${i}" title="Chạy lại riêng test này (không tính điểm)">▶ chạy lại</button>`;

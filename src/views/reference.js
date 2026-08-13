@@ -9,7 +9,7 @@
  * Bảng cú pháp dựng TRỰC TIẾP từ `syntax-hints.js` — không chép lại dữ liệu ở đây.
  */
 
-import { HINTS, KIND_LABEL } from '../syntax-hints.js';
+import { HINTS, KIND_LABEL, HINT_TOPICS, EX_EXACT, EX_ABOUT, hintHaystack } from '../hints/index.js';
 import { DS_REFERENCE, PICK_TABLE, XLANG } from '../data/reference.js';
 import { problemById } from '../data/index.js';
 import { store } from '../store.js';
@@ -26,7 +26,7 @@ const curLang = () => (store.get().lang === 'python' ? 'python' : 'javascript');
 /* ==================================================================== */
 
 /** Trạng thái của trang, giữ trong module để quay lại vẫn còn (không lưu localStorage). */
-const cs = { q: '', lang: null, section: 'all' };
+const cs = { q: '', lang: null, section: 'all', topic: 'all' };
 
 const SECTIONS = [
   ['all', 'Tất cả'],
@@ -59,6 +59,14 @@ export function renderCheatsheet() {
           <button type="button" class="chip fchip${cs.lang === 'python' ? ' on' : ''}" data-v="python">🐍 Python</button>
         </div>
       </div>
+      ${cs.lang === 'python' ? `
+        <div class="row filter-row">
+          <span class="muted small">Cú pháp theo module:</span>
+          <div class="chips" data-cs="topic">
+            <button type="button" class="chip fchip${cs.topic === 'all' ? ' on' : ''}" data-v="all">Tất cả</button>
+            ${HINT_TOPICS.map((t) => `<button type="button" class="chip fchip${cs.topic === t.id ? ' on' : ''}" data-v="${t.id}">${esc(t.label)}</button>`).join('')}
+          </div>
+        </div>` : ''}
     </div>
 
     <div id="cs-body">${cheatBody()}</div>`;
@@ -82,6 +90,8 @@ export function mountCheatsheet() {
       if (!chip) return;
       cs[key] = chip.dataset.v;
       $$('.fchip', group).forEach((c) => c.classList.toggle('on', c === chip));
+      // Đổi ngôn ngữ thì hàng lọc theo module xuất hiện/biến mất -> phải dựng lại cả thanh lọc
+      if (key === 'lang') { $('#view').innerHTML = renderCheatsheet(); mountCheatsheet(); return; }
       redraw();
     });
   });
@@ -90,9 +100,13 @@ export function mountCheatsheet() {
 
 /** Panel trượt "tra cứu" dùng lại trong trang làm bài — chỉ phần bảng cú pháp.
  *  Bảng này chỉ có cú pháp của MỘT ngôn ngữ, nên khi không khớp phải chỉ đường đi tiếp
- *  (bảng cấu trúc dữ liệu ở trang Tra cứu nhanh có cả hai ngôn ngữ). */
-export function syntaxSectionsHtml(lang, query = '') {
-  const html = syntaxSection(lang, query);
+ *  (bảng cấu trúc dữ liệu ở trang Tra cứu nhanh có cả hai ngôn ngữ).
+ *
+ *  `moduleId` là module của bài đang làm: cú pháp của module đó được đưa lên đầu, để
+ *  mở panel ra là thấy ngay phần vừa học chứ không phải cuộn đi tìm. */
+export function syntaxSectionsHtml(lang, query = '', moduleId = null) {
+  const topic = HINT_TOPICS.find((t) => t.module === moduleId)?.id || null;
+  const html = syntaxSection(lang, query, { topic });
   if (html) return html;
   const name = lang === 'python' ? 'Python' : 'JavaScript';
   return `<div class="card tight">
@@ -110,7 +124,7 @@ function cheatBody() {
     show('pick') ? pickSection(q) : '',
     show('ds') ? dsSection(q) : '',
     show('xlang') ? xlangSection(q) : '',
-    show('syntax') ? syntaxSection(cs.lang, q) : '',
+    show('syntax') ? syntaxSection(cs.lang, q, { only: cs.topic }) : '',
   ].filter(Boolean);
 
   if (!parts.length) {
@@ -219,40 +233,73 @@ function xlangSection(q) {
 }
 
 /* --------------------------- bảng cú pháp --------------------------- */
-function syntaxSection(lang, q) {
+/** Tìm trong tên, từ khoá phụ, chữ ký, mô tả VÀ cả ví dụ — gõ "0.30000000000000004"
+ *  cũng phải tìm ra chỗ giải thích số thực. */
+const synHay = (i) => [...hintHaystack(i), (i.ex || []).join(' ')];
+
+/** Một mục cú pháp: viết thế nào → làm gì → chạy ra cái gì. */
+function synItem(i) {
+  const copy = i.insert ? i.insert.split('$|').join('') : i.label;
+  return `
+    <div class="card tight syn-item cs-hit">
+      <div class="row">
+        <code class="syn-name">${esc(i.label)}</code>
+        <span class="badge">${esc(KIND_LABEL[i.kind] || i.kind)}</span>
+        <span class="spacer"></span>
+        <button type="button" class="code-copy" data-copy="${esc(copy)}" title="Chép vào bộ nhớ tạm">📋</button>
+      </div>
+      <code class="syn-sig">${esc(i.detail || i.label)}</code>
+      <p class="syn-doc">${esc(i.doc || '')}</p>
+      ${(i.ex || []).length ? `<ul class="syn-ex">
+        ${i.ex.map((ex) => {
+          const arrow = ex.includes(` ${EX_ABOUT} `) ? EX_ABOUT : EX_EXACT;
+          const at = ex.lastIndexOf(` ${arrow} `);
+          const code = at < 0 ? ex : ex.slice(0, at);
+          const out = at < 0 ? '' : ex.slice(at + arrow.length + 2);
+          // Ví dụ nhiều dòng thì xuống hàng cho phần kết quả, nếu không mũi tên bị
+          // đẩy lên cạnh dòng đầu và trông như kết quả của riêng dòng đó.
+          const multi = code.includes('\n');
+          return `<li${multi ? ' class="multi"' : ''}><code class="ex-code">${esc(code)}</code>${out
+            ? `<span class="ex-pair"><span class="ex-arrow" title="${arrow === EX_ABOUT ? 'kết quả tuỳ lúc chạy' : 'kết quả chính xác'}">${arrow}</span><code class="ex-out">${esc(out)}</code></span>`
+            : ''}</li>`;
+        }).join('')}
+      </ul>` : ''}
+    </div>`;
+}
+
+/**
+ * Bảng cú pháp, chia theo CHỦ ĐỀ (trùng với 15 module của lộ trình Python) chứ không
+ * theo phân loại kỹ thuật: đang học module nào thì tra đúng phần của module đó.
+ *
+ * @param {object} [opts] { topic } — chủ đề cần đặt lên đầu (module của bài đang làm)
+ */
+function syntaxSection(lang, q, { topic = null, only = null } = {}) {
   const dict = HINTS[lang] || HINTS.python;
   const label = lang === 'python' ? '🐍 Python' : '🟨 JavaScript';
+  const items = [...dict.globals, ...dict.members].filter((i) => (!q || matches(synHay(i), q)));
+  if (!items.length) return '';
 
-  const buckets = [
-    ['Từ khoá & hàm dựng sẵn', dict.globals.filter((i) => i.kind === 'kw' || i.kind === 'fn')],
-    ['Thư viện hay dùng', dict.globals.filter((i) => i.kind === 'mod')],
-    ['Phương thức (sau dấu chấm)', dict.members],
-    ['Mẫu code', dict.globals.filter((i) => i.kind === 'snip')],
-  ];
+  // JavaScript chưa gắn chủ đề -> một khối duy nhất.
+  const groups = lang === 'python'
+    ? orderedTopics(topic)
+      .map((t) => ({ ...t, items: items.filter((i) => i.topic === t.id) }))
+      .filter((g) => g.items.length && (!only || only === 'all' || only === g.id))
+    : [{ id: 'js', label: 'Cú pháp JavaScript', items }];
+  if (!groups.length) return '';
 
-  const rendered = buckets.map(([title, items]) => {
-    const hits = items.filter((i) => !q || matches([i.label, i.detail, i.doc], q));
-    if (!hits.length) return '';
-    return `
-      <h3>${esc(title)} <span class="badge">${hits.length}</span></h3>
-      <div class="card tight cs-table-wrap">
-        <table class="cs-table syn">
-          <tbody>
-            ${hits.map((i) => `<tr class="cs-hit">
-              <td class="syn-name"><code>${esc(i.label)}</code></td>
-              <td class="syn-sig"><code>${esc(i.detail || '')}</code></td>
-              <td class="muted">${esc(i.doc || '')}</td>
-              <td class="syn-copy"><button type="button" class="code-copy" data-copy="${esc(i.insert ? i.insert.replace(/\$\|/g, '') : i.label)}">📋</button></td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>`;
-  }).filter(Boolean);
-
-  if (!rendered.length) return '';
   return `<h2>🧩 Cú pháp ${label}</h2>
-    <p class="muted small">Cùng bộ dữ liệu với bảng gợi ý trong trình soạn thảo — bấm 📋 để chép.</p>
-    ${rendered.join('')}`;
+    <p class="muted small">Mỗi mục có <strong>ví dụ kèm kết quả</strong> — mọi ví dụ đều đã được chạy thật bằng Python
+      (xem tools/test-hints.mjs), nên kết quả ghi ở đây là kết quả thật. Bấm 📋 để chép.</p>
+    ${groups.map((g) => `
+      <h3>${esc(g.label)} <span class="badge">${g.items.length}</span></h3>
+      <div class="grid c2 syn-grid">${g.items.map(synItem).join('')}</div>`).join('')}`;
+}
+
+/** Thứ tự chủ đề, có thể đưa một chủ đề lên đầu (chủ đề của bài đang làm). */
+function orderedTopics(first) {
+  if (!first) return HINT_TOPICS;
+  const head = HINT_TOPICS.filter((t) => t.id === first);
+  return [...head, ...HINT_TOPICS.filter((t) => t.id !== first)];
 }
 
 /* ==================================================================== */

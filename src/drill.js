@@ -10,7 +10,7 @@
  * Lịch ôn dùng CHUNG thuật toán SM-2 rút gọn với bài tập (`srs.js`) — không có hệ thống thứ hai.
  */
 
-import { HINTS, KIND_LABEL } from './syntax-hints.js';
+import { HINTS, KIND_LABEL } from './hints/index.js';
 import { DS_CARDS } from './data/reference.js';
 import { store } from './store.js';
 import { schedule } from './srs.js';
@@ -47,7 +47,10 @@ function syntaxCards(lang) {
       // Mặt trước/sau là MARKDOWN (giống DS_CARDS) — trang hiển thị sẽ render qua md().
       front: `Trong ${LANG_NAME[lang]}, dùng gì để: *${it.doc}*`,
       answer: it.label,
-      back: '`' + (it.detail || it.label) + '`',
+      // Mặt sau có cả ví dụ kèm kết quả: nhớ được chữ ký mà không hình dung ra kết quả
+      // thì vẫn chưa dùng được.
+      back: '`' + (it.detail || it.label) + '`'
+        + (it.ex?.length ? '\n\n' + it.ex.map((x) => '- `' + x + '`').join('\n') : ''),
     });
   }
   return out;

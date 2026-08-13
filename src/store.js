@@ -126,16 +126,26 @@ export const store = {
 
   /** Bản ghi SỐNG của một bài tập: ghi vào object trả về là ghi thẳng vào tiến độ
    *  (nhớ gọi `store.save()`). Object này giữ nguyên danh tính suốt phiên, kể cả
-   *  khi đồng bộ đa máy gộp dữ liệu về — xem `adoptState`. */
+   *  khi đồng bộ đa máy gộp dữ liệu về — xem `adoptState`.
+   *
+   *  `hintsUsed`/`revealed` là phần PHẢI TRẢ ĐIỂM (mở khi chưa giải được), còn
+   *  `hintsOpen`/`solutionSeen` chỉ là "đang hiện trên màn hình" — xem unlock.js. */
   problem(id) {
     if (!state.problems[id]) {
       state.problems[id] = {
         best: 0, attempts: 0, solved: false, hintsUsed: 0, revealed: false,
+        hintsOpen: 0, solutionSeen: false, perfRatio: null, perfAt: null,
         firstTry: null, code: null, lastRun: null,
         srs: { due: null, interval: 0, ease: 2.5, reps: 0 },
       };
     }
-    return state.problems[id];
+    // Bản ghi tạo từ phiên bản cũ chưa có các trường mở khoá / hiệu năng.
+    const r = state.problems[id];
+    if (r.hintsOpen === undefined) r.hintsOpen = r.hintsUsed || 0;
+    if (r.solutionSeen === undefined) r.solutionSeen = !!r.revealed;
+    if (r.perfRatio === undefined) r.perfRatio = null;
+    if (r.perfAt === undefined) r.perfAt = null;
+    return r;
   },
 
   quiz(topicId) {
