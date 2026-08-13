@@ -173,6 +173,44 @@ check('đồng bộ lặp lại không làm hỏng dữ liệu', JSON.stringify(
   check('máy chủ giữ code của máy C', finalDoc.state.problems['best-time-to-buy'].code === '// tu may C');
 }
 
+/* ------- đồng bộ nền chạy GIỮA lúc đang làm bài: không được mất kết quả ------- */
+{
+  // Đúng luồng của trang làm bài: `rec` được lấy MỘT lần lúc mở bài rồi được ghi
+  // vào nhiều phút sau, khi người học chạy test xong. Nếu đồng bộ nền chen vào
+  // giữa mà thay object bản ghi, mọi thứ ghi sau đó sẽ biến mất — trong khi điểm
+  // vẫn tăng (addXp ghi thẳng vào state). Đó là bug "giải xong, điểm tăng, nhưng
+  // bài vẫn báo chưa làm".
+  const id = 'two-sum';
+
+  const rec = store.problem(id);           // mở bài
+  rec.attempts += 1;
+  rec.code = '// dang go do';
+
+  await syncNow();                          // đồng bộ nền chen vào giữa phiên làm bài
+
+  check('mở bài xong, đồng bộ nền chạy -> vẫn là cùng một bản ghi', store.problem(id) === rec);
+
+  const xpTruoc = store.get().xp;
+  rec.solved = true;                        // giải xong: ghi qua tham chiếu đã giữ
+  rec.best = 100;
+  rec.lastRun = Date.now();
+  store.addXp(5, { type: 'problem', ref: id });
+  store.save();
+
+  const luu = store.get().problems[id];
+  check('cờ đã giải không bị mất khi đồng bộ chen giữa', luu.solved === true, JSON.stringify(luu));
+  check('điểm bài không bị mất khi đồng bộ chen giữa', luu.best === 100, `nhận ${luu.best}`);
+  check('code đang gõ không bị mất', luu.code === '// dang go do');
+  check('điểm tổng vẫn cộng bình thường', store.get().xp === xpTruoc + 5);
+
+  // Và kết quả đó phải đi được lên máy chủ ở lượt đồng bộ sau.
+  await syncNow();
+  const res = await worker.fetch(new Request(`https://sync.test/p/${store.sync.get().code}`), env);
+  const doc = await res.json();
+  check('máy chủ nhận được bài vừa giải', doc.state.problems[id].solved === true);
+  check('máy chủ nhận đúng điểm của bài', doc.state.problems[id].best === 100, `nhận ${doc.state.problems[id].best}`);
+}
+
 /* --------------------------- mạng hỏng thì không mất gì --------------------------- */
 {
   const snapshotBefore = JSON.stringify(store.get());

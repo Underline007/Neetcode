@@ -85,7 +85,7 @@ $$('#lang-switch button').forEach((btn) => {
 
 /* ------------------------------- router ------------------------------- */
 const routes = [
-  { re: /^\/$/, render: () => renderDashboard() },
+  { re: /^\/$/, render: () => renderDashboard(currentDomain()) },
   { re: /^\/plan$/, render: () => (store.get().lang === 'python' ? renderPythonHome() : renderPlan()) },
   { re: /^\/topics$/, render: () => renderTopics(currentDomain()) },
   { re: /^\/topic\/([\w-]+)$/, render: (m) => renderTopic(m[1], DETAIL_DOMAIN) },

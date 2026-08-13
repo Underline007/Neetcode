@@ -7,7 +7,11 @@
     "start": "python -m http.server 8000",
     "dev": "python -m http.server 8000",
     "verify": "node tools/verify.mjs",
-    "test:sync": "node tools/test-merge.mjs && node tools/test-sync-worker.mjs && node tools/test-sync-e2e.mjs"
+    "verify:py": "node tools/verify-python.mjs",
+    "verify:all": "node tools/verify.mjs && node tools/verify-python.mjs",
+    "test:sync": "node tools/test-merge.mjs && node tools/test-sync-worker.mjs && node tools/test-sync-e2e.mjs && node tools/test-store-refs.mjs",
+    "test:views": "node tools/test-dashboard.mjs",
+    "test": "npm run verify && npm run verify:py && npm run test:sync && npm run test:views"
   },
   "keywords": ["algorithms", "neetcode", "leetcode", "interview", "vietnamese"],
   "license": "MIT"

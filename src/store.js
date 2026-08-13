@@ -44,6 +44,53 @@ function load() {
   }
 }
 
+/** Các map "id -> bản ghi" trong state (xem EMPTY()). */
+const RECORD_MAPS = ['problems', 'quizzes', 'lessons', 'days', 'notes', 'bookmarks', 'cards', 'errorStats'];
+
+/**
+ * Ghi một state vừa tính xong vào state ĐANG DÙNG, **giữ nguyên danh tính của
+ * mọi object** (cả `state` lẫn từng bản ghi bên trong).
+ *
+ * Vì sao không viết gọn thành `state = next`? Các trang làm bài giữ tham chiếu
+ * tới bản ghi suốt cả phiên: `const rec = store.problem(id)` lúc mở bài, rồi
+ * ghi `rec.attempts`, `rec.code`, `rec.solved`, `rec.best`... nhiều phút sau.
+ * Thay `state` bằng object mới (khi đồng bộ đa máy gộp dữ liệu về) sẽ biến
+ * những tham chiếu đó thành MỒ CÔI: mọi thay đổi tiếp theo ghi vào chỗ không ai
+ * đọc và biến mất, trong khi điểm vẫn tăng vì `addXp` ghi thẳng vào state.
+ * Bất biến "bản ghi luôn sống" được test bởi tools/test-store-refs.mjs.
+ */
+function adoptState(next) {
+  for (const key of Object.keys(state)) {
+    if (!(key in next)) delete state[key];
+  }
+  for (const [key, value] of Object.entries(next)) {
+    if (RECORD_MAPS.includes(key)) {
+      if (!state[key] || typeof state[key] !== 'object') state[key] = {};
+      adoptRecordMap(state[key], value || {});
+    } else {
+      state[key] = value;
+    }
+  }
+}
+
+/** Cập nhật từng bản ghi tại chỗ; chỉ thay object khi bản ghi đó hoàn toàn mới. */
+function adoptRecordMap(target, source) {
+  for (const id of Object.keys(target)) {
+    if (!(id in source)) delete target[id];
+  }
+  for (const [id, value] of Object.entries(source)) {
+    const current = target[id];
+    const canMergeInPlace = current && typeof current === 'object' && !Array.isArray(current)
+      && value && typeof value === 'object' && !Array.isArray(value);
+    if (!canMergeInPlace) { target[id] = value; continue; }
+    if (current === value) continue;
+    for (const field of Object.keys(current)) {
+      if (!(field in value)) delete current[field];
+    }
+    Object.assign(current, value);
+  }
+}
+
 let saveTimer = null;
 function persist() {
   state.updatedAt = Date.now();
@@ -77,6 +124,9 @@ export const store = {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   },
 
+  /** Bản ghi SỐNG của một bài tập: ghi vào object trả về là ghi thẳng vào tiến độ
+   *  (nhớ gọi `store.save()`). Object này giữ nguyên danh tính suốt phiên, kể cả
+   *  khi đồng bộ đa máy gộp dữ liệu về — xem `adoptState`. */
   problem(id) {
     if (!state.problems[id]) {
       state.problems[id] = {
@@ -185,8 +235,9 @@ export const store = {
   save: persist,
 
   reset() {
-    state = EMPTY();
-    localStorage.removeItem(KEY);
+    adoptState(EMPTY());
+    // localStorage có thể không dùng được (Safari chế độ riêng tư, chạy trong Node để test)
+    try { localStorage.removeItem(KEY); } catch { /* không sao, persist() cũng đã tự bọc */ }
     persist();
   },
 
@@ -204,7 +255,7 @@ export const store = {
     const parsed = typeof json === 'string' ? JSON.parse(json) : json;
     if (!parsed || typeof parsed !== 'object') throw new Error('Dữ liệu không hợp lệ');
     if (mode === 'replace') {
-      state = { ...EMPTY(), ...parsed };
+      adoptState({ ...EMPTY(), ...parsed });
       persist();
       notifyChanged();
       return { newProblems: 0, newSolved: 0, xpGained: 0 };
@@ -215,7 +266,7 @@ export const store = {
   /** Gộp một bản state đến từ máy khác vào state hiện tại. */
   mergeRemote(remote) {
     const before = this.snapshot();
-    state = mergeState({ ...EMPTY(), ...state }, { ...EMPTY(), ...remote });
+    adoptState(mergeState({ ...EMPTY(), ...state }, { ...EMPTY(), ...remote }));
     persist();
     notifyChanged();
     return summarizeMerge(before, state);
