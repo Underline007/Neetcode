@@ -40,6 +40,14 @@ export function on(root, action, handler) {
 
 export const go = (hash) => { window.location.hash = hash; };
 
+/** Phần "?key=value" sau đường dẫn trong hash hiện tại, ví dụ
+ *  "#/problem/two-sum?review=1" -> hashQuery().get('review') === '1'. */
+export function hashQuery() {
+  const h = window.location.hash.replace(/^#/, '');
+  const i = h.indexOf('?');
+  return new URLSearchParams(i < 0 ? '' : h.slice(i + 1));
+}
+
 /** Render Markdown ngắn (đậm/nghiêng/code) mà không bọc thẻ <p> */
 export function inlineMd(text) {
   return mdRender(text).replace(/^<p>/, '').replace(/<\/p>$/, '');

@@ -6,10 +6,10 @@ import { runTests, benchmark } from '../runner.js';
 import { measureTests, perfTier, perfLabel, perfAdvice, perfScope, perfShaky, fmtMs, fmtRatio } from '../perf.js';
 import {
   openHint, hintButton, hintPaneNote, needsRevealConfirm, revealSolution,
-  revealButtonLabel, revealNote,
+  revealButtonLabel, revealNote, resetUnlockState,
 } from '../unlock.js';
 import { md } from '../markdown.js';
-import { $, $$, esc, inlineMd, toast, diffClass, diffLabel, bar } from '../ui.js';
+import { $, $$, esc, inlineMd, toast, diffClass, diffLabel, bar, hashQuery } from '../ui.js';
 import { questionHtml } from '../quiz-format.js';
 import { resolveLang, pick } from '../lang.js';
 import { createEditor } from '../editor.js';
@@ -24,6 +24,16 @@ let session = null;   // trạng thái phiên làm bài hiện tại
 /** Danh sách bài theo đúng thứ tự học, dùng cho điều hướng trước/sau. */
 function orderedProblems(domain) {
   return domain.PROBLEMS || [...domain.problemById.values()];
+}
+
+/**
+ * Đang mở bài này để ÔN TẬP (tới từ trang 🔁 Ôn tập ngắt quãng, link có "?review=1")?
+ *
+ * Chỉ có ý nghĩa khi có sẵn code cũ để giấu đi — nếu chưa từng viết gì thì hành vi
+ * mở bài vẫn như bình thường (không có gì để trở thành "gợi ý" cả).
+ */
+export function isReviewMode(rec) {
+  return hashQuery().get('review') === '1' && !!(rec.code || rec.codePy);
 }
 
 export function renderProblem(id, domain = JS_DOMAIN) {
@@ -46,6 +56,13 @@ export function renderProblem(id, domain = JS_DOMAIN) {
 
   const marked = store.isBookmarked(p.id);
   const firstArgs = sampleArgs(p);
+  const reviewMode = isReviewMode(rec);
+  if (reviewMode) {
+    // Bắt đầu một lượt ôn tập MỚI: gợi ý & lời giải phải trả điểm lại từ đầu,
+    // không được hiện sẵn hoặc ăn ké trạng thái miễn phí có từ lần giải trước.
+    resetUnlockState(rec);
+    store.save();
+  }
 
   session = {
     problem: p,
@@ -90,6 +107,15 @@ export function renderProblem(id, domain = JS_DOMAIN) {
     <h1 style="margin-top:12px">${esc(p.title)}</h1>
     <p class="sub">${esc(p.en)} · Điểm tối đa cơ bản: ${BASE_POINTS[p.difficulty]}</p>
     ${notReady ? '<div class="card" style="border-color:var(--warn);margin-bottom:14px"><strong>🔧 Bài này chưa có bản Python.</strong> <span class="muted small">Đang hiển thị bằng JavaScript — bài sẽ có bản Python trong các đợt cập nhật tiếp theo.</span></div>' : ''}
+    ${reviewMode ? `
+      <div class="card" style="border-color:var(--accent);margin-bottom:14px">
+        <div class="row">
+          <strong>🔁 Đang ôn tập</strong>
+          <span class="spacer"></span>
+          <button class="btn ghost small" id="review-reveal-btn">👁 Xem lời giải trước của bạn</button>
+        </div>
+        <p class="muted small" style="margin:6px 0 0">Khung code bắt đầu <strong>từ đầu</strong>, không tự điền lại lời giải cũ — hãy thử tự nhớ trước. Giải lại thành công sẽ thay cho lời giải cũ.</p>
+      </div>` : ''}
 
     <div class="workspace">
       <div>
@@ -102,7 +128,7 @@ export function renderProblem(id, domain = JS_DOMAIN) {
           <div class="pane-head">
             <strong>💡 Gợi ý theo bậc</strong>
             <span class="spacer"></span>
-            <span class="muted small" id="hint-note">${esc(hintPaneNote(rec))}</span>
+            <span class="muted small" id="hint-note">${esc(hintPaneNote(rec, { forcePaid: reviewMode }))}</span>
           </div>
           <div class="pane-body">
             <div id="hints"></div>
@@ -113,8 +139,8 @@ export function renderProblem(id, domain = JS_DOMAIN) {
         <div class="pane" style="margin-top:14px">
           <div class="pane-head"><strong>📖 Phân tích &amp; lời giải</strong></div>
           <div class="pane-body">
-            <p class="muted small" style="margin-top:0" id="reveal-note">${inlineMd(revealNote(rec))}</p>
-            <button class="btn ghost small" id="reveal-btn">${revealButtonLabel(rec)}</button>
+            <p class="muted small" style="margin-top:0" id="reveal-note">${inlineMd(revealNote(rec, { forcePaid: reviewMode }))}</p>
+            <button class="btn ghost small" id="reveal-btn">${revealButtonLabel(rec, { forcePaid: reviewMode })}</button>
             <div id="solution"></div>
           </div>
         </div>
@@ -231,16 +257,39 @@ export function mountProblem(id, domain = JS_DOMAIN) {
   // Phiên của ĐÚNG lần mở bài này: việc chạy nền (đo hiệu năng) có thể trả kết quả
   // sau khi người học đã sang bài khác — lúc đó không được ghi vào phiên mới.
   const sess = session;
+  // `let` vì bị TẮT ngay khi người học tự giải lại thành công (xem onPass): từ lúc đó
+  // gợi ý/lời giải quay về miễn phí như một bài đã giải bình thường, và editor lại tự
+  // lưu theo từng ký tự gõ — giống hệt hành vi ngoài chế độ ôn tập.
+  let reviewMode = isReviewMode(rec);
+  // Bấm "xem lời giải trước" thì tắt hành vi "giữ nguyên code cũ" cho phần còn lại của
+  // phiên này — đã nhìn code cũ rồi thì lần pass tiếp theo không còn là "tự nhớ được" nữa.
+  let revealedOld = false;
 
   const editor = createEditor({
     mount: $('#editor-mount'),
-    value: (isPy ? rec.codePy : rec.code) || starter,
+    value: (reviewMode ? '' : (isPy ? rec.codePy : rec.code)) || starter,
     lang,
     onChange: (v) => {
+      // Đang ôn tập mà chưa xem lại code cũ: KHÔNG ghi đè lời giải cũ bằng bản đang gõ dở.
+      // Nếu ghi ngay từ ký tự đầu tiên, code cũ (đã từng chạy đúng) sẽ mất ngay cả khi
+      // người học bỏ dở giữa chừng — điều đó tệ hơn cả việc không có tính năng này.
+      if (reviewMode && !revealedOld) return;
       if (isPy) rec.codePy = v; else rec.code = v;
       store.save();
     },
     onRun: () => run(),
+  });
+
+  $('#review-reveal-btn')?.addEventListener('click', () => {
+    if (!confirm('Xem lại code cũ sẽ không còn tính là bạn tự nhớ được, và điểm của lượt ôn này sẽ bị giới hạn ở 30% — y như xem lời giải tham chiếu. Vẫn xem chứ?')) return;
+    revealedOld = true;
+    // Xem code cũ của chính mình cũng là một dạng "xem đáp án" — tính điểm y như
+    // bấm "Xem phân tích & lời giải", không có đường tắt riêng cho việc này.
+    revealSolution(rec, { forcePaid: reviewMode });
+    store.save();
+    editor.value = (isPy ? rec.codePy : rec.code) || starter;
+    $('#review-reveal-btn').remove();
+    toast('Đây là code bạn đã viết trước đó — đọc xong hãy thử gõ lại bằng lời của mình.');
   });
 
   // bảng cú pháp: bấm một mẫu là chèn vào vị trí con trỏ
@@ -312,7 +361,7 @@ export function mountProblem(id, domain = JS_DOMAIN) {
   // ----- gợi ý -----
   renderHints();
   $('#hint-btn').addEventListener('click', () => {
-    const { opened, level, free } = openHint(rec, hints.length);
+    const { opened, level, free } = openHint(rec, hints.length, { forcePaid: reviewMode });
     if (!opened) return;
     store.save();
     renderHints();
@@ -327,17 +376,17 @@ export function mountProblem(id, domain = JS_DOMAIN) {
       .map((h, i) => `<div class="hint"><strong>Gợi ý ${i + 1}.</strong> ${md(h).replace(/^<p>|<\/p>$/g, '')}</div>`)
       .join('');
     const btn = $('#hint-btn');
-    const state = hintButton(rec, hints.length);
+    const state = hintButton(rec, hints.length, { forcePaid: reviewMode });
     btn.textContent = state.label;
     btn.disabled = state.disabled;
-    $('#hint-note').textContent = hintPaneNote(rec);
+    $('#hint-note').textContent = hintPaneNote(rec, { forcePaid: reviewMode });
   }
 
   // ----- lời giải -----
   $('#reveal-btn').addEventListener('click', () => {
-    if (needsRevealConfirm(rec)
+    if (needsRevealConfirm(rec, { forcePaid: reviewMode })
       && !confirm('Xem lời giải sẽ giới hạn điểm bài này ở 30%. Tiếp tục?\n\nMẹo: pass hết test trước thì phần này mở miễn phí.')) return;
-    revealSolution(rec);
+    revealSolution(rec, { forcePaid: reviewMode });
     store.save();
     $('#reveal-btn').classList.add('hidden');
     const primarySolution = pick(p, 'solution', lang);
@@ -371,9 +420,9 @@ export function mountProblem(id, domain = JS_DOMAIN) {
   function unlockPanes() {
     renderHints();
     const note = $('#reveal-note');
-    if (note) note.innerHTML = inlineMd(revealNote(rec));
+    if (note) note.innerHTML = inlineMd(revealNote(rec, { forcePaid: reviewMode }));
     const btn = $('#reveal-btn');
-    if (btn && !btn.classList.contains('hidden')) btn.textContent = revealButtonLabel(rec);
+    if (btn && !btn.classList.contains('hidden')) btn.textContent = revealButtonLabel(rec, { forcePaid: reviewMode });
   }
 
   /** Mở (hoặc cuộn tới) khung lời giải — dùng cho nút trong thẻ hiệu năng. */
@@ -555,6 +604,20 @@ export function mountProblem(id, domain = JS_DOMAIN) {
     sess.elapsed = Date.now() - sess.startedAt;
     sess.code = code;
 
+    // Đánh giá "có thực sự tự nhớ được không" TRƯỚC khi tắt chế độ ôn tập: phải xét
+    // đúng những gì xảy ra TRONG lượt ôn này — không xem code cũ, không mở gợi ý,
+    // không xem lời giải tham chiếu.
+    const rememberedFromScratch = reviewMode && !revealedOld && !rec.hintsUsed && !rec.revealed;
+    // Từ đây trở đi: gợi ý & lời giải quay lại MIỄN PHÍ (y như một bài đã giải bình
+    // thường), và editor tiếp tục tự lưu theo từng ký tự gõ — đúng hành vi ngoài
+    // chế độ ôn tập, vì lời giải MỚI này giờ là lời giải chính thức của bài.
+    reviewMode = false;
+
+    // Ở chế độ ôn tập, onChange cố tình KHÔNG ghi vào rec.code/rec.codePy khi đang gõ
+    // (xem mountProblem) để giữ nguyên lời giải cũ phòng khi bỏ dở. Giờ đã pass thật rồi
+    // thì lời giải mới thay cho lời giải cũ — đúng tinh thần "đã tự nhớ lại được".
+    if (isPy) rec.codePy = code; else rec.code = code;
+
     const sc = scoreNow();
     applyScore(sc.score, 'solve');
 
@@ -567,6 +630,7 @@ export function mountProblem(id, domain = JS_DOMAIN) {
       <div class="card" style="border-color:var(--ok)">
         <div class="row"><strong style="color:var(--ok)">✅ Toàn bộ ${res.results.length} test đều đạt!</strong>
           <span class="spacer"></span><span class="muted small">${res.totalMs} ms</span></div>
+        ${rememberedFromScratch ? '<p class="small" style="margin:8px 0 0;color:var(--ok)">🔁 Ôn tập thành công — bạn vừa tự giải lại được mà không nhìn code cũ. Trí nhớ dài hạn được củng cố chính là ở bước này.</p>' : ''}
         <div id="score-card">${scoreBreakdown(sc, rec)}</div>
       </div>
       <div id="perf" style="margin-top:12px">${perfCard({ state: 'running' })}</div>

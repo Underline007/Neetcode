@@ -14,7 +14,8 @@
     "test:scoring": "node tools/test-scoring.mjs",
     "test:bench": "node tools/test-bench.mjs && node tools/test-bench-python.mjs",
     "test:hints": "node tools/test-hints.mjs",
-    "test": "npm run verify && npm run verify:py && npm run test:sync && npm run test:views && npm run test:scoring && npm run test:bench && npm run test:hints"
+    "test:review": "node tools/test-review-mode.mjs",
+    "test": "npm run verify && npm run verify:py && npm run test:sync && npm run test:views && npm run test:scoring && npm run test:bench && npm run test:hints && npm run test:review"
   },
   "keywords": ["algorithms", "neetcode", "leetcode", "interview", "vietnamese"],
   "license": "MIT"

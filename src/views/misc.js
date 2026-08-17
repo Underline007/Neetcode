@@ -32,11 +32,11 @@ export function renderReview() {
       </div>` : `
       <div class="card" style="border-color:var(--warn)">
         <strong>${due.length} bài đến hạn ôn hôm nay</strong>
-        <p class="muted small" style="margin:6px 0 0">Mẹo: hãy giải lại <em>từ đầu</em>, đừng đọc lại code cũ. Mục tiêu là kiểm tra trí nhớ chủ động.</p>
+        <p class="muted small" style="margin:6px 0 0">Bấm vào một bài, khung code sẽ <strong>bắt đầu từ đầu</strong> — không tự điền lại lời giải cũ của bạn, để việc ôn thật sự là kiểm tra trí nhớ chủ động chứ không phải chép lại.</p>
       </div>
       <div class="list" style="margin-top:12px">
         ${due.map(({ p, rec }) => `
-          <a class="list-item" href="#/problem/${p.id}">
+          <a class="list-item" href="#/problem/${p.id}?review=1">
             <span>🔁</span>
             <span class="t">${esc(p.title)}</span>
             <span class="badge ${diffClass(p.difficulty)}">${diffLabel(p.difficulty)}</span>

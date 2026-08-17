@@ -102,7 +102,10 @@ const routes = [
 
 function currentPath() {
   const h = window.location.hash.replace(/^#/, '');
-  return h || '/';
+  // "?..." không phải một phần của đường dẫn để so khớp route (xem hashQuery trong ui.js)
+  // — nó mang cờ như ?review=1 mà trang làm bài tự đọc riêng.
+  const path = h.split('?')[0];
+  return path || '/';
 }
 
 function router() {

@@ -20,7 +20,7 @@ import { computeScore, BASE_POINTS, BONUS, REVEAL_CAP } from '../src/scoring.js'
 import { perfTier, benchTests, perfScope, perfShaky, fmtMs, fmtRatio, PERF_TIERS } from '../src/perf.js';
 import {
   isFree, openHint, hintButton, hintPaneNote, needsRevealConfirm,
-  revealSolution, revealButtonLabel, revealNote,
+  revealSolution, revealButtonLabel, revealNote, resetUnlockState,
 } from '../src/unlock.js';
 import { store } from '../src/store.js';
 
@@ -169,6 +169,55 @@ const rec = (patch = {}) => ({
   check('bản ghi mới có đủ trường mới',
     fresh.hintsOpen === 0 && fresh.solutionSeen === false && fresh.perfRatio === null);
   store.reset();
+}
+
+/* ================= 7. Ôn tập (forcePaid): đã giải rồi vẫn phải trả điểm ================= */
+{
+  const paid = { forcePaid: true };
+
+  // Bài ĐÃ GIẢI (rec.solved = true) nhưng đang ôn tập -> KHÔNG được coi là miễn phí.
+  const r = rec({ solved: true });
+  check('rec.solved=true nhưng forcePaid -> không còn miễn phí', !isFree(r, paid));
+  check('không truyền opts thì vẫn miễn phí như cũ (không phá vỡ hành vi cũ)', isFree(r));
+
+  const opened = openHint(r, 3, paid);
+  check('mở gợi ý lúc đang ôn tập vẫn tính là phải trả điểm', opened.free === false);
+  eq('hintsUsed tăng lên dù bài đã từng giải', r.hintsUsed, 1);
+  check('nhãn nút nói rõ số % mất, không nói "miễn phí"',
+    /−\d+% điểm/.test(hintButton(r, 3, paid).label) && !/miễn phí/.test(hintButton(r, 3, paid).label),
+    hintButton(r, 3, paid).label);
+  check('lời nhắc đầu khung gợi ý nói "trừ điểm dần"', /trừ điểm/.test(hintPaneNote(r, paid)));
+
+  check('xem lời giải lúc đang ôn tập vẫn phải hỏi lại', needsRevealConfirm(r, paid));
+  check('nhãn nút xem lời giải không còn nói miễn phí', !/miễn phí/.test(revealButtonLabel(r, paid)));
+  check('phần giải thích cảnh báo trần 30%', /30%/.test(revealNote(r, paid)));
+  const revealRes = revealSolution(r, paid);
+  check('xem lời giải lúc ôn tập bị tính là "đã xem" -> chặn trần điểm', revealRes.free === false && r.revealed === true);
+
+  const scoreDuringReview = computeScore({ difficulty: 'Medium', hintsUsed: r.hintsUsed, revealed: r.revealed }).score;
+  eq('điểm của lượt ôn tập này bị chặn trần 30% y như bài chưa từng giải',
+    scoreDuringReview, Math.round(BASE_POINTS.Medium * REVEAL_CAP));
+
+  // Không có forcePaid (đã giải lại thành công, review kết thúc) -> quay lại miễn phí ngay,
+  // dù hintsUsed/revealed vẫn còn nguyên giá trị của lượt vừa rồi.
+  check('bỏ forcePaid đi thì miễn phí trở lại (giống lúc vừa giải lại xong)', isFree(r));
+  check('nhãn nút quay lại nói miễn phí khi không còn forcePaid', /miễn phí/.test(revealButtonLabel(r)));
+}
+
+/* ================= 8. resetUnlockState: bắt đầu lượt ôn tập mới sạch sẽ ================= */
+{
+  // Bản ghi mang trạng thái "đã mở hết, đã xem lời giải" từ TRƯỚC (dù miễn phí hay
+  // không) -> resetUnlockState phải đưa nó về y hệt bài chưa từng đụng tới gì.
+  const r = rec({ solved: true, hintsUsed: 2, hintsOpen: 3, revealed: true, solutionSeen: true });
+  resetUnlockState(r);
+  eq('hintsOpen về 0', r.hintsOpen, 0);
+  eq('hintsUsed về 0', r.hintsUsed, 0);
+  eq('revealed về false', r.revealed, false);
+  eq('solutionSeen về false', r.solutionSeen, false);
+  check('không đụng vào best/solved — đó là lịch sử thật, không phải trạng thái mở khoá',
+    r.solved === true);
+
+  check('resetUnlockState(null) không crash', (() => { resetUnlockState(null); return true; })());
 }
 
 console.log(`Chấm điểm & mở khoá: ${passed} kiểm tra đạt${failures.length ? `, ${failures.length} THẤT BẠI` : ''}.`);
