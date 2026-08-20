@@ -11,22 +11,25 @@
  * nút "Làm bài tập" để chuyển từ đọc sang thực hành.
  */
 
-import { HANDBOOK } from './handbook.js';
+import { HANDBOOK, HANDBOOK_PARTS } from './handbook/index.js';
 import { PY_TOPICS } from './python/index.js';
 
 /** Ước lượng thời gian đọc: ~900 ký tự/phút với văn bản kỹ thuật tiếng Việt có code. */
 const uocLuongPhut = (text) => Math.max(2, Math.round(String(text).length / 900));
 
 export const BOOK_PARTS = [
-  {
-    id: 'cam-nang',
-    title: 'Cẩm nang cú pháp',
-    icon: '⚡',
-    blurb: 'Tra nhanh khi đang cần: mỗi chương 3–5 phút, nặng về bảng tra và ví dụ ngắn.',
-    chapters: HANDBOOK.map((c) => ({ ...c, partId: 'cam-nang' })),
-  },
+  // Cẩm nang chia thành 5 phần nhỏ — 26 chương trong một danh sách phẳng thì không tra được.
+  ...HANDBOOK_PARTS.map((p) => ({
+    id: `cam-nang-${p.id}`,
+    group: 'Cẩm nang cú pháp',
+    title: p.title,
+    icon: p.icon,
+    blurb: p.blurb,
+    chapters: HANDBOOK.filter((c) => c.part === p.id).map((c) => ({ ...c, partId: `cam-nang-${p.id}` })),
+  })),
   {
     id: 'lo-trinh',
+    group: 'Lộ trình Python',
     title: 'Lộ trình Python',
     icon: '🐍',
     blurb: 'Đi sâu từng chủ đề, đúng nội dung bài giảng của 15 module — đọc xong có thể làm bài tập ngay.',

@@ -54,9 +54,13 @@ export function renderBookHome() {
 
     <div id="offline-box">${offlineCard()}</div>
 
-    ${BOOK_PARTS.map((part) => {
+    ${BOOK_PARTS.map((part, i) => {
       const done = part.chapters.filter((c) => r.read[c.id]).length;
+      // Đầu mỗi nhóm (Cẩm nang / Lộ trình) chèn một dải phân cách để mục lục có cấu trúc
+      const moNhom = i === 0 || BOOK_PARTS[i - 1].group !== part.group;
+      const soChuong = BOOK_PARTS.filter((x) => x.group === part.group).reduce((n, x) => n + x.chapters.length, 0);
       return `
+        ${moNhom ? `<div class="book-group"><span>${esc(part.group)}</span><span class="muted small">${soChuong} chương</span></div>` : ''}
         <h2>${part.icon} ${esc(part.title)} <span class="badge${done === part.chapters.length ? ' ok' : ''}">${done}/${part.chapters.length}</span></h2>
         <p class="muted small" style="margin-top:-4px">${esc(part.blurb)}</p>
         <div class="list toc-list">

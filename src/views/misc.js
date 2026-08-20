@@ -356,9 +356,15 @@ export function renderGuide() {
       <p><code>console.log</code> / <code>print</code> của <strong>mỗi test hiện riêng trong thẻ test đó</strong>, không trộn chung — nên bạn luôn biết dòng log nào là của test nào.</p>
 
       <h2>📖 Đọc sách trên điện thoại</h2>
-      <p>Mục <strong>📖 Sách Python</strong> gộp toàn bộ nội dung thành một cuốn 26 chương (~148 phút đọc):
-        phần <em>Cẩm nang cú pháp</em> gồm các chương ngắn 3–5 phút để tra nhanh, và phần <em>Lộ trình Python</em>
-        là đúng bài giảng của 15 module — đọc xong bấm một nút là sang làm bài tập chương đó.</p>
+      <p>Mục <strong>📖 Sách Python</strong> gộp toàn bộ nội dung thành một cuốn <strong>41 chương
+        (~251 phút đọc)</strong>, chia hai nhóm:</p>
+      <ul>
+        <li><strong>Cẩm nang cú pháp</strong> — 26 chương viết riêng để đọc trên điện thoại, chia 5 phần:
+          <em>Bắt đầu · Dữ liệu · Luồng &amp; hàm · Tổ chức code · Làm việc thật</em>. Mỗi chương 4–7 phút,
+          nặng bảng tra và ví dụ ngắn.</li>
+        <li><strong>Lộ trình Python</strong> — 15 chương lấy đúng bài giảng của 15 module; đọc xong bấm
+          một nút là sang làm bài tập chương đó.</li>
+      </ul>
       <table>
         <thead><tr><th>Tính năng</th><th>Để làm gì</th></tr></thead>
         <tbody>

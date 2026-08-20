@@ -8,7 +8,7 @@ Không phải một danh sách bài tập. Đây là một **khoá học có c�
 kèm bài tập chấm điểm tự động, gợi ý theo bậc, chẩn đoán lỗi và lịch ôn tập ngắt quãng.
 
 ```
-18 chủ đề · 64 bài tập · 401 test case · 72 câu quiz · 277 thẻ ghi nhớ · sách 26 chương · lộ trình 30 ngày
+18 chủ đề · 64 bài tập · 401 test case · 72 câu quiz · 277 thẻ ghi nhớ · sách 41 chương · lộ trình 30 ngày
 ```
 
 ---
@@ -113,9 +113,15 @@ có nút chép. *🧠 Luyện nhớ*: 277 thẻ ghi nhớ chạy trên đúng th
 Mọi ô tìm kiếm đều **bỏ dấu** — gõ `hai con tro` ra "Hai con trỏ".
 
 **Đọc như một cuốn sách, ngay trên điện thoại.**
-Mục *📖 Sách Python* gộp nội dung thành 26 chương (~148 phút): phần **Cẩm nang cú pháp** gồm các chương
-ngắn 3–5 phút để tra nhanh, phần **Lộ trình Python** là đúng bài giảng của 15 module. Trình đọc nhớ chỗ
-đang đọc dở, chỉnh được cỡ chữ, có mục lục trong chương và tự đánh dấu chương đã đọc.
+Mục *📖 Sách Python* gộp nội dung thành **41 chương (~251 phút, ~98 trang A5)**:
+
+- **Cẩm nang cú pháp** — 26 chương viết riêng, chia 5 phần: *Bắt đầu* (chạy Python, biến & kiểu, toán tử,
+  số học) · *Dữ liệu* (chuỗi, cắt lát, list/tuple, dict, set) · *Luồng & hàm* (điều kiện, comprehension,
+  hàm, generator, decorator) · *Tổ chức code* (lớp, kế thừa & dunder, module, ngoại lệ, chú thích kiểu) ·
+  *Làm việc thật* (file & JSON, thư viện chuẩn, regex, ngày giờ, đọc lỗi, PEP 8, chuyển từ JavaScript).
+- **Lộ trình Python** — 15 chương lấy thẳng bài giảng của 15 module.
+
+Trình đọc nhớ chỗ đang đọc dở, chỉnh được cỡ chữ, có mục lục trong chương và tự đánh dấu chương đã đọc.
 
 **Cài được lên màn hình chính và đọc khi mất mạng.**
 App là một PWA: sau lần mở đầu tiên, đọc sách · tra cứu · luyện thẻ · làm bài **JavaScript** đều chạy
@@ -177,7 +183,7 @@ src/
     part1..part6.js        toàn bộ bài giảng, quiz, bài tập, test, gợi ý, lời giải
     index.js               gộp dữ liệu + lộ trình 30 ngày + sinh test hiệu năng
     reference.js           cấu trúc dữ liệu, bảng chọn cấu trúc, đối chiếu JS↔Python, thẻ nhớ
-    handbook.js            cẩm nang cú pháp Python — 11 chương viết riêng để đọc trên điện thoại
+    handbook/part1..5.js   cẩm nang cú pháp Python — 26 chương viết riêng để đọc trên điện thoại
     book.js                ghép cẩm nang + 15 module thành cấu trúc sách cho trình đọc
     python/                15 module Python thuần tuý
       part1..part15.js     bài giảng (tư duy), quiz, bài tập của từng module
