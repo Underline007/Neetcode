@@ -196,11 +196,38 @@ for (const c of cards) {
   if (!c.front || !c.back) { console.error(`❌ thẻ ghi nhớ ${c.id}: thiếu mặt trước/sau`); failures++; }
 }
 
+/* ---- sách & service worker ---- */
+const { CHAPTERS, BOOK_MINUTES } = await import('../src/data/book.js');
+const chapterIds = new Set();
+for (const c of CHAPTERS) {
+  if (chapterIds.has(c.id)) { console.error(`❌ sách: TRÙNG ID chương "${c.id}"`); failures++; }
+  chapterIds.add(c.id);
+  for (const field of ['title', 'icon', 'body', 'partId']) {
+    if (!c[field]) { console.error(`❌ sách ${c.id}: thiếu trường "${field}"`); failures++; }
+  }
+  if (c.body.length < 400) { console.error(`❌ sách ${c.id}: nội dung quá ngắn`); failures++; }
+  // Chương lấy từ module phải trỏ đúng vào một chủ đề có thật
+  if (c.topicId && !TOPICS.concat(await import('../src/data/python/index.js').then((m) => m.PY_TOPICS))
+      .some((t) => t.id === c.topicId)) {
+    console.error(`❌ sách ${c.id}: topicId "${c.topicId}" không tồn tại`); failures++;
+  }
+}
+
+// sw.js được sinh tự động — lỗi thời là app hỏng khi offline, phải bắt ngay ở đây.
+const { execFileSync } = await import('node:child_process');
+try {
+  execFileSync(process.execPath, ['tools/gen-sw.mjs', '--check'], { stdio: 'pipe' });
+} catch (err) {
+  console.error('❌ sw.js lỗi thời so với cây file — chạy: node tools/gen-sw.mjs');
+  failures++;
+}
+
 console.log('');
 console.log(`Chủ đề : ${TOPICS.length}`);
 console.log(`Bài tập: ${PROBLEMS.length}`);
 console.log(`Test   : ${totalTests}`);
 console.log(`Tra cứu: ${DS_REFERENCE.length} cấu trúc · ${PICK_TABLE.length} dấu hiệu · ${XLANG.reduce((s, g) => s + g.rows.length, 0)} dòng đối chiếu`);
 console.log(`Thẻ nhớ: ${cards.length}`);
+console.log(`Sách   : ${CHAPTERS.length} chương · ~${BOOK_MINUTES} phút đọc`);
 console.log(failures === 0 ? '✅ TẤT CẢ ĐỀU ĐẠT' : `❌ ${failures} lỗi`);
 process.exit(failures === 0 ? 0 : 1);

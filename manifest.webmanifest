@@ -1,0 +1,24 @@
+{
+  "name": "NeetCode 30 — Học thuật toán & Python",
+  "short_name": "NeetCode 30",
+  "description": "Học thuật toán và Python bằng tiếng Việt: đọc sách, làm bài tập chấm điểm tự động, ôn tập ngắt quãng. Đọc được khi không có mạng.",
+  "lang": "vi",
+  "dir": "ltr",
+  "start_url": "./index.html#/book",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "categories": ["education", "books", "productivity"],
+  "icons": [
+    { "src": "./assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Đọc sách", "url": "./index.html#/book", "description": "Mở trình đọc sách Python" },
+    { "name": "Luyện nhớ", "url": "./index.html#/drill", "description": "Ôn thẻ ghi nhớ cú pháp" },
+    { "name": "Tra cứu nhanh", "url": "./index.html#/cheatsheet", "description": "Tra cú pháp và cấu trúc dữ liệu" }
+  ]
+}

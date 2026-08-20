@@ -10,6 +10,16 @@
       rel="icon"
       href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>"
     />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="theme-color" content="#0d1117" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="NeetCode 30" />
+    <link rel="apple-touch-icon" href="./assets/icons/icon-192.png" />
   </head>
   <body>
     <div id="app">
@@ -19,6 +29,15 @@
             <strong>NeetCode 30</strong>
           </div>
         </div>
+
+        <button
+          id="nav-toggle"
+          class="nav-toggle"
+          aria-expanded="false"
+          aria-controls="nav"
+        >
+          ☰ Menu
+        </button>
 
         <div class="row" id="lang-switch" style="gap: 6px; margin: 2px 0 4px">
           <button class="btn small" data-lang="javascript" style="flex: 1">
@@ -43,7 +62,11 @@
             >🔁 Ôn tập ngắt quãng
             <span id="due-badge" class="badge hidden">0</span></a
           >
-          <div class="nav-sep">Ghi nhớ</div>
+          <div class="nav-sep">Đọc &amp; ghi nhớ</div>
+          <a href="#/book" data-route="/book"
+            >📖 Sách Python
+            <span id="book-badge" class="badge hidden">0</span></a
+          >
           <a href="#/notebook" data-route="/notebook">📔 Sổ tay</a>
           <a href="#/cheatsheet" data-route="/cheatsheet">🔎 Tra cứu nhanh</a>
           <a href="#/drill" data-route="/drill"

@@ -355,6 +355,34 @@ export function renderGuide() {
       </table>
       <p><code>console.log</code> / <code>print</code> của <strong>mỗi test hiện riêng trong thẻ test đó</strong>, không trộn chung — nên bạn luôn biết dòng log nào là của test nào.</p>
 
+      <h2>📖 Đọc sách trên điện thoại</h2>
+      <p>Mục <strong>📖 Sách Python</strong> gộp toàn bộ nội dung thành một cuốn 26 chương (~148 phút đọc):
+        phần <em>Cẩm nang cú pháp</em> gồm các chương ngắn 3–5 phút để tra nhanh, và phần <em>Lộ trình Python</em>
+        là đúng bài giảng của 15 module — đọc xong bấm một nút là sang làm bài tập chương đó.</p>
+      <table>
+        <thead><tr><th>Tính năng</th><th>Để làm gì</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Nhớ chỗ đang đọc</strong></td><td>Đóng app giữa chừng rồi mở lại vẫn quay đúng đoạn dở dang. Mục lục hiện "đang đọc N%".</td></tr>
+          <tr><td><strong>A− / A+</strong></td><td>Chỉnh cỡ chữ cho vừa mắt; lựa chọn được ghi nhớ.</td></tr>
+          <tr><td><strong>Trong chương</strong></td><td>Mục lục các phần của chương, chạm là nhảy tới.</td></tr>
+          <tr><td><strong>Tự đánh dấu đã đọc</strong></td><td>Cuộn hết chương là tự tick; thanh bên đếm số chương còn lại.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Đọc khi không có mạng &amp; cài lên màn hình chính</h2>
+      <p>App cài được vào màn hình chính điện thoại như một ứng dụng thật (ở trang Sách có nút
+        <strong>📲 Cài lên màn hình chính</strong>; trên iPhone thì bấm <strong>Chia sẻ → Thêm vào MH chính</strong>).
+        Sau lần mở đầu tiên, toàn bộ app được lưu lại trong máy.</p>
+      <table>
+        <thead><tr><th>Khi mất mạng</th><th>Trạng thái</th></tr></thead>
+        <tbody>
+          <tr><td>Đọc sách, tra cứu, luyện thẻ, xem ghi chú</td><td>✅ chạy bình thường</td></tr>
+          <tr><td>Làm và chấm bài <strong>JavaScript</strong></td><td>✅ chạy bình thường</td></tr>
+          <tr><td>Chấm bài <strong>Python</strong></td><td>❌ cần mạng ở lần chạy đầu mỗi phiên để tải môi trường Python (Pyodide) từ Internet</td></tr>
+        </tbody>
+      </table>
+      <p class="muted">Tiến độ luôn nằm trong máy bạn, không gửi đi đâu — nên đọc offline vẫn ghi nhận đầy đủ.</p>
+
       <h2>Nhớ cú pháp và cấu trúc dữ liệu</h2>
       <p>Hai mục phục vụ hai lúc khác nhau:</p>
       <ul>
