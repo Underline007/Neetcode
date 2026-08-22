@@ -8,7 +8,7 @@ Không phải một danh sách bài tập. Đây là một **khoá học có c�
 kèm bài tập chấm điểm tự động, gợi ý theo bậc, chẩn đoán lỗi và lịch ôn tập ngắt quãng.
 
 ```
-18 chủ đề · 64 bài tập · 401 test case · 72 câu quiz · 277 thẻ ghi nhớ · lộ trình 30 ngày
+18 chủ đề · 64 bài tập · 401 test case · 72 câu quiz · 277 thẻ ghi nhớ · sách 41 chương · lộ trình 30 ngày
 ```
 
 ---
@@ -93,7 +93,7 @@ Hệ thống phân tích code + kết quả test để chỉ ra *loại lỗi*, 
 
 **Lỗi được giải thích bằng tiếng Việt, kèm số dòng.**
 `TypeError: Cannot read properties of undefined (reading 'next')` là một bức tường với người mới.
-App dịch 23 loại lỗi hay gặp của JavaScript và Python thành ba câu trả lời — *nghĩa là gì · vì sao
+App dịch 25 loại lỗi hay gặp của JavaScript và Python thành ba câu trả lời — *nghĩa là gì · vì sao
 thường xảy ra · sửa thế nào* — chỉ đúng **dòng** gây lỗi và có nút nhảy tới dòng đó.
 Thông báo gốc vẫn giữ lại để đối chiếu.
 
@@ -111,6 +111,22 @@ Thông báo gốc vẫn giữ lại để đối chiếu.
 dữ liệu kèm cú pháp **cả hai ngôn ngữ**, bảng đối chiếu JavaScript ↔ Python, và toàn bộ bảng cú pháp
 có nút chép. *🧠 Luyện nhớ*: 277 thẻ ghi nhớ chạy trên đúng thuật toán ôn ngắt quãng của bài tập.
 Mọi ô tìm kiếm đều **bỏ dấu** — gõ `hai con tro` ra "Hai con trỏ".
+
+**Đọc như một cuốn sách, ngay trên điện thoại.**
+Mục *📖 Sách Python* gộp nội dung thành **41 chương (~251 phút, ~98 trang A5)**:
+
+- **Cẩm nang cú pháp** — 26 chương viết riêng, chia 5 phần: *Bắt đầu* (chạy Python, biến & kiểu, toán tử,
+  số học) · *Dữ liệu* (chuỗi, cắt lát, list/tuple, dict, set) · *Luồng & hàm* (điều kiện, comprehension,
+  hàm, generator, decorator) · *Tổ chức code* (lớp, kế thừa & dunder, module, ngoại lệ, chú thích kiểu) ·
+  *Làm việc thật* (file & JSON, thư viện chuẩn, regex, ngày giờ, đọc lỗi, PEP 8, chuyển từ JavaScript).
+- **Lộ trình Python** — 15 chương lấy thẳng bài giảng của 15 module.
+
+Trình đọc nhớ chỗ đang đọc dở, chỉnh được cỡ chữ, có mục lục trong chương và tự đánh dấu chương đã đọc.
+
+**Cài được lên màn hình chính và đọc khi mất mạng.**
+App là một PWA: sau lần mở đầu tiên, đọc sách · tra cứu · luyện thẻ · làm bài **JavaScript** đều chạy
+hoàn toàn ngoại tuyến. Riêng chấm bài **Python** vẫn cần mạng ở lần chạy đầu mỗi phiên vì môi trường
+Python (Pyodide) tải từ CDN ngoài.
 
 **Sổ tay giữ lại thứ bạn rút ra được.**
 Ghi chú theo từng bài, đánh dấu bài cần xem lại, và mục **"Lỗi bạn hay mắc"** xếp hạng những loại lỗi
@@ -141,6 +157,8 @@ Từ `git diff` (dãy con chung dài nhất) tới rate limiter (cửa sổ trư
 
 ```
 index.html                 khung ứng dụng (sidebar + vùng nội dung + bảng lệnh Ctrl+K)
+manifest.webmanifest       khai báo PWA (cài lên màn hình chính)
+sw.js                      service worker — SINH TỰ ĐỘNG, đừng sửa tay (xem tools/gen-sw.mjs)
 assets/css/app.css         giao diện, hỗ trợ chế độ sáng/tối
 src/
   main.js                  router theo hash, khởi tạo, bảng lệnh Ctrl+K
@@ -152,6 +170,7 @@ src/
   search.js                tìm kiếm bỏ dấu tiếng Việt (bộ lọc · bảng lệnh · tra cứu)
   error-vi.js              dịch & giải thích lỗi runtime sang tiếng Việt
   drill.js                 sinh bộ thẻ ghi nhớ (tự động từ syntax-hints + viết tay)
+  pwa.js                   đăng ký service worker, cài đặt & trạng thái ngoại tuyến
   runner.js                cầu nối tới worker chấm bài, có timeout
   sandbox.worker.js        chạy code người học trong luồng riêng (ListNode/TreeNode/trace() có sẵn)
   sandbox.worker.py.js     chạy Python thật qua Pyodide, cùng bộ tiện ích
@@ -164,12 +183,15 @@ src/
     part1..part6.js        toàn bộ bài giảng, quiz, bài tập, test, gợi ý, lời giải
     index.js               gộp dữ liệu + lộ trình 30 ngày + sinh test hiệu năng
     reference.js           cấu trúc dữ liệu, bảng chọn cấu trúc, đối chiếu JS↔Python, thẻ nhớ
+    handbook/part1..5.js   cẩm nang cú pháp Python — 26 chương viết riêng để đọc trên điện thoại
+    book.js                ghép cẩm nang + 15 module thành cấu trúc sách cho trình đọc
     python/                15 module Python thuần tuý
       part1..part15.js     bài giảng (tư duy), quiz, bài tập của từng module
       syntax1..3.js        phần "Cú pháp cần biết trước" — dạy cú pháp Python từ số 0
       syntax.js            gộp 3 file trên thành map theo id module
       index.js             ghép syntax vào từng module rồi xuất PY_TOPICS/PY_PROBLEMS
 tools/verify.mjs           kiểm chứng: chạy mọi lời giải mẫu qua mọi test case + dữ liệu tra cứu
+tools/gen-sw.mjs           sinh sw.js từ cây file thật (verify sẽ báo nếu sw.js lỗi thời)
 tools/test-merge.mjs       kiểm chứng bộ gộp tiến độ đa máy
 tools/test-sync-worker.mjs kiểm chứng Worker đồng bộ (Durable Object giả, không cần deploy)
 tools/test-sync-e2e.mjs    kiểm chứng đồng bộ đầu-cuối: hai máy + Worker giả
@@ -178,7 +200,8 @@ worker/                    Cloudflare Worker + Durable Object làm hộp thư đ
 
 Một nguyên tắc xuyên suốt: **mỗi dữ liệu chỉ có một nguồn**. `syntax-hints.js` vừa nuôi bảng gợi ý
 trong trình soạn thảo, vừa nuôi trang Tra cứu nhanh, vừa sinh thẻ ghi nhớ — sửa một chỗ là cả ba
-cùng đổi. `srs.js` xếp lịch cho cả bài tập lẫn thẻ nhớ, không có hệ thống thứ hai.
+cùng đổi. `srs.js` xếp lịch cho cả bài tập lẫn thẻ nhớ, không có hệ thống thứ hai. Trình đọc sách dùng thẳng
+trường `lesson` của 15 module thay vì chép nội dung sang một chỗ khác.
 
 **Không phụ thuộc thư viện ngoài. Không có bước build.** Toàn bộ là ES modules thuần.
 

@@ -676,3 +676,107 @@ details.spoiler > summary { cursor: pointer; font-weight: 650; }
   #nav { flex-direction: row; flex-wrap: wrap; }
   .view { padding: 18px 16px 70px; }
 }
+
+/* ---------- 📖 Trình đọc sách (tối ưu cho điện thoại) ---------- */
+.book-cover { border-color: var(--accent); }
+.toc-list .toc-item { align-items: center; }
+.toc-num {
+  flex: 0 0 26px; font-family: var(--mono); font-size: 12px;
+  color: var(--muted); text-align: center;
+}
+
+.reader { --reader-font: 17px; max-width: 720px; margin: 0 auto; }
+
+.reader-bar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 0; background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.tiny-label { font-family: var(--mono); font-size: 11.5px; min-width: 18px; text-align: center; }
+
+.reader-progress {
+  position: sticky; top: 41px; z-index: 20;
+  height: 3px; background: var(--panel-2);
+}
+.reader-progress > i { display: block; height: 100%; background: var(--accent); transition: width .1s linear; }
+
+.reader-head { margin: 26px 0 20px; }
+.reader-head h1 { font-size: 28px; line-height: 1.25; margin: 8px 0 0; }
+
+.reader-toc {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 16px; margin-bottom: 22px;
+}
+.reader-toc .k { color: var(--muted); font-size: 11.5px; font-weight: 750; text-transform: uppercase; letter-spacing: .05em; }
+.reader-toc ol { margin: 8px 0 0; padding-left: 20px; }
+.reader-toc li { margin: 5px 0; font-size: 14px; }
+
+/* Cột chữ dễ đọc: cỡ chữ chỉnh được, dòng thoáng, chữ không dính mép màn hình */
+.reader-md {
+  font-size: var(--reader-font);
+  line-height: 1.78;
+}
+.reader-md h2 {
+  font-size: calc(var(--reader-font) + 5px); margin: 34px 0 12px;
+  padding-top: 10px; border-top: 1px solid var(--border);
+  scroll-margin-top: 60px;   /* nhảy tới mục thì không bị thanh sticky che */
+}
+.reader-md h3 { font-size: calc(var(--reader-font) + 1px); margin: 22px 0 8px; }
+.reader-md p, .reader-md li { font-size: var(--reader-font); }
+.reader-md li { margin: 7px 0; }
+.reader-md blockquote { margin: 18px 0; }
+.reader-md table { font-size: calc(var(--reader-font) - 2px); }
+/* bảng và khối code tự cuộn trong khung, không đẩy tràn cả trang trên điện thoại */
+.reader-md .code-block, .reader-md pre { max-width: 100%; }
+.reader-md pre.hl code { font-size: calc(var(--reader-font) - 3px); }
+
+.reader-end {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin: 34px 0 0; padding-top: 22px; border-top: 1px solid var(--border);
+}
+.reader-nav { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+
+@media (max-width: 820px) {
+  .reader-head h1 { font-size: 23px; }
+  .reader-end .btn { flex: 1; text-align: center; }
+  /* trên điện thoại thanh bên nằm ở đầu trang (không sticky) nên thanh đọc dính lên đỉnh màn hình */
+  .reader-bar { top: 0; }
+}
+
+.offline-box { border-color: color-mix(in srgb, var(--ok) 40%, transparent); margin: 16px 0; }
+.offline-box.is-offline { border-color: var(--warn); }
+
+/* ---------- Thanh bên thu gọn trên điện thoại ---------- */
+.nav-toggle {
+  display: none; width: 100%; text-align: left;
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 9px 13px; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.nav-toggle:hover { border-color: var(--accent); }
+
+@media (max-width: 820px) {
+  .sidebar { gap: 10px; padding: 12px 14px; }
+  .nav-toggle { display: block; }
+  /* Mặc định chỉ hiện thương hiệu + nút Menu; phần còn lại chờ chạm mới mở. */
+  .sidebar > #lang-switch,
+  .sidebar > #pal-open,
+  .sidebar > #nav,
+  .sidebar > .sidebar-foot { display: none; }
+  .sidebar.open > #lang-switch { display: flex; }
+  .sidebar.open > #pal-open { display: block; }
+  .sidebar.open > #nav { display: flex; }
+  .sidebar.open > .sidebar-foot { display: flex; margin-top: 4px; }
+  .brand small { font-size: 11px; }
+}
+
+.book-group {
+  display: flex; align-items: baseline; gap: 10px;
+  margin: 30px 0 4px; padding-bottom: 6px; border-bottom: 2px solid var(--accent);
+}
+.book-group > span:first-child {
+  font-size: 12px; font-weight: 750; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--accent);
+}
+.book-group .muted { margin-left: auto; }

@@ -27,6 +27,12 @@ const EMPTY = () => ({
   bookmarks: {},            // problemId -> true
   cards: {},                // cardId -> { due, interval, ease, reps }  (thẻ luyện nhớ, dùng chung srs.js)
   errorStats: {},           // errorKey -> { count, lastAt, lastProblem }
+  reader: {                 // trình đọc sách
+    fontSize: 17,           // cỡ chữ (px) — người đọc tự chỉnh
+    lastChapter: null,      // chương đang đọc dở, để nút "Đọc tiếp"
+    positions: {},          // chapterId -> % đã cuộn (0..100)
+    read: {},               // chapterId -> mốc thời gian đọc xong
+  },
   theme: 'dark',
   lang: 'javascript',       // ngôn ngữ đang chọn để duyệt/học: 'javascript' | 'python'
 });
@@ -92,12 +98,28 @@ function adoptRecordMap(target, source) {
 }
 
 let saveTimer = null;
+
+function writeNow() {
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* quota */ }
+}
+
+/** Ghi có hoãn — dùng cho thứ thay đổi liên tục (gõ code, cuộn trang). */
 function persist() {
   state.updatedAt = Date.now();
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* quota */ }
-  }, 120);
+  saveTimer = setTimeout(writeNow, 120);
+}
+
+// Rời trang khi vẫn còn thay đổi chưa ghi thì phải ghi ngay, nếu không là mất.
+// (Trên điện thoại, chuyển app đi chỗ khác cũng tính là rời trang.)
+if (typeof document !== 'undefined') {
+  for (const ev of ['pagehide', 'visibilitychange']) {
+    document.addEventListener(ev, () => {
+      if (saveTimer && document.visibilityState !== 'visible') writeNow();
+    });
+  }
 }
 
 /** Báo cho thanh bên (và bộ đồng bộ tự động) rằng tiến độ vừa đổi. */
@@ -169,8 +191,45 @@ export const store = {
   toggleBookmark(problemId) {
     if (state.bookmarks[problemId]) delete state.bookmarks[problemId];
     else state.bookmarks[problemId] = true;
-    persist();
+    writeNow();
     return !!state.bookmarks[problemId];
+  },
+
+  /* ----------------------------- trình đọc ----------------------------- */
+  reader() {
+    // Tiến độ cũ (hoặc file nhập từ bản trước) không có khoá này -> tạo khi cần.
+    if (!state.reader) state.reader = { fontSize: 17, lastChapter: null, positions: {}, read: {} };
+    const r = state.reader;
+    if (!r.positions) r.positions = {};
+    if (!r.read) r.read = {};
+    if (!r.fontSize) r.fontSize = 17;
+    return r;
+  },
+
+  setFontSize(px) {
+    this.reader().fontSize = Math.max(14, Math.min(24, Math.round(px)));
+    writeNow();   // thiết lập người dùng cố ý đổi -> ghi ngay, đóng tab liền cũng không mất
+    return this.reader().fontSize;
+  },
+
+  /** Ghi vị trí đang đọc. Cuộn gần hết chương thì tự đánh dấu đã đọc. */
+  saveReadingSpot(chapterId, percent) {
+    const r = this.reader();
+    r.positions[chapterId] = Math.max(0, Math.min(100, Math.round(percent)));
+    r.lastChapter = chapterId;
+    if (r.positions[chapterId] >= 92 && !r.read[chapterId]) {
+      r.read[chapterId] = Date.now();
+      this.touchStreak();
+    }
+    persist();
+  },
+
+  markChapterRead(chapterId, done = true) {
+    const r = this.reader();
+    if (done) r.read[chapterId] = Date.now();
+    else delete r.read[chapterId];
+    writeNow();
+    return !!r.read[chapterId];
   },
 
   /* --------------------------- thẻ luyện nhớ --------------------------- */
@@ -297,6 +356,6 @@ export const store = {
     },
   },
 
-  setTheme(t) { state.theme = t; persist(); },
-  setLang(l) { state.lang = l; persist(); },
+  setTheme(t) { state.theme = t; writeNow(); },
+  setLang(l) { state.lang = l; writeNow(); },
 };

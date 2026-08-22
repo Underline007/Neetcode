@@ -13,9 +13,12 @@ import { renderReview, renderStats, mountStats, renderGuide } from './views/misc
 import { renderPythonHome } from './views/python.js';
 import { renderNotebook, mountNotebook } from './views/notebook.js';
 import { renderCheatsheet, mountCheatsheet, renderDrill, mountDrill } from './views/reference.js';
+import { renderBookHome, mountBookHome, renderChapter, mountChapter, unreadCount } from './views/book.js';
+import { CHAPTERS } from './data/book.js';
 import { buildIndex, searchIndex } from './search.js';
 import { dueCount } from './drill.js';
 import { startAutoSync } from './sync.js';
+import { registerServiceWorker } from './pwa.js';
 
 /** 18 chủ đề thuật toán + 5 module Python nằm CHUNG một không gian id (mỗi bài tập/chủ
  *  đề thuật toán có thể mang thêm field "...Py" để trở thành song ngữ — xem lang.js).
@@ -94,6 +97,8 @@ const routes = [
   { re: /^\/quiz\/([\w-]+)$/, render: (m) => renderQuiz(m[1], DETAIL_DOMAIN), mount: (m) => mountQuiz(m[1], DETAIL_DOMAIN) },
   { re: /^\/review$/, render: () => renderReview() },
   { re: /^\/notebook$/, render: () => renderNotebook(), mount: () => mountNotebook(document) },
+  { re: /^\/book$/, render: () => renderBookHome(), mount: () => mountBookHome() },
+  { re: /^\/book\/([\w-]+)$/, render: (m) => renderChapter(m[1]), mount: (m) => mountChapter(m[1]) },
   { re: /^\/cheatsheet$/, render: () => renderCheatsheet(), mount: () => mountCheatsheet() },
   { re: /^\/drill$/, render: () => renderDrill(), mount: () => mountDrill() },
   { re: /^\/stats$/, render: () => renderStats(), mount: () => mountStats(document) },
@@ -142,6 +147,26 @@ document.addEventListener('click', async (e) => {
   }
 });
 
+/* ------------------- thanh bên thu gọn trên điện thoại ------------------- */
+/* Màn hình hẹp: thanh bên chiếm gần trọn màn hình nếu bày hết mục, phải cuộn rất lâu
+   mới tới nội dung. Thu về một nút Menu, chạm mới mở. */
+const sidebar = document.querySelector('.sidebar');
+const navToggle = $('#nav-toggle');
+
+function closeNav() {
+  sidebar.classList.remove('open');
+  navToggle.setAttribute('aria-expanded', 'false');
+}
+
+navToggle.addEventListener('click', () => {
+  const open = sidebar.classList.toggle('open');
+  navToggle.setAttribute('aria-expanded', String(open));
+});
+
+// Chọn xong một mục thì đóng lại, khỏi phải bấm hai lần
+$('#nav').addEventListener('click', (e) => { if (e.target.closest('a')) closeNav(); });
+$('#pal-open').addEventListener('click', closeNav);
+
 /* ------------------------- bảng lệnh Ctrl+K ------------------------- */
 const PAGES = [
   { icon: '🏠', label: 'Bảng điều khiển', hash: '#/' },
@@ -150,6 +175,7 @@ const PAGES = [
   { icon: '⌨️', label: 'Ngân hàng bài tập', hash: '#/problems' },
   { icon: '🔁', label: 'Ôn tập ngắt quãng', hash: '#/review' },
   { icon: '📔', label: 'Sổ tay', hash: '#/notebook' },
+  { icon: '📖', label: 'Sách: Python từ cú pháp tới thực hành', hash: '#/book' },
   { icon: '🔎', label: 'Tra cứu nhanh (cú pháp & cấu trúc dữ liệu)', hash: '#/cheatsheet' },
   { icon: '🧠', label: 'Luyện nhớ (thẻ ghi nhớ)', hash: '#/drill' },
   { icon: '📈', label: 'Thống kê & điểm', hash: '#/stats' },
@@ -162,6 +188,10 @@ const palIndex = [
   ...buildIndex(ALL_TOPICS, (t) => ({
     fields: [t.name, t.en, t.id], kind: 'Chủ đề', icon: t.icon, label: t.name,
     hash: `#/topic/${t.id}`, sub: t.en,
+  })),
+  ...buildIndex(CHAPTERS, (c) => ({
+    fields: [c.title, c.subtitle, c.id], kind: 'Chương sách', icon: c.icon, label: c.title,
+    hash: `#/book/${c.id}`, sub: `${c.minutes} phút đọc`,
   })),
   ...buildIndex(ALL_PROBLEMS, (p) => ({
     fields: [p.title, p.en, p.id, p.topicName], kind: 'Bài tập', icon: '⌨️', label: p.title,
@@ -289,12 +319,19 @@ function updateChrome(path) {
   cardBadge.textContent = cards;
   cardBadge.classList.toggle('hidden', cards === 0);
 
+  const unread = unreadCount(st);
+  const bookBadge = $('#book-badge');
+  bookBadge.textContent = unread;
+  bookBadge.classList.toggle('hidden', unread === 0);
+
   $$('#nav a').forEach((a) => {
     const route = a.dataset.route;
     const active = route === '/' ? path === '/' : path.startsWith(route);
     a.classList.toggle('active', active);
   });
 }
+
+registerServiceWorker();
 
 window.addEventListener('hashchange', router);
 window.addEventListener('progress-changed', () => updateChrome(currentPath()));
