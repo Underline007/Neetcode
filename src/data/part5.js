@@ -91,12 +91,40 @@ for (let i = 1; i < n; i++) dp[i] = Math.max(dp[i-1], (dp[i-2] ?? 0) + nums[i]);
   lessonPy: `
 ## 1. Vấn đề gốc
 
-Đệ quy tự nhiên thường tính **đi tính lại** cùng một bài toán con.
-Ví dụ Fibonacci đệ quy: \`fib(5)\` gọi \`fib(3)\` hai lần, \`fib(2)\` ba lần...
-Số lời gọi tăng theo hàm mũ 2ⁿ dù chỉ có n giá trị khác nhau.
+Đệ quy tự nhiên (không tối ưu gì thêm) thường tính **đi tính lại** cùng một bài toán con nhiều lần.
+Ví dụ kinh điển — Fibonacci bằng đệ quy thuần:
 
-**Quy hoạch động = đệ quy + ghi nhớ.** Chỉ vậy thôi. Python có sẵn \`functools.lru_cache\`
-để memo hoá tự động — nhưng vẫn nên biết cách tự viết bằng \`dict\` để hiểu bản chất.
+\`\`\`python
+def fib_cham(n):
+    if n <= 1:
+        return n
+    return fib_cham(n - 1) + fib_cham(n - 2)
+\`\`\`
+
+Thử vẽ cây gọi hàm của \`fib_cham(5)\`: nó gọi \`fib_cham(4)\` và \`fib_cham(3)\`. Nhưng \`fib_cham(4)\`
+bên trong lại gọi \`fib_cham(3)\` một lần nữa — \`fib_cham(3)\` bị tính TRÙNG LẶP hoàn toàn từ đầu, dù
+kết quả của nó không hề thay đổi giữa hai lần gọi. Càng xuống sâu, số lần tính trùng càng nhân lên:
+\`fib_cham(2)\` bị gọi lại 3 lần, \`fib_cham(1)\` những 5 lần. Tổng số lời gọi hàm tăng theo cấp số mũ
+\`2ⁿ\`, dù trên thực tế chỉ có đúng \`n\` giá trị \`fib\` khác nhau cần được tính.
+
+**Quy hoạch động (Dynamic Programming — DP) = đệ quy + ghi nhớ kết quả đã tính (memo hoá).** Bản chất
+chỉ đơn giản vậy thôi — không có gì huyền bí hơn. Ý tưởng: trước khi tính một bài toán con, kiểm tra
+xem nó đã được tính trước đó chưa; nếu rồi thì lấy lại kết quả cũ thay vì tính lại từ đầu.
+
+\`\`\`python
+def fib_co_memo(n, memo={}):
+    if n <= 1:
+        return n
+    if n in memo:
+        return memo[n]              # đã tính trước đó -> lấy lại, KHÔNG tính lại
+    memo[n] = fib_co_memo(n - 1, memo) + fib_co_memo(n - 2, memo)
+    return memo[n]
+\`\`\`
+
+Với bản có memo, mỗi giá trị \`fib(k)\` chỉ thực sự được TÍNH đúng một lần duy nhất trong suốt chương
+trình — từ 2ⁿ lời gọi giảm xuống chỉ còn O(n). Python còn có sẵn decorator \`functools.lru_cache\` để
+tự động memo hoá mà không cần tự quản lý \`dict\` — nhưng vẫn nên biết cách tự viết bằng \`dict\` như
+trên để hiểu rõ bản chất đang diễn ra bên dưới.
 
 ## 2. Ba câu hỏi để giải MỌI bài DP
 

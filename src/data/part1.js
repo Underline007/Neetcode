@@ -121,35 +121,83 @@ for (const x of arr) pre.push(pre.at(-1) + x);
   lessonPy: `
 ## 1. Vấn đề gốc
 
-Mảng (\`list\`) cho bạn **truy cập theo chỉ số** cực nhanh: \`a[7]\` là O(1). Nhưng khi câu hỏi đổi thành
-**"giá trị 42 nằm ở đâu?"** thì \`list\` bó tay — bạn phải quét từng phần tử, O(n).
+Mảng (\`list\`) cho bạn **truy cập theo chỉ số** cực nhanh: \`a[7]\` là O(1) — máy tính chỉ cần nhảy
+thẳng tới địa chỉ bộ nhớ số 7, không cần xem qua sáu ô trước đó. Nhưng khi câu hỏi đổi dạng, từ
+*"ô số 7 chứa gì?"* thành **"giá trị 42 nằm ở ô nào?"**, thì \`list\` hoàn toàn bó tay — nó không biết
+đường tắt nào cả, phải đi hỏi từng ô một: "có phải mày không? có phải mày không?..." cho tới khi tìm
+thấy hoặc hết mảng. Đó là O(n).
 
-Hầu hết bài toán "chậm" ở mức người mới đều có chung một hình dạng:
+Hãy nhìn cụ thể một bài toán chậm ở mức người mới hay viết ra đầu tiên: kiểm tra một mảng có hai phần
+tử nào giống nhau không.
 
 \`\`\`python
-for i in range(n):
-    for j in range(n):          # <-- vòng lặp thứ hai chỉ để ĐI TÌM một thứ
-        if a[j] == something_about(a[i]):
-            ...
+def has_duplicate_cham(a):
+    n = len(a)
+    for i in range(n):
+        for j in range(n):          # <-- vòng lặp thứ hai chỉ để ĐI TÌM một thứ
+            if i != j and a[i] == a[j]:
+                return True
+    return False
 \`\`\`
 
-Vòng lặp bên trong không hề "tính toán" gì — nó chỉ **đi tìm**. Nếu xoá được nó, O(n²) tụt xuống O(n).
-Bẫy này còn tinh vi hơn trong Python vì cú pháp \`x in b\` trông rất "vô hại" — nhưng nếu \`b\` là \`list\`,
-đây vẫn là O(n) mỗi lần gọi.
+Với \`a\` có 10 phần tử, vòng lặp ngoài chạy 10 lần, mỗi lần vòng lặp trong lại quét lại **toàn bộ**
+10 phần tử để "đi hỏi": có ai bằng \`a[i]\` không? Tổng cộng khoảng 10 × 10 = 100 phép so sánh cho
+10 phần tử — nếu mảng có 100.000 phần tử, con số đó là 10 tỷ. Vòng lặp bên trong không hề "tính toán"
+gì mới cả — nó chỉ lặp lại đúng một câu hỏi đã hỏi rồi. Đây chính là dấu hiệu để nhận ra: **nếu vòng
+lặp trong chỉ để "đi tìm" chứ không tính gì mới, gần như luôn có cách xoá nó, đưa O(n²) về O(n).**
 
 ## 2. Ý tưởng cốt lõi
 
 > **\`dict\`/\`set\` = đánh đổi bộ nhớ để mua thời gian.**
-> Thay vì đi tìm, ta ghi sẵn "vật ở đâu" vào một cuốn sổ tra cứu (bảng băm).
+> Thay vì mỗi lần đi hỏi lại từ đầu, ta ghi sẵn "đã thấy gì rồi" vào một cuốn sổ tra cứu (bảng băm),
+> và tra cuốn sổ đó thay vì quét lại mảng.
 
-Hàm băm biến một khoá bất kỳ (chuỗi, số, tuple) thành một vị trí trong bảng. Nhờ vậy \`d[key]\`
-cũng chỉ là một phép truy cập theo vị trí — O(1) trung bình. \`dict\` trong Python (từ 3.7+) còn giữ
-**thứ tự chèn**, nhưng đó là hiệu ứng phụ — không nên dựa vào đó để suy luận thuật toán.
+Cơ chế bên trong: một **hàm băm** (hash function) biến một khoá bất kỳ (số, chuỗi, tuple...) thành
+một con số, con số đó lại được dùng làm chỉ số trong một mảng nội bộ (giống hệt \`a[7]\` ở trên).
+Nhờ vậy \`d[key]\` thực chất cũng chỉ là một phép **truy cập theo chỉ số** — chính là phép toán O(1)
+ở phần 1, chỉ khác là chỉ số được máy tự tính ra từ \`key\` thay vì do bạn gõ tay. Đây là lý do vì sao
+tra cứu trong \`dict\`/\`set\` nhanh ngang truy cập mảng, thay vì phải quét tuần tự như \`list\`.
 
-Mental model: **danh bạ điện thoại**. Tìm số của "Minh" trong danh sách 10.000 người chưa sắp xếp
-mất 10.000 bước. Có danh bạ sắp theo tên: mở đúng trang, 1 bước.
+Viết lại bài trên bằng \`set\` — không còn vòng lặp lồng nhau:
 
-## 3. Dấu hiệu nhận biết (rất quan trọng)
+\`\`\`python
+def has_duplicate_nhanh(a):
+    seen = set()           # cuốn sổ "đã thấy những gì"
+    for x in a:
+        if x in seen:       # tra sổ — O(1), KHÔNG quét lại toàn bộ seen
+            return True
+        seen.add(x)          # ghi thêm vào sổ
+    return False
+\`\`\`
+
+Chạy thử bằng tay với \`a = [3, 1, 4, 1]\`: \`seen\` bắt đầu rỗng.
+Bước 1: \`x=3\`, \`3\` chưa có trong \`seen\` → thêm, \`seen = {3}\`.
+Bước 2: \`x=1\`, \`1\` chưa có → thêm, \`seen = {3, 1}\`.
+Bước 3: \`x=4\`, chưa có → thêm, \`seen = {3, 1, 4}\`.
+Bước 4: \`x=1\`, **đã có trong seen** → trả về \`True\` ngay, không cần quét lại \`a\`.
+Chỉ một lượt duyệt \`a\`, mỗi bước tốn O(1) để tra/ghi sổ → tổng O(n), không phải O(n²).
+
+Mental model dễ nhớ nhất: **danh bạ điện thoại**. Tìm số của "Minh" trong danh sách 10.000 người
+*chưa sắp xếp* mất tới 10.000 bước dò từng dòng. Có một cuốn danh bạ đã đánh chỉ mục theo tên: bạn mở
+thẳng đúng mục, 1 bước là xong. \`dict\`/\`set\` chính là cuốn danh bạ đó, còn hàm băm là "quy tắc đánh
+chỉ mục" chạy ngầm bên dưới mà bạn không cần tự viết.
+
+## 3. Cấu trúc & hàm Python thường dùng trong chủ đề này
+
+| Tên | Vai trò | Ví dụ dùng nhanh |
+|---|---|---|
+| \`set\` | Tập hợp không trùng lặp, kiểm tra "đã có chưa" trong O(1) | \`seen = set(); seen.add(x); x in seen\` |
+| \`dict\` | Ánh xạ khoá → giá trị, tra cứu O(1) | \`d = {}; d[key] = value; d.get(key, mac_dinh)\` |
+| \`dict.get(k, mac_dinh)\` | Đọc giá trị, không ném lỗi nếu khoá chưa tồn tại | \`count.get(x, 0)\` thay vì \`count[x]\` (sẽ \`KeyError\`) |
+| \`collections.Counter\` | \`dict\` chuyên đếm số lần xuất hiện, có sẵn \`.most_common()\` | \`Counter(arr)\` đếm tần suất chỉ trong 1 dòng |
+| \`collections.defaultdict\` | \`dict\` tự tạo giá trị mặc định khi gặp khoá mới, khỏi phải \`if key not in d\` | \`defaultdict(list)\` cho bài "gom nhóm" |
+| \`enumerate(arr)\` | Duyệt vừa lấy chỉ số vừa lấy giá trị, khỏi phải \`range(len(arr))\` rồi \`arr[i]\` | \`for i, x in enumerate(arr): ...\` |
+| \`sorted(s)\` | Trả về **danh sách ký tự/phần tử đã sắp** — dùng làm "chữ ký" so khớp anagram | \`sorted("eat")\` → \`['a','e','t']\` |
+| \`"".join(list_ky_tu)\` | Ghép một list ký tự lại thành chuỗi (để dùng chuỗi làm khoá dict) | \`"".join(sorted("eat"))\` → \`"aet"\` |
+| \`tuple(...)\` | Biến một list thành \`tuple\` — bất biến nên **hashable**, dùng làm khoá dict/phần tử set được | \`tuple(sorted(word))\` làm khoá anagram |
+| \`hashlib.sha256\` | Băm nội dung (chuỗi/byte) thành một chuỗi cố định — so trùng nội dung lớn mà không so từng byte | \`hashlib.sha256(data).hexdigest()\` |
+
+## 4. Dấu hiệu nhận biết (rất quan trọng)
 
 Thấy một trong các câu này trong đề bài → nghĩ ngay tới \`set\`/\`dict\`:
 
@@ -165,46 +213,91 @@ Mẹo tổng quát: **hãy hỏi "khoá là gì?"**. Nghĩ ra đúng khoá thì 
 Với "nhóm các từ đảo chữ", khoá là *chuỗi đã sắp xếp ký tự* (hoặc tốt hơn: \`tuple\` đếm 26 chữ cái) —
 đó là toàn bộ lời giải.
 
-## 4. Mẫu code cần thuộc lòng
+## 5. Mẫu code cần thuộc lòng
+
+**(a) Đếm tần suất** — bài toán con xuất hiện trong hầu hết mọi đề: "phần tử nào xuất hiện nhiều
+nhất/đúng k lần?"
 
 \`\`\`python
-# (a) Đếm tần suất
 from collections import Counter
-count = Counter(arr)                 # cách nhanh nhất, 1 dòng
-# hoặc tự tay:
-count = {}
-for x in arr:
-    count[x] = count.get(x, 0) + 1
 
-# (b) Kiểm tra đã gặp chưa
-seen = set()
-for x in arr:
-    if x in seen:
-        return True
-    seen.add(x)
+def dem_tan_suat(arr):
+    # Cách nhanh nhất: Counter là dict chuyên dụng để đếm, chỉ 1 dòng
+    count = Counter(arr)
+    print(count)                 # Counter({1: 3, 2: 1})  — arr = [1,1,1,2]
+    print(count.most_common(1))  # [(1, 3)] — phần tử xuất hiện nhiều nhất, kèm số lần
+    return count
 
-# (c) Tra phần bù (two-sum pattern)
-pos = {}                             # giá trị -> chỉ số
-for i, x in enumerate(arr):
-    need = target - x
-    if need in pos:
-        return [pos[need], i]
-    pos[x] = i                       # LƯU SAU khi kiểm tra -> tránh dùng lại chính nó
-
-# (d) Nhóm theo chữ ký
-from collections import defaultdict
-groups = defaultdict(list)
-for w in words:
-    key = signature(w)
-    groups[key].append(w)            # defaultdict tự tạo list rỗng nếu khoá chưa có
-
-# (e) Tổng tiền tố: sum(i..j) = pre[j+1] - pre[i]
-pre = [0]
-for x in arr:
-    pre.append(pre[-1] + x)
+# Nếu không dùng Counter, tự đếm bằng dict thường — CÙNG bản chất, chỉ dài hơn:
+def dem_tan_suat_tu_tay(arr):
+    count = {}
+    for x in arr:
+        count[x] = count.get(x, 0) + 1   # get(x, 0): nếu x CHƯA có khoá, coi như đang đếm từ 0
+    return count
 \`\`\`
 
-## 5. Bẫy thường gặp
+**(b) Kiểm tra đã gặp chưa** — dùng cho "có phần tử trùng không?", "hai mảng có giao nhau không?".
+
+\`\`\`python
+def co_phan_tu_trung(arr):
+    seen = set()              # "cuốn sổ" các giá trị đã thấy
+    for x in arr:
+        if x in seen:          # tra sổ — O(1)
+            return True
+        seen.add(x)             # chưa có -> ghi vào sổ rồi đi tiếp
+    return False
+\`\`\`
+
+**(c) Tra phần bù (khuôn mẫu Two Sum)** — bất cứ khi nào đề có dạng "tìm hai phần tử có tổng/hiệu
+bằng X", đây là khuôn mẫu cần nhớ, không phải nghĩ lại từ đầu:
+
+\`\`\`python
+def two_sum(nums, target):
+    pos = {}                          # giá trị đã duyệt qua -> chỉ số của nó
+    for i, x in enumerate(nums):       # enumerate: vừa có chỉ số i, vừa có giá trị x
+        need = target - x              # "mình đang thiếu giá trị nào để đủ target?"
+        if need in pos:                 # đã từng thấy giá trị mình cần chưa?
+            return [pos[need], i]
+        pos[x] = i                      # LƯU SAU khi kiểm tra -> tránh việc x tự ghép với chính nó
+    return []                            # đề bài đảm bảo luôn có đáp án thì dòng này không tới lượt chạy
+
+print(two_sum([2, 7, 11, 15], 9))   # [0, 1] vì nums[0] + nums[1] == 2 + 7 == 9
+\`\`\`
+
+**(d) Nhóm theo chữ ký** — dùng cho "gom các phần tử giống nhau theo một tiêu chí nào đó vào chung
+nhóm" (ví dụ: các từ là đảo chữ của nhau).
+
+\`\`\`python
+from collections import defaultdict
+
+def nhom_anagram(words):
+    groups = defaultdict(list)     # khoá chưa tồn tại -> tự tạo list() rỗng, khỏi cần kiểm tra tay
+    for w in words:
+        key = "".join(sorted(w))     # "chữ ký": sắp xếp ký tự rồi nối lại thành chuỗi
+        groups[key].append(w)         # mọi từ có cùng chữ ký sẽ rơi vào cùng một list
+    return list(groups.values())
+
+print(nhom_anagram(["eat", "tea", "tan", "ate", "nat", "bat"]))
+# [['eat', 'tea', 'ate'], ['tan', 'nat'], ['bat']]
+# "eat" và "tea" cùng chữ ký "aet" nên vào chung nhóm; "bat" chữ ký "abt" không trùng ai nên đứng riêng.
+\`\`\`
+
+**(e) Tổng tiền tố (prefix sum)** — dùng cho "tính tổng của một đoạn con \`[i, j]\` nhiều lần".
+
+\`\`\`python
+def xay_prefix_sum(arr):
+    pre = [0]                 # pre[0] = 0: quy ước "tổng của 0 phần tử đầu tiên"
+    for x in arr:
+        pre.append(pre[-1] + x)  # pre[k] = tổng của k phần tử đầu tiên trong arr
+    return pre
+
+arr = [3, 1, 4, 1, 5]
+pre = xay_prefix_sum(arr)      # pre = [0, 3, 4, 8, 9, 14]
+# Muốn tổng đoạn [1, 3] (tức arr[1] + arr[2] + arr[3] = 1 + 4 + 1 = 6):
+print(pre[3 + 1] - pre[1])      # pre[4] - pre[1] = 9 - 3 = 6 — đúng, và chỉ tốn O(1), không cần duyệt lại
+\`\`\`
+
+## 6. Bẫy thường gặp
 
 - **Dùng \`list\` làm khoá \`dict\`/phần tử \`set\`**: \`TypeError: unhashable type: 'list'\`. List là
   mutable nên không hashable. Cần khoá là tập hợp bất biến thì dùng \`tuple\`.
@@ -218,7 +311,7 @@ for x in arr:
   collision (hashDoS — CPython có random hash seed để giảm rủi ro này). Trong phỏng vấn cứ nói O(n)
   trung bình, nhưng biết có worst case sẽ ghi điểm.
 
-## 6. Ứng dụng thực tế
+## 7. Ứng dụng thực tế
 
 - **Chống trùng lặp**: khử trùng log/sự kiện bằng \`set\` các \`event_id\` (idempotency key trong thanh toán).
 - **Cache / memoization**: \`functools.lru_cache\`, hay Redis ở quy mô lớn — về bản chất đều là bảng băm.
@@ -227,7 +320,7 @@ for x in arr:
 - **Đếm sự kiện analytics**: \`Counter\` chính là mẫu (a) đóng gói sẵn.
 - **Prefix sum** là nền tảng của mọi bảng thống kê tích luỹ (doanh thu luỹ kế, biểu đồ đường).
 
-## 7. Bảng độ phức tạp
+## 8. Bảng độ phức tạp
 
 | Thao tác | list | set/dict (băm) |
 |---|---|---|
@@ -887,29 +980,62 @@ while (l < r && a[l] === a[l + 1]) l++;
   lessonPy: `
 ## 1. Vấn đề gốc
 
-Bạn cần xét **mọi cặp** (i, j) — đó là O(n²) cặp. Nhưng nếu dữ liệu có **cấu trúc** (đã sắp xếp,
-hoặc đối xứng), bạn không cần xét hết: mỗi bước có thể **loại bỏ hàng loạt** ứng viên cùng lúc.
+Kiểu bài "tìm cặp phần tử thoả điều kiện" (tổng bằng target, khoảng cách lớn nhất...) mà giải bằng
+cách xét **mọi cặp (i, j)** sẽ tốn O(n²), vì có tới n×(n-1)/2 cặp cần thử:
+
+\`\`\`python
+def hai_so_co_tong_cham(nums, target):
+    n = len(nums)
+    for i in range(n):
+        for j in range(i + 1, n):        # duyệt HẾT các cặp còn lại
+            if nums[i] + nums[j] == target:
+                return [i, j]
+    return []
+\`\`\`
+
+Nhưng nếu dữ liệu có **cấu trúc** — cụ thể ở đây là *đã sắp xếp tăng dần* — bạn không cần xét hết
+mọi cặp: mỗi bước so sánh có thể giúp **loại bỏ hàng loạt** ứng viên cùng lúc, không phải loại từng
+cái một.
 
 ## 2. Ý tưởng cốt lõi
 
 > Hai con trỏ hoạt động được khi ta chứng minh được: *"phần tử này không thể là đáp án với bất kỳ ai
-> còn lại"* — nhờ đó ta an tâm bỏ nó đi và thu hẹp phạm vi.
+> còn lại"* — nhờ đó ta an tâm bỏ nó đi vĩnh viễn và thu hẹp phạm vi tìm kiếm.
 
-Ví dụ list đã sắp tăng, tìm cặp có tổng \`target\`:
+Ví dụ cụ thể: list đã sắp tăng \`[1, 3, 5, 7, 9, 11]\`, tìm cặp có tổng \`target = 12\`. Đặt con trỏ
+\`l\` ở đầu (giá trị 1), \`r\` ở cuối (giá trị 11).
 
 \`\`\`
 l ->                      <- r
 [1, 3, 5, 7, 9, 11]   target = 12
-sum = 1 + 11 = 12  -> tìm thấy
+sum = 1 + 11 = 12  -> tìm thấy ngay!
 \`\`\`
-Nếu \`sum > target\`: \`nums[r]\` quá lớn. Nhưng nó đã ghép với **phần tử nhỏ nhất còn lại** rồi mà vẫn dư
-→ nó không thể ghép với bất kỳ ai khác → **loại r** (\`r -= 1\`). Một bước loại được cả một cột của ma trận cặp.
-Đó chính là lý do O(n²) → O(n).
 
-Câu thần chú: **"mỗi lần dịch chuyển phải loại bỏ vĩnh viễn một ứng viên"**. Nếu không chứng minh được
-điều đó, hai con trỏ sẽ cho kết quả sai.
+Giả sử tổng thay vào đó là *quá lớn* so với target (\`sum > target\`): điều đó nghĩa là \`nums[r]\` (số
+lớn nhất bên phải \`l\`) đã ghép với **phần tử nhỏ nhất còn lại trong phạm vi đang xét** (\`nums[l]\`)
+mà tổng vẫn dư. Vì mảng đã sắp tăng, ghép \`nums[r]\` với bất kỳ phần tử nào khác bên trong đoạn
+\`[l, r-1]\` (toàn số ≤ \`nums[l]\`) tổng sẽ còn dư nhiều hơn nữa, chắc chắn không bao giờ bằng target.
+Vậy \`nums[r]\` **bị loại vĩnh viễn** khỏi mọi cặp còn lại có thể xét (\`r -= 1\`). Chỉ một phép so sánh
+đã loại bỏ được cả một cột trong "ma trận mọi cặp" tưởng tượng — đó chính xác là lý do độ phức tạp
+tụt từ O(n²) xuống O(n): tổng số bước di chuyển của \`l\` và \`r\` cộng lại không bao giờ vượt quá \`n\`.
 
-## 3. Ba biến thể phải biết
+Câu thần chú cần thuộc: **"mỗi lần dịch chuyển phải loại bỏ vĩnh viễn ít nhất một ứng viên, và không
+bao giờ được bỏ sót đáp án đúng"**. Nếu không chứng minh được cả hai vế đó, hai con trỏ sẽ cho kết
+quả sai một cách âm thầm — chương trình vẫn chạy, chỉ là trả lời sai.
+
+## 3. Cấu trúc & hàm Python thường dùng trong chủ đề này
+
+| Tên | Vai trò | Ví dụ dùng nhanh |
+|---|---|---|
+| \`sorted(a)\` | Trả về list **mới** đã sắp tăng, giữ nguyên \`a\` gốc | \`b = sorted(a)\` — hai con trỏ thường cần dữ liệu đã sắp |
+| \`a.sort()\` | Sắp xếp **tại chỗ**, không tạo bản sao, không trả về gì (trả \`None\`) | \`a.sort()\` rồi dùng luôn \`a\` |
+| \`list.pop()\` / \`list.pop(0)\` | Xoá phần tử cuối (O(1)) hoặc đầu (O(n) — phải dồn cả list) | dùng khi mô phỏng "bỏ một đầu ra khỏi phạm vi xét" |
+| Gán bội \`l, r = 0, n - 1\` | Khởi tạo hai con trỏ trong một dòng, không cần biến tạm | thay cho hai dòng \`l = 0\` rồi \`r = n - 1\` |
+| \`while l < r:\` | Vòng lặp chính của hầu hết bài hai con trỏ hội tụ | dừng khi hai con trỏ gặp/vượt nhau |
+| \`str[::-1]\` | Đảo ngược chuỗi bằng slicing — dùng để so sánh palindrome nhanh | \`s == s[::-1]\` (chỉ nên dùng để đối chiếu, không thay hai con trỏ khi cần O(1) bộ nhớ) |
+| \`str.isalnum()\` | Kiểm tra ký tự có phải chữ/số không — lọc ký tự khi kiểm tra palindrome | \`if ch.isalnum(): ...\` |
+
+## 4. Ba biến thể phải biết
 
 | Biến thể | Hình dạng | Bài tiêu biểu |
 |---|---|---|
@@ -917,44 +1043,65 @@ Câu thần chú: **"mỗi lần dịch chuyển phải loại bỏ vĩnh viễn
 | Cùng chiều (nhanh/chậm) | \`slow\` giữ vị trí ghi, \`fast\` quét | Xoá phần tử trùng tại chỗ, dời số 0 |
 | Hai list | mỗi con trỏ trên một list | Trộn hai list đã sắp, giao/hợp |
 
-## 4. Mẫu code
+## 5. Mẫu code cần thuộc lòng
+
+**(a) Hai đầu hội tụ trên list đã sắp** — khuôn mẫu quan trọng nhất của cả chủ đề:
 
 \`\`\`python
-# (a) Hai đầu hội tụ trên list đã sắp
-l, r = 0, n - 1
-while l < r:
-    total = a[l] + a[r]
-    if total == target:
-        return [l, r]
-    if total < target:
-        l += 1              # cần lớn hơn -> bỏ phần tử nhỏ nhất
-    else:
-        r -= 1              # cần nhỏ hơn -> bỏ phần tử lớn nhất
+def hai_so_co_tong(nums_da_sap, target):
+    l, r = 0, len(nums_da_sap) - 1
+    while l < r:
+        total = nums_da_sap[l] + nums_da_sap[r]
+        if total == target:
+            return [l, r]
+        if total < target:
+            l += 1              # tổng đang nhỏ hơn target -> cần lớn hơn -> bỏ phần tử nhỏ nhất
+        else:
+            r -= 1              # tổng đang lớn hơn target -> cần nhỏ hơn -> bỏ phần tử lớn nhất
+    return []
 
-# (b) Nhanh/chậm — ghi đè tại chỗ
-slow = 0
-for fast in range(n):
-    if giu_lai(a[fast]):
-        a[slow] = a[fast]
-        slow += 1
-# slow chính là độ dài mới
-
-# (c) Bỏ qua phần tử trùng (dùng nhiều trong 3Sum)
-while l < r and a[l] == a[l + 1]:
-    l += 1
+print(hai_so_co_tong([1, 3, 5, 7, 9, 11], 12))   # [0, 5] vì 1 + 11 == 12
 \`\`\`
 
-## 5. Bẫy thường gặp
+**(b) Nhanh/chậm — ghi đè tại chỗ**, dùng khi đề yêu cầu "xoá phần tử X mà không cấp phát mảng mới":
+
+\`\`\`python
+def loc_tai_cho(a, giu_lai):
+    slow = 0                       # slow: vị trí TIẾP THEO sẽ ghi phần tử được giữ lại
+    for fast in range(len(a)):      # fast: con trỏ quét qua từng phần tử một
+        if giu_lai(a[fast]):
+            a[slow] = a[fast]        # ghi đè lên vị trí slow, không tạo list mới
+            slow += 1
+    return slow                       # slow chính là độ dài mới của phần "đã lọc"
+
+a = [3, 0, 1, 0, 5]
+n_moi = loc_tai_cho(a, lambda x: x != 0)   # giữ lại phần tử khác 0
+print(a[:n_moi])    # [3, 1, 5] — phần đầu của a đã được nén lại, đúng thứ tự ban đầu
+\`\`\`
+
+**(c) Bỏ qua phần tử trùng** — mảnh ghép bắt buộc phải nhớ khi làm 3Sum (loại bộ ba trùng nhau):
+
+\`\`\`python
+# giả sử nums đã sắp và l đang trỏ tới một giá trị vừa được xét làm ứng viên đầu tiên của bộ ba
+while l < r and nums[l] == nums[l + 1]:
+    l += 1     # nhảy qua mọi bản sao liên tiếp của cùng một giá trị, tránh sinh lại bộ ba đã có
+\`\`\`
+
+## 6. Bẫy thường gặp
 
 - **Quên sắp xếp**: đa số bài hai con trỏ yêu cầu list đã sắp. Sắp xếp trước là hoàn toàn hợp lệ
   (\`sorted(a)\`, O(n log n)) *trừ khi* đề yêu cầu giữ chỉ số gốc.
 - **\`a.sort()\` (tại chỗ) vs \`sorted(a)\` (tạo bản sao)**: nếu cần giữ mảng gốc để trả lại chỉ số ban đầu,
   đừng dùng \`sort()\` trực tiếp trên nó — hãy sort trên bản sao hoặc trên danh sách cặp (giá trị, chỉ số).
-- **Vòng lặp vô hạn**: mọi nhánh của \`if\` đều phải dịch chuyển ít nhất một con trỏ.
-- **Điều kiện \`l < r\` hay \`l <= r\`**: nếu i và j phải khác nhau thì dùng \`l < r\`.
-- **Bỏ sót trùng lặp**: bài 3Sum yêu cầu bộ ba *không trùng* — phải bỏ qua giá trị lặp ở cả 3 vị trí.
+  Nhớ thêm: \`a.sort()\` trả về \`None\` — viết \`a = a.sort()\` là lỗi kinh điển, xoá luôn dữ liệu.
+- **Vòng lặp vô hạn**: mọi nhánh của \`if\`/\`while\` đều phải dịch chuyển ít nhất một con trỏ, nếu không
+  chương trình treo mãi.
+- **Điều kiện \`l < r\` hay \`l <= r\`**: nếu i và j phải khác nhau (không được trỏ cùng một phần tử)
+  thì dùng \`l < r\`.
+- **Bỏ sót trùng lặp**: bài 3Sum yêu cầu bộ ba *không trùng* — phải bỏ qua giá trị lặp ở cả 3 vị trí,
+  không chỉ vị trí ngoài cùng.
 
-## 6. Ứng dụng thực tế
+## 7. Ứng dụng thực tế
 
 - **Merge trong merge sort / external sort**: trộn hai file đã sắp xếp bằng hai con trỏ — nền tảng của
   việc sắp xếp dữ liệu lớn hơn RAM (\`heapq.merge\` trong Python dùng chính ý tưởng này).
@@ -1510,68 +1657,115 @@ Cảnh báo quan trọng: cửa sổ trượt yêu cầu tính **đơn điệu**
   lessonPy: `
 ## 1. Vấn đề gốc
 
-Bài toán dạng "tìm **đoạn con liên tiếp** (subarray/substring) thoả điều kiện X và tối ưu Y".
-Có O(n²) đoạn con. Duyệt hết là quá chậm.
+Bài toán dạng "tìm **đoạn con liên tiếp** (subarray/substring) thoả điều kiện X và tối ưu Y" (dài
+nhất, ngắn nhất, tổng lớn nhất...). Một mảng độ dài \`n\` có tới O(n²) đoạn con liên tiếp khác nhau
+(mỗi cặp điểm bắt đầu/kết thúc là một đoạn), nên nếu duyệt và tính lại từ đầu cho từng đoạn, tổng
+chi phí ít nhất là O(n²) — quá chậm khi \`n\` lớn.
+
+\`\`\`python
+def doan_dai_nhat_tong_le_k_cham(a, k):
+    n = len(a)
+    best = 0
+    for i in range(n):
+        for j in range(i, n):          # xét MỌI đoạn con [i, j]
+            if sum(a[i:j + 1]) <= k:     # sum() lại quét từ đầu -> lãng phí, tính đi tính lại
+                best = max(best, j - i + 1)
+    return best
+\`\`\`
+
+Nhận ra vấn đề: khi đi từ đoạn \`[i, j]\` sang đoạn \`[i, j+1]\`, phần lớn dữ liệu (từ \`i\` đến \`j\`)
+không hề đổi — chỉ có thêm đúng một phần tử mới. Vậy tại sao phải \`sum()\` lại từ đầu mỗi lần?
 
 ## 2. Ý tưởng cốt lõi
 
-> Khi cửa sổ dịch từ \`[i, j]\` sang \`[i, j+1]\`, ta **không tính lại từ đầu** —
-> chỉ cập nhật phần chênh lệch. Mỗi phần tử vào cửa sổ đúng 1 lần và ra đúng 1 lần → O(n).
+> Khi cửa sổ dịch từ \`[l, r]\` sang \`[l, r+1]\`, ta **không tính lại từ đầu** —
+> chỉ cập nhật phần chênh lệch (thêm phần tử mới vào, và nếu cần thì bớt phần tử cũ ra).
+> Mỗi phần tử vào cửa sổ đúng 1 lần và ra khỏi cửa sổ đúng 1 lần trong suốt vòng lặp → tổng công
+> việc là O(n), dù số lượng cửa sổ đã xét qua vẫn là O(n²).
 
-Điều kiện để dùng được: trạng thái của cửa sổ phải **cập nhật được theo kiểu tăng dần**
-(thêm 1 phần tử / bớt 1 phần tử) trong O(1) hoặc O(log n). Ví dụ: tổng, số lượng ký tự phân biệt,
-số lần xuất hiện. Ngược lại, "trung vị của cửa sổ" thì cần cấu trúc phức tạp hơn (2 heap).
+Điều kiện để dùng được kỹ thuật này: trạng thái của cửa sổ phải **cập nhật được theo kiểu tăng dần**
+(thêm 1 phần tử / bớt 1 phần tử) trong O(1) hoặc O(log n) — ví dụ: tổng cộng dồn, số lượng ký tự
+phân biệt, số lần xuất hiện của từng ký tự. Ngược lại, một đại lượng như "trung vị của cửa sổ" không
+cập nhật kiểu tăng dần đơn giản được, nên cần cấu trúc phức tạp hơn (hai heap).
 
-## 3. Hai kiểu cửa sổ
+## 3. Cấu trúc & hàm Python thường dùng trong chủ đề này
 
-**(a) Cửa sổ cố định (kích thước k)**
+| Tên | Vai trò | Ví dụ dùng nhanh |
+|---|---|---|
+| \`collections.Counter\` | Đếm số lần xuất hiện của từng phần tử trong cửa sổ hiện tại | \`window = Counter()\` rồi \`window[ch] += 1\` |
+| \`collections.defaultdict(int)\` | Tương tự Counter, nhưng chủ động hơn khi cần logic đặc biệt | \`count = defaultdict(int)\` |
+| \`len(dict)\` | Số lượng khoá phân biệt hiện có — dùng cho "nhiều nhất k ký tự phân biệt" | \`if len(count) > k: ...\` |
+| \`max(best, r - l + 1)\` | Cập nhật đáp án là độ dài cửa sổ hiện tại, nếu nó lớn hơn đáp án cũ | luôn đặt sau khi cửa sổ đã hợp lệ trở lại |
+| \`while dieu_kien:\` (thay vì \`if\`) | Co cửa sổ tới khi hợp lệ — có thể cần co NHIỀU bước liên tiếp, không chỉ một | \`while count[ch] > 1: ...\` |
+| \`del d[key]\` | Xoá hẳn khoá khỏi dict khi số đếm về 0, tránh \`len(d)\` bị sai | \`if count[ch] == 0: del count[ch]\` |
+| \`s[l:r+1]\` | Cắt ra chuỗi con hiện tại của cửa sổ để trả kết quả cuối cùng | chỉ dùng lúc trả kết quả, tránh cắt lặp lại bên trong vòng lặp chính |
+
+## 4. Hai kiểu cửa sổ
+
+**(a) Cửa sổ cố định (kích thước k)** — dùng khi đề cho sẵn độ dài cửa sổ, ví dụ "tổng lớn nhất của
+mọi đoạn con liên tiếp dài đúng k phần tử":
+
 \`\`\`python
-total = 0
-for i in range(n):
-    total += a[i]
-    if i >= k:
-        total -= a[i - k]       # phần tử rời khỏi cửa sổ
-    if i >= k - 1:
+def tong_lon_nhat_cua_so_k(a, k):
+    total = sum(a[:k])       # tổng của cửa sổ đầu tiên, tính một lần duy nhất
+    best = total
+    for i in range(k, len(a)):
+        total += a[i]          # phần tử mới a[i] TIẾN vào cửa sổ
+        total -= a[i - k]       # phần tử a[i-k] RỜI khỏi cửa sổ (cửa sổ luôn giữ đúng k phần tử)
         best = max(best, total)
+    return best
+
+print(tong_lon_nhat_cua_so_k([2, 1, 5, 1, 3, 2], 3))   # 9 (đoạn [5, 1, 3])
 \`\`\`
 
-**(b) Cửa sổ co giãn (quan trọng hơn nhiều)**
+**(b) Cửa sổ co giãn (quan trọng hơn nhiều — 70% bài sliding window dùng khung này)**:
+
 \`\`\`python
-l = 0
-for r in range(n):
-    them_a_r_vao_trang_thai()
-    while dieu_kien_bi_vi_pham():
-        bot_a_l_khoi_trang_thai()
-        l += 1
-    # ở đây [l, r] luôn là cửa sổ HỢP LỆ dài nhất kết thúc tại r
-    best = max(best, r - l + 1)
+def doan_dai_nhat_khong_lap_ky_tu(s):
+    seen = set()          # trạng thái của cửa sổ: tập ký tự đang có trong [l, r]
+    l = 0
+    best = 0
+    for r in range(len(s)):
+        while s[r] in seen:            # cửa sổ đang VI PHẠM (ký tự mới bị trùng) -> co lại từ trái
+            seen.remove(s[l])
+            l += 1
+        seen.add(s[r])                  # ở đây cửa sổ [l, r] chắc chắn đã HỢP LỆ trở lại
+        best = max(best, r - l + 1)      # nên mới được phép cập nhật đáp án
+    return best
+
+print(doan_dai_nhat_khong_lap_ky_tu("abcabcbb"))   # 3 ("abc")
 \`\`\`
 
-**Học thuộc khung (b).** 70% bài sliding window chỉ khác nhau ở phần "trạng thái" và "điều kiện vi phạm".
+Hãy học thuộc bộ khung \`for r ... while vi_phạm: co lại ... cập nhật đáp án\` — phần lớn bài trong
+chủ đề này chỉ khác nhau ở "trạng thái cửa sổ là gì" và "điều kiện vi phạm là gì", còn bộ khung giữ
+nguyên.
 
-## 4. Nhận dạng bài toán
+## 5. Nhận dạng bài toán
 
 | Đề bài nói | Hướng làm |
 |---|---|
 | "đoạn con **liên tiếp** dài nhất thoả..." | cửa sổ co giãn, tối đa hoá \`r-l+1\` |
 | "đoạn con ngắn nhất có tổng ≥ target" | cửa sổ co giãn, co lại khi *đã* thoả |
 | "cửa sổ kích thước k" | cửa sổ cố định |
-| "nhiều nhất k ký tự phân biệt" | cửa sổ + dict đếm |
-| Mảng có **số âm** và hỏi tổng | ⚠️ sliding window **không** dùng được → chuyển sang prefix sum + hash |
+| "nhiều nhất k ký tự phân biệt" | cửa sổ + dict đếm, so \`len(dict)\` với k |
+| Mảng có **số âm** và hỏi tổng | sliding window **không** dùng được -> chuyển sang prefix sum + hash |
 
 Cảnh báo quan trọng: cửa sổ trượt yêu cầu tính **đơn điệu** — mở rộng cửa sổ làm đại lượng tăng
-(hoặc giảm) một chiều. Có số âm thì "tổng tăng khi thêm phần tử" không còn đúng → thuật toán sai.
+(hoặc giảm) một chiều. Có số âm thì "tổng tăng khi thêm phần tử" không còn đúng nữa (thêm một số âm
+làm tổng GIẢM) → thuật toán sai âm thầm.
 
-## 5. Bẫy thường gặp
+## 6. Bẫy thường gặp
 
-- Dùng \`if\` thay vì \`while\` khi co cửa sổ (có thể phải co nhiều bước).
+- Dùng \`if\` thay vì \`while\` khi co cửa sổ — có những bước cần co liên tiếp NHIỀU lần mới hợp lệ trở
+  lại, \`if\` chỉ co được đúng một bước rồi dừng.
 - Cập nhật đáp án sai thời điểm: với bài "dài nhất" cập nhật *sau* khi đã sửa cửa sổ hợp lệ;
-  với bài "ngắn nhất" cập nhật *bên trong* vòng co.
-- Quên xoá khoá khỏi dict khi số đếm về 0 (làm sai phép kiểm tra \`len(count)\`).
+  với bài "ngắn nhất" cập nhật *bên trong* vòng co (ngay khi cửa sổ vừa hợp lệ, trước khi co tiếp).
+- Quên xoá khoá khỏi dict khi số đếm về 0 (làm sai phép kiểm tra \`len(count)\`, vì khoá với giá trị 0
+  vẫn được \`dict\` tính là "đang tồn tại").
 - \`collections.Counter\` rất tiện cho đếm, nhưng nhớ rằng \`counter[key] -= 1\` không tự xoá khoá khi về 0 —
-  phải \`del counter[key]\` thủ công nếu logic dựa vào số lượng khoá còn lại.
+  phải \`del counter[key]\` thủ công nếu logic dựa vào số lượng khoá còn lại (\`len(counter)\`).
 
-## 6. Ứng dụng thực tế
+## 7. Ứng dụng thực tế
 
 - **Rate limiting** (giới hạn tần suất API): "tối đa 100 request trong 60 giây trượt" — chính xác là cửa sổ trượt.
 - **Chỉ báo tài chính**: đường trung bình động (moving average) 20 phiên.

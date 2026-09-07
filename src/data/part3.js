@@ -87,36 +87,73 @@ Cách đúng: truyền **khoảng hợp lệ** (min, max) xuống dưới.
   lessonPy: `
 ## 1. Vấn đề gốc
 
-Dữ liệu đời thực rất hay có **cấu trúc phân cấp**: thư mục, DOM, cơ cấu tổ chức, cây quyết định.
-List và linked list là *tuyến tính* — chúng không diễn tả được quan hệ cha/con.
+Dữ liệu đời thực rất hay có **cấu trúc phân cấp**, không phải một hàng thẳng: thư mục lồng thư mục
+con, DOM của một trang web, cơ cấu tổ chức công ty (quản lý → nhân viên), cây quyết định. \`list\` và
+\`linked list\` đều là cấu trúc **tuyến tính** — mỗi phần tử chỉ có đúng một "phần tử tiếp theo", nên
+chúng không diễn tả được quan hệ "một cha có NHIỀU con" một cách tự nhiên.
 
-Ngoài ra, cây tìm kiếm nhị phân (BST) cân bằng cho cả ba thao tác tìm/thêm/xoá trong **O(log n)**,
-điều mà list đã sắp (tìm nhanh, thêm chậm) và linked list (thêm nhanh, tìm chậm) không làm được.
+Ngoài việc mô hình hoá phân cấp, cây tìm kiếm nhị phân (Binary Search Tree — BST) cân bằng còn giải
+quyết một đánh đổi mà \`list\`/\`linked list\` không thể: \`list\` đã sắp tìm nhanh (O(log n) nhờ binary
+search) nhưng thêm/xoá chậm (O(n), phải dịch chuyển); \`linked list\` thêm/xoá nhanh (O(1) tại vị trí
+đã biết) nhưng tìm chậm (O(n), phải đi từ đầu). BST cân bằng cho **cả ba** thao tác tìm/thêm/xoá cùng
+chạy trong O(log n) — nhờ cấu trúc phân nhánh cho phép loại bỏ một nửa cây con ở mỗi bước, giống hệt
+cơ chế của binary search nhưng áp dụng lên một cấu trúc có thể thay đổi linh hoạt.
 
 ## 2. Ý tưởng cốt lõi
 
-> **Cây là cấu trúc đệ quy**: một cây = một nút gốc + cây con trái + cây con phải.
-> Vì vậy hầu hết bài toán cây có dạng: *"giải bài toán này cho cây con trái, cho cây con phải,
-> rồi kết hợp hai kết quả lại."*
+> **Cây là một cấu trúc dữ liệu đệ quy**: một cây con bất kỳ trông giống hệt "một cây" — gồm một
+> nút gốc, cộng với cây con trái, cộng với cây con phải (và mỗi cây con đó lại là một cây hoàn chỉnh
+> theo đúng định nghĩa này). Vì vậy hầu hết bài toán trên cây đều có chung một dạng: *"giải bài toán
+> này cho cây con trái, giải cho cây con phải, rồi kết hợp hai kết quả con lại thành kết quả của cả
+> cây."*
 
-Khung mẫu đúng cho ~80% bài:
+Khung mẫu đúng cho khoảng 80% bài toán cây:
+
 \`\`\`python
 def solve(node):
     if not node:
-        return gia_tri_co_so           # 1. TRƯỜNG HỢP CƠ SỞ
-    L = solve(node.left)                # 2. tin tưởng đệ quy làm đúng
-    R = solve(node.right)
-    return ket_hop(node.val, L, R)      # 3. ghép lại
+        return gia_tri_co_so           # 1. TRƯỜNG HỢP CƠ SỞ — cây rỗng thì trả lời gì?
+    L = solve(node.left)                # 2. TIN TƯỞNG đệ quy đã giải đúng cho cây con trái
+    R = solve(node.right)                #    và cho cây con phải — không cần hiểu "bên trong" nó chạy ra sao
+    return ket_hop(node.val, L, R)         # 3. chỉ tập trung GHÉP node.val với hai kết quả con lại
 \`\`\`
 
-**Mẹo tâm lý quan trọng:** đừng cố "chạy trong đầu" toàn bộ đệ quy — bạn sẽ rối.
-Hãy tin rằng \`solve(node.left)\` trả về đúng kết quả (giả thiết quy nạp), và chỉ tập trung
-vào việc **kết hợp**. Đây là bước nhảy tư duy lớn nhất của chủ đề này.
+Ví dụ cụ thể — tính chiều cao của cây (số cạnh dài nhất từ gốc xuống lá):
 
-Lưu ý về Python: độ sâu đệ quy mặc định giới hạn ~1000 (\`sys.getrecursionlimit()\`).
-Với cây rất lệch/sâu, đệ quy có thể ném \`RecursionError\` — khi đó cần chuyển sang bản lặp (BFS/dùng stack).
+\`\`\`python
+def chieu_cao(node):
+    if not node:
+        return -1                        # quy ước: cây rỗng có chiều cao -1 (để lá có chiều cao 0)
+    trai = chieu_cao(node.left)
+    phai = chieu_cao(node.right)
+    return 1 + max(trai, phai)             # chiều cao của node = 1 + chiều cao lớn hơn của hai con
+\`\`\`
 
-## 3. Bốn kiểu duyệt và khi nào dùng
+**Mẹo tâm lý quan trọng:** đừng cố "chạy trong đầu" toàn bộ cây đệ quy từng bước một — với cây có
+hàng chục nút, bạn sẽ rối và bỏ cuộc. Hãy tin rằng \`chieu_cao(node.left)\` **đã** trả về đúng kết quả
+(đây gọi là "giả thiết quy nạp" trong toán học), và chỉ tập trung suy nghĩ vào **một bước duy nhất**:
+nếu đã có kết quả đúng của hai cây con, làm sao kết hợp chúng để ra kết quả của \`node\`? Đây là bước
+nhảy tư duy quan trọng nhất của cả chủ đề đệ quy trên cây.
+
+Lưu ý kỹ thuật riêng của Python: độ sâu đệ quy mặc định bị giới hạn khoảng 1000 lời gọi lồng nhau
+(xem \`sys.getrecursionlimit()\`). Với một cây rất lệch (gần giống một danh sách liên kết dài), đệ quy
+có thể ném ra \`RecursionError\` dù thuật toán hoàn toàn đúng — khi đó cần chuyển cách viết từ đệ quy
+sang vòng lặp dùng \`list\` làm stack tường minh (xem lại [[Ngăn xếp]] — mọi đệ quy đều viết lại được
+bằng vòng lặp cộng stack).
+
+## 3. Cấu trúc & hàm Python thường dùng trong chủ đề này
+
+| Tên | Vai trò | Ví dụ dùng nhanh |
+|---|---|---|
+| \`node.val\`, \`node.left\`, \`node.right\` | Ba thuộc tính chuẩn của một nút cây nhị phân (đã có sẵn trong bài tập) | \`if node.val > x: node = node.left\` |
+| \`if not node:\` | Kiểm tra nút là \`None\` (cây rỗng/đã hết nhánh) — điều kiện dừng của MỌI đệ quy trên cây | \`if not node: return 0\` |
+| \`collections.deque\` | Hàng đợi hai đầu — cấu trúc bắt buộc cho BFS/duyệt theo tầng, vì \`popleft()\` là O(1) (list.pop(0) là O(n)) | \`from collections import deque; q = deque([root])\` |
+| \`q.popleft()\` | Lấy phần tử ở ĐẦU hàng đợi ra — đúng thứ tự "vào trước, ra trước" (FIFO) cần cho BFS | \`node = q.popleft()\` |
+| \`float('-inf')\`, \`float('inf')\` | Giá trị âm/dương vô cùng — dùng làm biên khởi tạo khi kiểm tra tính hợp lệ của BST | \`kiem_tra(node, float('-inf'), float('inf'))\` |
+| \`sys.setrecursionlimit(n)\` | Nâng giới hạn độ sâu đệ quy khi cây rất sâu (dùng cẩn trọng, có rủi ro tràn stack thật) | \`import sys; sys.setrecursionlimit(10000)\` |
+| \`nonlocal\` | Cho phép một hàm lồng bên trong SỬA biến của hàm cha (thường dùng để lưu đáp án "tốt nhất" khi duyệt) | \`def solve(node):\` bên trong hàm có \`nonlocal best\` |
+
+## 4. Bốn kiểu duyệt và khi nào dùng
 
 | Kiểu | Thứ tự | Dùng khi |
 |---|---|---|
@@ -125,34 +162,105 @@ Với cây rất lệch/sâu, đệ quy có thể ném \`RecursionError\` — kh
 | Postorder (trái → phải → gốc) | xử lý nút **sau** con | tính chiều cao, xoá cây, gom thông tin **từ dưới lên** |
 | BFS theo mức (dùng \`collections.deque\`) | từng tầng | "theo từng tầng", đường đi ngắn nhất theo số cạnh |
 
-Hai câu hỏi quyết định chọn kiểu nào:
-1. Nút cần thông tin **từ cha** (giới hạn, độ sâu)? → preorder, truyền tham số xuống.
-2. Nút cần thông tin **từ con** (chiều cao, tổng)? → postorder, trả giá trị lên.
+Ba kiểu preorder/inorder/postorder viết bằng đệ quy trông gần như giống hệt nhau — chỉ khác vị trí
+của dòng "xử lý \`node.val\`":
 
-## 4. BST — tính chất phải thuộc
+\`\`\`python
+def preorder(node, out):
+    if not node: return
+    out.append(node.val)      # xử lý TRƯỚC khi đi xuống hai con
+    preorder(node.left, out)
+    preorder(node.right, out)
 
-> Với mọi nút: **toàn bộ** cây con trái < nút < **toàn bộ** cây con phải.
+def inorder(node, out):
+    if not node: return
+    inorder(node.left, out)
+    out.append(node.val)      # xử lý Ở GIỮA — sau con trái, trước con phải
+    inorder(node.right, out)
 
-Chú ý chữ "toàn bộ". Lỗi kinh điển khi kiểm tra BST là chỉ so nút với hai con trực tiếp:
+def postorder(node, out):
+    if not node: return
+    postorder(node.left, out)
+    postorder(node.right, out)
+    out.append(node.val)      # xử lý SAU KHI đã xong cả hai con
+\`\`\`
+
+Còn BFS (duyệt theo từng tầng) không dùng đệ quy — nó dùng một hàng đợi (\`collections.deque\`) để xử
+lý đúng thứ tự "tầng gần gốc trước, tầng xa gốc sau":
+
+\`\`\`python
+from collections import deque
+
+def duyet_theo_tang(root):
+    if not root:
+        return []
+    ket_qua = []
+    hang_doi = deque([root])          # bắt đầu với đúng 1 phần tử: gốc
+    while hang_doi:
+        so_luong_tang_nay = len(hang_doi)    # "chốt" số nút thuộc tầng hiện tại TRƯỚC khi thêm tầng sau
+        tang_hien_tai = []
+        for _ in range(so_luong_tang_nay):
+            node = hang_doi.popleft()          # lấy nút CŨ NHẤT ra trước (FIFO — vào trước ra trước)
+            tang_hien_tai.append(node.val)
+            if node.left:
+                hang_doi.append(node.left)
+            if node.right:
+                hang_doi.append(node.right)
+        ket_qua.append(tang_hien_tai)
+    return ket_qua
+\`\`\`
+
+Hai câu hỏi quyết định chọn kiểu duyệt nào cho một bài cụ thể:
+1. Nút cần thông tin **từ cha truyền xuống** (giới hạn, độ sâu hiện tại)? → dùng preorder, truyền
+   thêm tham số xuống lời gọi đệ quy.
+2. Nút cần thông tin **từ con dội lên** (chiều cao, tổng của cây con)? → dùng postorder, để mỗi lời
+   gọi đệ quy trả giá trị lên cho cha xử lý tiếp.
+
+## 5. BST — tính chất phải thuộc
+
+> Với mọi nút của một cây tìm kiếm nhị phân (BST): **toàn bộ** giá trị trong cây con trái phải nhỏ
+> hơn nút, và **toàn bộ** giá trị trong cây con phải phải lớn hơn nút.
+
+Chú ý chữ "toàn bộ" — đây không phải chỉ so với hai con trực tiếp. Lỗi kinh điển khi kiểm tra một cây
+có phải BST hợp lệ hay không là chỉ so nút với hai con ngay bên dưới nó:
+
 \`\`\`
     5
    / \\
   1   7
      / \\
-    3   8      <- 3 < 7 nhưng 3 < 5 nên KHÔNG phải BST hợp lệ
+    3   8      <- 3 < 7 (đúng khi so với cha trực tiếp) nhưng 3 < 5 (SAI so với gốc) -> KHÔNG phải BST hợp lệ
 \`\`\`
-Cách đúng: truyền **khoảng hợp lệ** (lo, hi) xuống dưới — dùng \`float('-inf')\`/\`float('inf')\` làm biên khởi tạo.
 
-## 5. Bẫy thường gặp
+Nút \`3\` nằm trong cây con phải của \`5\`, nên toàn bộ cây con đó — bao gồm cả \`3\` — phải lớn hơn
+\`5\`. Chỉ so với cha trực tiếp (\`7\`) sẽ bỏ sót ràng buộc này vì nó mang tính **toàn cục**, không chỉ
+cục bộ giữa cha-con liền kề. Cách làm đúng: truyền một **khoảng hợp lệ** \`(lo, hi)\` xuống dưới qua
+mỗi lời gọi đệ quy, thu hẹp dần khi đi sâu:
 
-- Quên trường hợp cơ sở \`if not node:\` → lỗi \`AttributeError: NoneType\`.
-- Nhầm **chiều cao** (số cạnh) với **số nút trên đường đi** — đọc kỹ đề.
-- Cây lệch (như danh sách liên kết) làm đệ quy sâu n tầng → \`RecursionError\` (không phải "stack overflow"
-  như ở JS/C++, nhưng cùng bản chất). BST **không tự cân bằng**; AVL/Red-Black tree mới cân bằng.
-- Với bài đường kính/đường đi, hãy tách rõ: hàm đệ quy **trả về** một thứ (chiều cao),
-  còn đáp án được cập nhật vào biến ngoài (dùng \`nonlocal\` nếu cập nhật biến ở hàm lồng nhau).
+\`\`\`python
+def la_bst_hop_le(node, lo=float('-inf'), hi=float('inf')):
+    if not node:
+        return True                          # cây rỗng luôn hợp lệ
+    if not (lo < node.val < hi):
+        return False                           # node.val phải nằm ĐÚNG trong khoảng cha truyền xuống
+    return (la_bst_hop_le(node.left, lo, node.val) and     # cây con trái: cận trên thu hẹp về node.val
+            la_bst_hop_le(node.right, node.val, hi))         # cây con phải: cận dưới thu hẹp về node.val
+\`\`\`
 
-## 6. Ứng dụng thực tế
+## 6. Bẫy thường gặp
+
+- Quên trường hợp cơ sở \`if not node:\` → lỗi \`AttributeError: 'NoneType' object has no attribute 'left'\`.
+- Nhầm **chiều cao** (số cạnh trên đường đi dài nhất) với **số nút trên đường đi** — hai định nghĩa
+  lệch nhau đúng 1, đọc kỹ đề để biết quy ước nào đang được dùng.
+- Cây lệch hẳn về một phía (gần giống một danh sách liên kết) làm đệ quy sâu tới \`n\` tầng →
+  \`RecursionError\` trong Python (khác tên gọi nhưng cùng bản chất với "stack overflow" ở JS/C++).
+  BST thường **không tự cân bằng**; các biến thể như AVL tree hay Red-Black tree mới đảm bảo cân bằng.
+- Với bài tính đường kính/đường đi dài nhất, hãy tách rõ hai việc: hàm đệ quy **trả về** một giá trị
+  cho cha dùng tiếp (thường là chiều cao), còn **đáp án cuối cùng** lại được cập nhật vào một biến bên
+  ngoài mỗi khi đi qua một nút (dùng từ khoá \`nonlocal\` để một hàm lồng bên trong có thể sửa được
+  biến của hàm cha).
+
+## 7. Ứng dụng thực tế
 
 - **Chỉ mục database (B-tree/B+ tree)**: cây nhiều nhánh, chiều cao 3-4 cho hàng tỷ bản ghi.
 - **DOM và Virtual DOM**: React so sánh (diff) hai cây để cập nhật giao diện tối thiểu.
@@ -846,17 +954,24 @@ nhanh hơn Map nhưng tốn bộ nhớ hơn nếu cây thưa.
   lessonPy: `
 ## 1. Vấn đề gốc
 
-Bạn có 1 triệu từ và cần trả lời: *"có từ nào bắt đầu bằng 'prog' không?"*
-- \`set\`/\`dict\`: tra chính xác một từ thì O(1), nhưng **không** trả lời được câu hỏi tiền tố
-  (bạn phải quét hết 1 triệu từ).
-- List đã sắp + binary search (\`bisect\`): O(log n · độ dài) — được, nhưng thêm từ mới thì tốn kém.
+Bạn có 1 triệu từ trong từ điển và cần trả lời liên tục câu hỏi: *"có từ nào bắt đầu bằng 'prog'
+không?"* (đây gọi là truy vấn theo **tiền tố**, khác với tra đúng một từ chính xác).
 
-**Trie** giải quyết triệt để: mọi thao tác chỉ phụ thuộc vào **độ dài từ**, không phụ thuộc số lượng từ.
+- \`set\`/\`dict\`: tra một từ chính xác thì O(1), nhưng **không** trả lời được câu hỏi tiền tố — vì
+  "prog" không phải là một từ hoàn chỉnh trong từ điển, bạn buộc phải quét qua cả 1 triệu từ để xem
+  từ nào bắt đầu bằng "prog".
+- List đã sắp cộng binary search (\`bisect\`): tìm được điểm bắt đầu của các từ có tiền tố "prog" trong
+  O(log n · độ dài từ) — chạy được, nhưng mỗi lần thêm từ mới vào từ điển lại tốn O(n) để giữ thứ tự.
+
+**Trie** (cây tiền tố) giải quyết triệt để vấn đề này: mọi thao tác — thêm từ, tra từ, tra tiền tố —
+đều chỉ phụ thuộc vào **độ dài của từ/tiền tố đang xét**, hoàn toàn không phụ thuộc vào việc từ điển
+đang có bao nhiêu từ.
 
 ## 2. Ý tưởng cốt lõi
 
-> Trie = cây mà **mỗi cạnh là một ký tự**, và **đường đi từ gốc tới một nút chính là một tiền tố**.
-> Các từ có chung tiền tố thì dùng chung phần đầu của đường đi.
+> Trie là một cây mà **mỗi cạnh nối hai nút mang một ký tự**, và **đường đi từ gốc tới một nút bất kỳ
+> chính là một chuỗi tiền tố**. Các từ có chung tiền tố sẽ dùng chung phần đầu của đường đi trong cây,
+> chỉ tách nhánh ra kể từ ký tự đầu tiên khác nhau.
 
 \`\`\`
         (root)
@@ -866,32 +981,78 @@ Bạn có 1 triệu từ và cần trả lời: *"có từ nào bắt đầu b�
        a      o
       / \\     |
      t   r    g
-    (*)  (*)  (*)      (*) = kết thúc một từ hợp lệ
+    (*)  (*)  (*)      (*) = đường đi tới đây tạo thành một từ HOÀN CHỈNH đã được thêm vào
    cat  car  dog
 \`\`\`
 
-Cấu trúc một nút cực kỳ đơn giản:
+Từ "cat" và "car" dùng chung hai ký tự đầu "c" và "a" (chung một nhánh trong cây), chỉ tách ra ở ký
+tự thứ ba ("t" và "r"). Đây chính là lý do trie tra tiền tố nhanh: muốn biết "có từ nào bắt đầu bằng
+'ca' không?", chỉ cần đi theo đúng hai bước "c" rồi "a" — nếu đường đi đó tồn tại trong cây, câu trả
+lời là có, bất kể từ điển có 100 hay 100 triệu từ.
+
+Cấu trúc một nút trong Python cực kỳ đơn giản, chỉ cần hai thuộc tính:
+
 \`\`\`python
 class TrieNode:
     def __init__(self):
-        self.children = {}     # ký tự -> TrieNode
-        self.is_end = False    # đường đi tới đây có tạo thành một từ hoàn chỉnh?
+        self.children = {}     # dict: ký tự -> TrieNode con tương ứng với ký tự đó
+        self.is_end = False    # đường đi TỪ GỐC tới đây có tạo thành một từ hoàn chỉnh đã insert không?
 \`\`\`
 
-**Cờ \`is_end\` là bắt buộc**: nếu không có nó, ta không phân biệt được "app" là từ thật
-hay chỉ là tiền tố của "apple".
+**Cờ \`is_end\` là bắt buộc, không thể thiếu**: nếu không có nó, khi đã \`insert("apple")\`, ta không
+thể phân biệt được liệu "app" có phải là một từ *thật sự* đã được thêm vào hay chỉ *tình cờ* là một
+tiền tố nằm trên đường đi tới "apple" mà thôi — về mặt cấu trúc cây, hai trường hợp đó trông giống
+hệt nhau nếu thiếu cờ đánh dấu.
 
-## 3. Ba thao tác — cùng một khung
+## 3. Cấu trúc & hàm Python thường dùng trong chủ đề này
+
+| Tên | Vai trò | Ví dụ dùng nhanh |
+|---|---|---|
+| \`dict\` làm \`children\` | Ánh xạ ký tự → nút con, tra cứu O(1) mỗi bước ký tự | \`node.children.get(ch)\` |
+| \`dict.setdefault(k, v)\` | Lấy giá trị tại khoá \`k\`, nếu chưa có thì TẠO MỚI bằng \`v\` rồi trả về — gọn hơn \`if\`/\`else\` khi vừa thêm vừa lấy nút con | \`node = node.children.setdefault(ch, TrieNode())\` |
+| \`in\` trên dict | Kiểm tra một ký tự đã có nhánh con hay chưa | \`if ch not in node.children: return False\` |
+| \`class ... : def __init__(self):\` | Định nghĩa cấu trúc \`TrieNode\` — mỗi nút là một object riêng biệt | xem định nghĩa \`TrieNode\` ở trên |
+| \`collections.defaultdict\` | Thay cho \`dict\` thường khi muốn nút con tự sinh mà không cần \`setdefault\` mỗi dòng | ít dùng hơn cách viết \`class TrieNode\` tường minh, nhưng vẫn hợp lệ |
+
+## 4. Ba thao tác — cùng một khung đi bộ trên cây
 
 \`\`\`python
-insert(word)   # đi theo ký tự, thiếu nút thì tạo (dict.setdefault tiện cho việc này), cuối cùng đánh dấu is_end = True
-search(word)   # đi theo ký tự, thiếu -> False, cuối cùng kiểm tra is_end
-startsWith(p)  # giống search nhưng KHÔNG cần kiểm tra is_end
+class Trie:
+    def __init__(self):
+        self.root = TrieNode()
+
+    def insert(self, word):
+        node = self.root
+        for ch in word:
+            node = node.children.setdefault(ch, TrieNode())   # thiếu nhánh -> tạo mới, rồi đi tiếp
+        node.is_end = True                                       # đánh dấu: đường đi này là MỘT TỪ HOÀN CHỈNH
+
+    def search(self, word):
+        node = self._di_toi_cuoi(word)
+        return node is not None and node.is_end                 # phải tồn tại đường đi VÀ là từ hoàn chỉnh
+
+    def starts_with(self, prefix):
+        return self._di_toi_cuoi(prefix) is not None              # chỉ cần đường đi tồn tại, KHÔNG cần is_end
+
+    def _di_toi_cuoi(self, s):
+        node = self.root
+        for ch in s:
+            if ch not in node.children:
+                return None                                        # thiếu nhánh giữa chừng -> chắc chắn không có
+            node = node.children[ch]
+        return node
+
+t = Trie()
+t.insert("apple")
+print(t.search("apple"))        # True — đã insert đúng từ này
+print(t.search("app"))          # False — "app" chưa từng được insert như một từ hoàn chỉnh
+print(t.starts_with("app"))     # True — "app" vẫn là một tiền tố hợp lệ trong cây
 \`\`\`
 
-Cả ba đều là O(L) với L là độ dài từ — **không phụ thuộc vào số từ đã lưu**. Đó là điều kỳ diệu.
+Cả ba thao tác đều là O(L) với \`L\` là độ dài từ/tiền tố đang xét — **không phụ thuộc vào số lượng
+từ đã lưu trong trie**. Đó chính là điều kỳ diệu đã giải quyết triệt để vấn đề nêu ở mục 1.
 
-## 4. Khi nào dùng Trie?
+## 5. Khi nào dùng Trie?
 
 | Dấu hiệu | Vì sao Trie thắng |
 |---|---|
@@ -904,7 +1065,7 @@ Cả ba đều là O(L) với L là độ dài từ — **không phụ thuộc v
 **Đánh đổi**: trie tốn bộ nhớ hơn hash set (mỗi nút một dict con). Với 26 chữ cái, dùng list 26 phần tử
 nhanh hơn dict một chút nhưng tốn bộ nhớ hơn nếu cây thưa.
 
-## 5. Ứng dụng thực tế
+## 6. Ứng dụng thực tế
 
 - **Gợi ý tìm kiếm** của Google/IDE (autocomplete) — ứng dụng kinh điển nhất.
 - **Bảng định tuyến IP**: router tra "tiền tố dài nhất khớp" bằng trie nhị phân, hàng triệu gói/giây.
@@ -1463,72 +1624,153 @@ Lưu ý: JavaScript **không có** priority queue dựng sẵn — trong phỏng
   lessonPy: `
 ## 1. Vấn đề gốc
 
-Bạn cần **liên tục** lấy ra phần tử nhỏ nhất (hoặc lớn nhất) trong một tập **đang thay đổi**.
+Bạn cần **liên tục** lấy ra phần tử nhỏ nhất (hoặc lớn nhất) trong một tập dữ liệu **đang thay đổi**
+— liên tục có phần tử mới được thêm vào, xen kẽ với việc lấy phần tử nhỏ nhất ra.
 
-- List chưa sắp: tìm min O(n) mỗi lần → quá chậm.
-- List đã sắp: tìm min O(1) nhưng chèn phần tử mới O(n).
-- **Heap: chèn O(log n), lấy min O(log n), xem min O(1).**
+\`\`\`python
+def lay_min_lien_tuc_cham(danh_sach_moi):
+    kho = []
+    ket_qua = []
+    for x in danh_sach_moi:
+        kho.append(x)
+        ket_qua.append(min(kho))    # min() quét lại TOÀN BỘ kho mỗi lần -> O(n) mỗi lần gọi
+    return ket_qua
+\`\`\`
 
-Điểm mấu chốt: sắp xếp toàn bộ là **làm dư việc**. Nếu chỉ cần biết ai đứng đầu, ta không cần
-biết thứ tự của những người còn lại.
+Ba lựa chọn cấu trúc dữ liệu và chi phí của từng lựa chọn:
+- \`list\` chưa sắp: thêm phần tử mới O(1), nhưng tìm min mỗi lần phải quét lại toàn bộ, O(n).
+- \`list\` luôn giữ đã sắp: tìm min O(1) (luôn ở đầu), nhưng chèn phần tử mới vào đúng vị trí để giữ
+  thứ tự tốn O(n) (phải dịch chuyển phần tử).
+- **Heap: chèn O(log n), lấy phần tử nhỏ nhất ra O(log n), chỉ xem (không lấy ra) O(1).**
+
+Điểm mấu chốt cần nắm: **sắp xếp toàn bộ tập dữ liệu là làm dư việc** so với nhu cầu thật sự. Nếu bạn
+chỉ cần biết "ai đang đứng đầu", bạn không cần biết đầy đủ thứ tự của tất cả những người còn lại —
+heap khai thác đúng khoảng trống này để làm ít việc hơn sắp xếp, nhưng vẫn đủ nhanh để trả lời đúng
+câu hỏi "ai nhỏ nhất" mọi lúc.
 
 ## 2. Ý tưởng cốt lõi
 
-> Heap là cây nhị phân **gần đầy đủ** thoả tính chất: **mỗi nút ≤ các con của nó** (min-heap).
-> Đây là thứ tự **một phần** (partial order), yếu hơn sắp xếp nhưng đủ để biết ai nhỏ nhất — và
-> chính vì yếu hơn nên duy trì rẻ hơn.
+> Heap là một cây nhị phân **gần đầy đủ** (mọi tầng đều kín, trừ tầng cuối được lấp từ trái sang
+> phải) thoả tính chất: **giá trị của mỗi nút ≤ giá trị của các con nó** (đây gọi là min-heap; đảo
+> chiều bất đẳng thức được max-heap). Đây là một thứ tự **một phần** (partial order) — chỉ đảm bảo
+> quan hệ cha-con, KHÔNG đảm bảo thứ tự giữa hai nút anh em hay hai nhánh khác nhau. Nó yếu hơn hẳn
+> việc sắp xếp toàn bộ, nhưng lại đủ để luôn biết ai đang nhỏ nhất — và chính vì "yếu hơn" (đòi hỏi
+> ít ràng buộc hơn) nên chi phí duy trì nó cũng rẻ hơn nhiều so với giữ toàn bộ dữ liệu luôn có thứ tự.
 
-**Python có sẵn module \`heapq\`** — cài đặt heap trên một \`list\` bình thường, không cần tự viết
-sift-up/sift-down như JS:
+**Python có sẵn module \`heapq\`** — module này cài đặt heap ngay trên một \`list\` Python bình thường
+(không có class \`Heap\` riêng), nên bạn không cần tự viết các thao tác sift-up/sift-down như ở nhiều
+ngôn ngữ khác:
+
 \`\`\`python
 import heapq
+
 h = []
-heapq.heappush(h, 5)
+heapq.heappush(h, 5)      # thêm 5 vào heap, tự động sắp xếp lại nội bộ
 heapq.heappush(h, 2)
-smallest = heapq.heappop(h)     # 2
-heapq.heapify(existing_list)    # biến 1 list sẵn có thành heap tại chỗ, O(n)
+heapq.heappush(h, 8)
+print(h[0])                 # 2 — phần tử nhỏ nhất LUÔN nằm ở chỉ số 0, đọc trực tiếp O(1)
+smallest = heapq.heappop(h)  # 2 — lấy ra phần tử nhỏ nhất, heap tự sắp xếp lại phần còn lại
+print(h)                      # [5, 8] — heap chỉ còn 2 phần tử
+
+# Biến một list SẴN CÓ thành heap tại chỗ, nhanh hơn push từng phần tử một: O(n) thay vì O(n log n)
+existing = [5, 2, 8, 1, 9]
+heapq.heapify(existing)
+print(existing[0])    # 1 — nhỏ nhất, dù list "trông" chưa được sắp xếp hoàn toàn
 \`\`\`
 
-**Bẫy quan trọng nhất của \`heapq\`: nó chỉ có MIN-heap.** Muốn max-heap, đảo dấu giá trị khi push/pop
-(\`heapq.heappush(h, -v)\`, lấy ra thì phủ định lại) — đây là mẹo bắt buộc phải nhớ trong Python.
+**Bẫy quan trọng nhất của \`heapq\`: nó chỉ có MIN-heap, không có tham số nào để đổi thành max-heap.**
+Muốn lấy ra phần tử LỚN NHẤT trước, mẹo bắt buộc phải nhớ là đảo dấu giá trị khi đưa vào heap, rồi
+đảo dấu lại khi lấy ra:
 
-Cha/con vẫn theo công thức mảng phẳng bên trong \`heapq\`, nhưng bạn hiếm khi cần tự đụng tới:
+\`\`\`python
+h = []
+for x in [5, 2, 8, 1]:
+    heapq.heappush(h, -x)         # đẩy vào SỐ ÂM của giá trị thật
+lon_nhat = -heapq.heappop(h)       # lấy ra rồi đảo dấu lại -> 8, đúng là giá trị lớn nhất
 \`\`\`
-cha của i      = (i - 1) // 2
-con trái của i = 2i + 1
-con phải của i = 2i + 2
+
+Cấu trúc cha/con vẫn theo công thức mảng phẳng bên trong \`heapq\`, nhưng bạn hiếm khi cần tự động tới
+những chỉ số này — \`heapq\` đã lo hết:
+
+\`\`\`
+cha của chỉ số i      = (i - 1) // 2
+con trái của chỉ số i = 2i + 1
+con phải của chỉ số i = 2i + 2
 \`\`\`
 
-## 3. Ba mẫu hình dùng heap
+## 3. Cấu trúc & hàm Python thường dùng trong chủ đề này
 
-**(a) Top-K với heap kích thước K** — mẹo quan trọng nhất:
-> Muốn tìm **K phần tử lớn nhất**, hãy dùng **min-heap** kích thước K (và ngược lại).
+| Tên | Vai trò | Ví dụ dùng nhanh |
+|---|---|---|
+| \`heapq.heappush(h, x)\` | Thêm \`x\` vào heap \`h\`, tự sắp xếp lại nội bộ | O(log n) |
+| \`heapq.heappop(h)\` | Lấy và xoá phần tử nhỏ nhất trong \`h\` | O(log n) |
+| \`h[0]\` | Xem phần tử nhỏ nhất mà KHÔNG lấy nó ra | O(1) |
+| \`heapq.heapify(list)\` | Biến một list có sẵn thành heap tại chỗ, nhanh hơn push từng phần tử | O(n) |
+| \`heapq.heappushpop(h, x)\` | Đẩy \`x\` vào rồi lấy min ra ngay trong 1 bước, nhanh hơn gọi 2 hàm riêng | dùng trong vòng lặp Top-K |
+| \`heapq.nlargest(k, it)\` / \`nsmallest(k, it)\` | Lấy k phần tử lớn/nhỏ nhất từ một iterable có sẵn, không cần tự quản lý heap | \`heapq.nlargest(3, [5,1,8,2])\` |
+| \`heapq.merge(*lists)\` | Trộn nhiều list ĐÃ SẮP thành một iterator đã sắp, không cần tải hết vào bộ nhớ | \`list(heapq.merge([1,4],[2,3]))\` |
+| \`(uu_tien, du_lieu)\` (tuple) | Đẩy cặp (độ ưu tiên, dữ liệu) vào heap để heap so sánh theo \`uu_tien\` trước | \`heapq.heappush(h, (khoang_cach, node))\` |
 
-Vì sao? Giữ heap đúng K phần tử; mỗi phần tử mới so với **gốc** (phần tử nhỏ nhất trong nhóm K).
-Nếu lớn hơn thì thay thế. Chi phí O(n log k) và bộ nhớ chỉ O(k) — quan trọng khi n là luồng vô hạn.
-Python còn có sẵn \`heapq.nlargest(k, iterable)\` / \`heapq.nsmallest(k, iterable)\` cho trường hợp
-dữ liệu đã có sẵn trọn vẹn (không phải luồng).
+## 4. Ba mẫu hình dùng heap
 
-**(b) Trộn k danh sách đã sắp**: \`heapq.merge(*lists)\` làm sẵn việc này! Hoặc tự đẩy phần tử đầu
-của mỗi danh sách vào heap, liên tục lấy nhỏ nhất. O(N log k).
+**(a) Top-K với heap kích thước K** — mẹo quan trọng nhất của cả chủ đề, dễ nhầm nên cần nhớ kỹ:
+> Muốn tìm **K phần tử LỚN nhất**, hãy dùng **MIN-heap** kích thước K (nghe ngược nhưng đúng!),
+> và ngược lại — muốn K phần tử NHỎ nhất thì dùng MAX-heap kích thước K.
 
-**(c) Mô phỏng theo sự kiện / lập lịch**: heap theo thời gian, luôn xử lý sự kiện sớm nhất trước.
-Đây chính là cách Dijkstra và mọi bộ lập lịch hoạt động.
+Vì sao lại ngược như vậy? Ta giữ heap luôn đúng K phần tử — đại diện cho "K ứng viên tốt nhất tính
+tới lúc này". Mỗi phần tử mới tới, ta so nó với **phần tử nhỏ nhất đang có trong heap** (gốc của
+min-heap, đọc được ngay ở \`h[0]\`): nếu phần tử mới LỚN HƠN phần tử nhỏ nhất đó, nghĩa là nó xứng
+đáng lọt vào top-K hơn thành viên yếu nhất hiện tại → thay thế. Vì thế cần MIN-heap để luôn biết ai
+là "yếu nhất trong nhóm mạnh" mà không cần quét lại cả K phần tử.
 
-## 4. Bảng so sánh — chọn đúng công cụ
+\`\`\`python
+import heapq
+
+def k_phan_tu_lon_nhat(nums, k):
+    heap = nums[:k]              # lấy k phần tử đầu làm heap ban đầu
+    heapq.heapify(heap)           # O(k), biến thành min-heap
+    for x in nums[k:]:
+        if x > heap[0]:            # x lớn hơn phần tử NHỎ NHẤT đang có trong top-K
+            heapq.heapreplace(heap, x)   # pop phần tử nhỏ nhất ra rồi push x vào, gọn hơn 2 lệnh riêng
+    return heap                     # heap chứa đúng k phần tử lớn nhất (chưa theo thứ tự cụ thể)
+
+print(k_phan_tu_lon_nhat([3, 1, 5, 9, 2, 8], 3))   # chứa {5, 9, 8} theo một thứ tự nào đó trong heap
+\`\`\`
+
+Chi phí O(n log k) và bộ nhớ chỉ O(k) — quan trọng khi \`n\` là một luồng dữ liệu rất lớn hoặc vô hạn
+(ví dụ: log sự kiện đổ về liên tục), vì ta không bao giờ cần giữ toàn bộ \`n\` phần tử trong bộ nhớ.
+Với dữ liệu đã có sẵn trọn vẹn (không phải luồng), Python còn có sẵn \`heapq.nlargest(k, iterable)\` /
+\`heapq.nsmallest(k, iterable)\` để làm việc này gọn hơn, khỏi tự viết vòng lặp.
+
+**(b) Trộn k danh sách đã sắp**: \`heapq.merge(*lists)\` làm sẵn việc này, trả về một iterator đã sắp
+mà không cần tải hết dữ liệu vào bộ nhớ cùng lúc:
+
+\`\`\`python
+print(list(heapq.merge([1, 4, 7], [2, 3, 9], [0, 5])))   # [0, 1, 2, 3, 4, 5, 7, 9]
+\`\`\`
+
+Cơ chế bên trong: đẩy phần tử đầu của mỗi danh sách vào một heap, liên tục lấy phần tử nhỏ nhất ra,
+rồi đẩy tiếp phần tử kế của đúng danh sách vừa lấy — tổng chi phí O(N log k) với N là tổng số phần tử.
+
+**(c) Mô phỏng theo sự kiện / lập lịch**: heap sắp theo thời gian xảy ra, luôn xử lý sự kiện sớm
+nhất trước bằng cách đẩy tuple \`(thoi_gian, du_lieu)\` vào heap — Python so sánh tuple theo phần tử
+đầu tiên trước, nên heap tự động ưu tiên đúng thời gian nhỏ nhất. Đây chính là cách thuật toán
+Dijkstra và mọi bộ lập lịch sự kiện hoạt động.
+
+## 5. Bảng so sánh — chọn đúng công cụ
 
 | Nhu cầu | Công cụ | Chi phí |
 |---|---|---|
 | Sắp xếp toàn bộ một lần | \`sorted()\` | O(n log n) |
-| Lấy min/max liên tục khi dữ liệu thay đổi | **\`heapq\`** | O(log n)/thao tác |
-| Top-K của luồng dữ liệu lớn | **heap kích thước K** | O(n log k), bộ nhớ O(k) |
-| Top-K của mảng cố định | \`heapq.nlargest/nsmallest\` hoặc quickselect | O(n log k) hoặc O(n) |
+| Lấy min/max liên tục khi dữ liệu thay đổi | \`heapq\` | O(log n)/thao tác |
+| Top-K của luồng dữ liệu lớn | heap kích thước K | O(n log k), bộ nhớ O(k) |
+| Top-K của mảng cố định | \`heapq.nlargest\`/\`nsmallest\` hoặc quickselect | O(n log k) hoặc O(n) |
 | Cần cả min lẫn max lẫn tìm kiếm | \`sortedcontainers.SortedList\` (thư viện ngoài) | O(log n) |
 
 Lưu ý: \`heapq\` thao tác trên \`list\` thường (không phải class riêng) — \`h[0]\` luôn là phần tử nhỏ nhất
 hiện tại, đọc được trực tiếp trong O(1) mà không cần gọi hàm.
 
-## 5. Ứng dụng thực tế
+## 6. Ứng dụng thực tế
 
 - **Dijkstra & A\\*** (tìm đường đi ngắn nhất trong bản đồ, game) — heap là trái tim của thuật toán.
 - **Bộ lập lịch tiến trình** của hệ điều hành; \`sched\` module và các thư viện task queue của Python

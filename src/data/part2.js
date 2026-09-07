@@ -92,54 +92,100 @@ Vì sao O(n)? Mỗi chỉ số vào stack đúng 1 lần và ra đúng 1 lần. 
 ## 1. Vấn đề gốc
 
 Có một lớp bài toán mà **thứ tự xử lý phải ngược với thứ tự xuất hiện**: cái mở sau phải đóng trước.
-Ngoặc lồng nhau, thẻ HTML, lời gọi hàm, phép toán ưu tiên — tất cả đều có cấu trúc *lồng*.
-List thường không nắm bắt được cấu trúc này một cách tự nhiên; ngăn xếp thì có.
+Ví dụ dễ hình dung nhất: chuỗi ngoặc \`"([{}])"\`. Dấu \`{\` mở SAU CÙNG (gần giữa nhất) lại phải được
+đóng ĐẦU TIÊN bởi \`}\` ngay sau nó, rồi mới tới \`[\`, rồi mới tới \`(\`. Ngoặc lồng nhau, thẻ HTML
+(\`<div><span></span></div>\`), lời gọi hàm lồng nhau, biểu thức toán có ưu tiên — tất cả đều mang
+đúng cấu trúc "lồng vào nhau" này.
+
+Nếu chỉ dùng biến thường để nhớ "còn bao nhiêu ngoặc đang mở", bạn sẽ đếm được **số lượng** nhưng
+không biết được **loại** ngoặc nào đang chờ đóng ở vị trí nào — với \`"([)]"\` (sai vì lồng chéo nhau)
+đếm số lượng vẫn ra huề nhau, nhưng chuỗi này thực chất KHÔNG hợp lệ. Bạn cần nhớ *toàn bộ thứ tự*
+các ngoặc mở, không chỉ đếm số lượng — đó chính là việc một **ngăn xếp (stack)** làm.
 
 ## 2. Ý tưởng cốt lõi
 
-> Ngăn xếp = **trí nhớ về những việc còn dang dở**, theo thứ tự "việc mới nhất chưa xong thì xử lý trước".
+> Ngăn xếp = **trí nhớ về những việc còn dang dở**, theo thứ tự "việc mới nhất chưa xong thì xử lý
+> trước" (Last-In-First-Out, viết tắt LIFO).
 
-\`append\` (push) = "tôi bắt đầu một việc mới, việc cũ tạm gác lại".
-\`pop\` = "việc mới nhất đã xong, quay lại việc trước đó".
+\`append(x)\` (push) = "tôi vừa bắt đầu một việc mới (\`x\`), việc cũ tạm gác lại bên dưới".
+\`pop()\` = "việc mới nhất vừa xong, dỡ nó ra và quay lại đúng việc đang dang dở trước đó".
 
-Chính vì thế **đệ quy và ngăn xếp là một**: máy tính cài đặt đệ quy bằng call stack
-(và Python giới hạn độ sâu đệ quy mặc định ~1000 — \`sys.setrecursionlimit\` có thể nâng nhưng
-đổi lại là rủi ro tràn stack thật của trình thông dịch).
-Mọi thuật toán đệ quy đều viết lại được bằng vòng lặp + \`list\` làm stack (và ngược lại).
+Hình dung một chồng đĩa: bạn chỉ có thể đặt thêm đĩa lên **đỉnh** chồng, và cũng chỉ lấy được đĩa ở
+**đỉnh** ra trước — muốn lấy đĩa dưới đáy phải dỡ hết đĩa phía trên ra đã. \`list\` trong Python đóng
+vai chồng đĩa đó một cách tự nhiên: \`append\`/\`pop\` (không tham số) đều thao tác ở cuối list, và đều
+là O(1).
 
-## 3. Hai mẫu hình phải thuộc
+Chính vì cơ chế "việc mới nhất xử lý trước" này mà **đệ quy và ngăn xếp là một thứ**: máy tính cài đặt
+lời gọi hàm đệ quy bằng một ngăn xếp thật gọi là *call stack* — mỗi lần gọi hàm là một "đĩa" được đặt
+lên, hàm return là dỡ đĩa đó ra. Python giới hạn độ sâu đệ quy mặc định khoảng 1000 lời gọi lồng nhau
+(\`sys.setrecursionlimit\` có thể nâng, nhưng đổi lại là rủi ro tràn stack thật của trình thông dịch).
+Mọi thuật toán viết bằng đệ quy đều có thể viết lại bằng vòng lặp cộng với một \`list\` đóng vai stack
+tường minh, và ngược lại.
+
+## 3. Cấu trúc & hàm Python thường dùng trong chủ đề này
+
+| Tên | Vai trò | Ví dụ dùng nhanh |
+|---|---|---|
+| \`list\` (\`append\`/\`pop\`) | Cài đặt stack đơn giản nhất — thao tác ở CUỐI list, cả hai đều O(1) | \`st = []; st.append(x); y = st.pop()\` |
+| \`st[-1]\` | Xem đỉnh stack mà KHÔNG lấy nó ra (khác \`pop()\` sẽ xoá luôn) | \`if st and st[-1] == x: ...\` |
+| \`if not st:\` | Kiểm tra stack rỗng trước khi \`pop()\`, tránh \`IndexError\` | \`if not st or st[-1] != x: return False\` |
+| \`collections.deque\` | Hàng đợi hai đầu — dùng khi cần \`pop\`/thêm ở **đầu** hiệu quả O(1) (list không làm được việc này nhanh) | \`from collections import deque; dq = deque()\` |
+| \`str.isdigit()\` | Kiểm tra một ký tự/chuỗi có phải toàn chữ số — hay dùng khi parse biểu thức RPN | \`if token.lstrip('-').isdigit(): ...\` |
+| \`int(token)\` | Chuyển token chuỗi (ví dụ \`"42"\`) thành số nguyên để tính toán | \`num = int(token)\` |
+| \`str.split()\` | Tách chuỗi biểu thức thành danh sách token theo khoảng trắng | \`"2 1 + 3 *".split()\` → \`['2','1','+','3','*']\` |
+
+## 4. Hai mẫu hình phải thuộc
 
 **(a) Ghép cặp / kiểm tra tính hợp lệ lồng nhau**
+
 \`\`\`python
-st = []
-for c in s:
-    if is_open(c):
-        st.append(c)
-    else:
-        if not st or not matches(st.pop(), c):
-            return False
-return len(st) == 0   # đừng quên: còn thừa dấu mở là SAI
+def ngoac_hop_le(s):
+    cap_dong = {')': '(', ']': '[', '}': '{'}   # ngoặc đóng -> ngoặc mở tương ứng
+    st = []
+    for c in s:
+        if c in '([{':
+            st.append(c)                          # gặp ngoặc mở -> đẩy lên stack, "việc mới bắt đầu"
+        elif c in cap_dong:
+            if not st or st.pop() != cap_dong[c]:   # đỉnh stack phải KHỚP đúng loại ngoặc mở tương ứng
+                return False
+    return len(st) == 0    # đừng quên: còn dư ngoặc mở CHƯA đóng ("(((") thì vẫn là SAI
+
+print(ngoac_hop_le("([{}])"))   # True
+print(ngoac_hop_le("([)]"))     # False — lồng chéo nhau, "[" chưa kịp đóng thì ")" đã xuất hiện
+print(ngoac_hop_le("((("))      # False — thiếu ngoặc đóng, stack còn dư 3 phần tử ở cuối
 \`\`\`
 
 **(b) Ngăn xếp đơn điệu (monotonic stack) — kỹ thuật ăn điểm**
 
-Dùng khi đề hỏi: *"với mỗi phần tử, tìm phần tử **lớn hơn/nhỏ hơn** đầu tiên ở bên phải/trái"*.
+Dùng khi đề hỏi: *"với mỗi phần tử, tìm phần tử **lớn hơn/nhỏ hơn** đầu tiên ở bên phải/trái"* — ví dụ
+bài "còn bao nhiêu ngày nữa thì nhiệt độ ấm hơn hôm nay":
 
 \`\`\`python
-st = []                                # lưu CHỈ SỐ, giữ giá trị giảm dần
-for i in range(n):
-    while st and a[i] > a[st[-1]]:
-        j = st.pop()
-        res[j] = i - j                 # a[i] chính là "phần tử lớn hơn kế tiếp" của a[j]
-    st.append(i)
+def ngay_cho_nhiet_do_am_hon(nhiet_do):
+    n = len(nhiet_do)
+    res = [0] * n
+    st = []                                # lưu CHỈ SỐ (không lưu giá trị), giữ nhiệt độ giảm dần
+    for i in range(n):
+        while st and nhiet_do[i] > nhiet_do[st[-1]]:
+            j = st.pop()                     # j là một ngày đang "chờ" ngày ấm hơn
+            res[j] = i - j                    # hôm nay (i) CHÍNH LÀ ngày ấm hơn mà j đang chờ
+        st.append(i)
+    return res
+
+print(ngay_cho_nhiet_do_am_hon([73, 74, 75, 71, 69, 72, 76, 73]))
+# [1, 1, 4, 2, 1, 1, 0, 0]
 \`\`\`
 
-Bất biến: **các phần tử trong stack luôn giảm dần và đều là những phần tử "chưa tìm được đáp án"**.
-Khi gặp phần tử lớn hơn, nó giải quyết một loạt phần tử đang chờ.
+Bất biến cần nắm: **các chỉ số còn nằm trong stack luôn ứng với nhiệt độ giảm dần, và đều là những
+ngày "chưa tìm được câu trả lời"**. Khi gặp một ngày ấm hơn, nó lần lượt "giải quyết" cho một loạt
+ngày đang chờ trong stack, rồi chính nó lại được đẩy vào chờ ngày ấm hơn tiếp theo.
 
-Vì sao O(n)? Mỗi chỉ số vào stack đúng 1 lần và ra đúng 1 lần. Lại là phân tích khấu hao.
+Vì sao độ phức tạp là O(n) dù có vòng \`while\` lồng trong \`for\`? Vì mỗi chỉ số chỉ được \`append\`
+đúng 1 lần và \`pop\` **tối đa** 1 lần trong suốt chương trình — tổng số lần \`pop\` trên toàn bộ vòng
+lặp ngoài không thể vượt quá \`n\`. Đây gọi là **phân tích khấu hao (amortized analysis)**: từng bước
+riêng lẻ trông như có thể chạy lâu, nhưng cộng dồn lại trên toàn bộ vòng lặp chỉ là O(n).
 
-## 4. Nhận dạng
+## 5. Nhận dạng
 
 | Dấu hiệu trong đề | Kỹ thuật |
 |---|---|
@@ -147,19 +193,22 @@ Vì sao O(n)? Mỗi chỉ số vào stack đúng 1 lần và ra đúng 1 lần. 
 | "phần tử lớn hơn tiếp theo", "số ngày phải chờ" | monotonic stack |
 | "biểu thức hậu tố (RPN)", máy tính bỏ túi | stack toán hạng |
 | "hoàn tác (undo)", "quay lại trang trước" | stack lịch sử |
-| Cần \`getMin()\` trong O(1) | stack phụ chứa min |
+| Cần \`get_min()\` trong O(1) | stack phụ chứa min |
 | Duyệt cây/đồ thị không đệ quy | stack (list) thay call stack |
 
-## 5. Bẫy thường gặp
+## 6. Bẫy thường gặp
 
 - Quên kiểm tra stack rỗng trước khi \`pop()\` → \`IndexError: pop from empty list\`.
-- Quên kiểm tra stack rỗng **ở cuối** trong bài ngoặc: \`"((("\` phải trả về False.
-- Trong monotonic stack: lưu **chỉ số** chứ đừng lưu giá trị, vì bạn thường cần khoảng cách \`i - j\`.
-- Nhầm \`>\` với \`>=\` khi có phần tử bằng nhau — quyết định này thay đổi kết quả bài toán.
-- \`list.pop()\` (không tham số) là O(1) — xoá ở **cuối**. \`list.pop(0)\` là O(n) vì phải dịch chuyển
-  cả list. Nếu cần xoá ở đầu hiệu quả, dùng \`collections.deque\`, không dùng \`list\`.
+- Quên kiểm tra stack rỗng **ở cuối** trong bài ngoặc: \`"((("\` phải trả về \`False\` vì còn dư ngoặc mở.
+- Trong monotonic stack: lưu **chỉ số** chứ đừng lưu giá trị, vì bạn thường cần khoảng cách \`i - j\`
+  giữa hai vị trí, không chỉ giá trị tại đó.
+- Nhầm \`>\` với \`>=\` khi có phần tử bằng nhau — quyết định này thay đổi kết quả bài toán (ví dụ:
+  hai ngày cùng nhiệt độ có tính là "ấm hơn" nhau không?).
+- \`list.pop()\` (không tham số) là O(1) — xoá ở **cuối**. \`list.pop(0)\` là O(n) vì Python phải dịch
+  chuyển toàn bộ phần tử còn lại lên một vị trí. Nếu cần xoá/thêm hiệu quả ở **đầu**, dùng
+  \`collections.deque\` (cả hai đầu đều O(1)), đừng dùng \`list\`.
 
-## 6. Ứng dụng thực tế
+## 7. Ứng dụng thực tế
 
 - **Trình biên dịch/parser**: kiểm tra cân bằng ngoặc, phân tích cú pháp đệ quy xuống — bản thân
   trình thông dịch Python cũng làm việc này khi parse code của bạn.
@@ -795,83 +844,148 @@ Ba bước luôn giống nhau:
   lessonPy: `
 ## 1. Vấn đề gốc
 
-Tìm một giá trị trong n phần tử cần O(n). Nhưng nếu dữ liệu có **thứ tự**, mỗi phép so sánh
-cho ta biết đáp án nằm ở **nửa nào** — thông tin đó đáng giá gấp bội.
+Tìm một giá trị trong \`n\` phần tử bằng cách quét lần lượt từng phần tử (\`for x in a: if x == target...\`)
+cần O(n) — với 1 triệu phần tử là 1 triệu phép so sánh trong trường hợp xấu nhất. Nhưng nếu dữ liệu
+có **thứ tự** (đã sắp xếp), mỗi phép so sánh không chỉ loại được MỘT phần tử — nó cho ta biết đáp án
+nằm ở **nửa nào** trong hai nửa còn lại, loại bỏ được cả nửa còn lại cùng lúc.
 
-log₂(1.000.000) ≈ 20. Từ một triệu bước xuống 20 bước.
+\`\`\`python
+def tim_kiem_tuyen_tinh(a, target):     # O(n) — quét từng phần tử
+    for i, x in enumerate(a):
+        if x == target:
+            return i
+    return -1
+\`\`\`
+
+Vì mỗi lần so sánh loại được một nửa, sau \`k\` lần so sánh chỉ còn \`n / 2^k\` phần tử để xét. Số lần
+so sánh cần thiết để đưa \`n\` phần tử về còn 1 phần tử là \`k = log₂(n)\`. Với \`n = 1.000.000\`,
+\`log₂(1.000.000) ≈ 20\` — từ một triệu bước quét tuần tự xuống chỉ còn 20 bước so sánh.
 
 ## 2. Ý tưởng cốt lõi
 
-> Tìm kiếm nhị phân **không phải** về "list đã sắp xếp".
-> Nó là về **tính đơn điệu của một vị từ (predicate)**: tồn tại một điểm cắt mà trước đó
-> điều kiện luôn sai, sau đó luôn đúng — dạng \`F F F F T T T T\`.
+> Tìm kiếm nhị phân **không phải** chỉ là "tìm trong list đã sắp xếp".
+> Bản chất của nó là tính **đơn điệu của một vị từ (predicate)** — một hàm \`check(x)\` trả về
+> \`True\`/\`False\` — sao cho tồn tại một điểm cắt: trước điểm đó \`check\` luôn \`False\`, từ điểm đó
+> trở đi luôn \`True\`. Viết ra thành dãy sẽ có dạng \`F F F F T T T T\`, không bao giờ xen kẽ lộn xộn.
 
-Nếu bạn tìm được một hàm \`check(x)\` có dạng đó, bạn tìm nhị phân được — kể cả khi
-"mảng" là **tập mọi đáp án có thể**. Đó là kỹ thuật **binary search on answer**, thứ phân biệt
-người mới với người có kinh nghiệm.
+Nếu bạn tìm được một hàm \`check(x)\` có đúng tính chất đơn điệu đó, bạn tìm nhị phân được — **kể cả
+khi "mảng" không phải là một danh sách số liệu có sẵn, mà là tập mọi đáp án khả dĩ** (ví dụ: mọi tốc
+độ ăn có thể có, từ 1 tới giá trị lớn nhất). Kỹ thuật tổng quát hoá này gọi là **binary search on
+answer**, và nó là thứ phân biệt rõ nhất người mới học với người đã có kinh nghiệm giải thuật toán.
 
-## 3. Mẫu code chống lỗi off-by-one
+## 3. Cấu trúc & hàm Python thường dùng trong chủ đề này
 
-Hãy dùng **một khuôn duy nhất** cho mọi bài (nửa mở \`[lo, hi)\`), đừng nhớ nhiều biến thể:
+| Tên | Vai trò | Ví dụ dùng nhanh |
+|---|---|---|
+| \`lo + (hi - lo) // 2\` | Tính điểm giữa an toàn, tránh cộng hai số lớn tràn phạm vi (thói quen tốt dù Python không tràn số) | thay cho \`(lo + hi) // 2\` |
+| \`//\` (floor division) | Luôn dùng để tính \`mid\` — chia \`/\` trả về \`float\`, không dùng làm chỉ số được | \`mid = (lo + hi) // 2\` |
+| \`bisect.bisect_left(a, x)\` | Tìm vị trí chèn \`x\` vào list \`a\` đã sắp để giữ thứ tự, ở BÊN TRÁI các phần tử bằng \`x\` | \`from bisect import bisect_left\` |
+| \`bisect.bisect_right(a, x)\` | Tương tự nhưng chèn ở BÊN PHẢI các phần tử bằng \`x\` | dùng khi cần đếm số phần tử \`<= x\` |
+| \`math.ceil(a / b)\` | Làm tròn LÊN — hay dùng trong \`check(x)\` của binary search on answer (ví dụ: "cần bao nhiêu giờ") | \`math.ceil(pile / speed)\` |
+| \`float('inf')\` | Giá trị vô cùng — dùng làm cận trên/dưới ban đầu khi chưa biết giới hạn cụ thể | \`hi = float('inf')\` |
+
+## 4. Mẫu code chống lỗi off-by-one
+
+Hãy dùng **một khuôn duy nhất** cho mọi bài (nửa mở \`[lo, hi)\`), đừng cố nhớ nhiều biến thể khác nhau:
 
 \`\`\`python
 # Tìm chỉ số NHỎ NHẤT thoả check(x) là True, với check có dạng F...F T...T
-lo, hi = 0, n                    # hi nằm NGOÀI phạm vi
-while lo < hi:
-    mid = lo + (hi - lo) // 2     # // là floor division, không tràn số trong Python
-    if check(mid):
-        hi = mid                 # mid có thể là đáp án -> giữ lại
-    else:
-        lo = mid + 1              # mid chắc chắn không phải -> bỏ
-return lo                          # lo == hi == điểm chuyển F->T
+def tim_bien_chuyen(check, n):
+    lo, hi = 0, n                    # hi nằm NGOÀI phạm vi hợp lệ, quy ước "nửa mở"
+    while lo < hi:
+        mid = lo + (hi - lo) // 2     # // là floor division, không tràn số trong Python
+        if check(mid):
+            hi = mid                 # mid THOẢ điều kiện -> có thể là đáp án -> giữ lại, thu hẹp bên phải
+        else:
+            lo = mid + 1              # mid chắc chắn KHÔNG THOẢ -> loại hẳn, thu hẹp bên trái
+    return lo                          # khi vòng lặp dừng, lo == hi == đúng điểm chuyển từ F sang T
+
+# Ví dụ: a = [1, 3, 3, 3, 5, 7], tìm vị trí đầu tiên có giá trị >= 3
+a = [1, 3, 3, 3, 5, 7]
+print(tim_bien_chuyen(lambda i: a[i] >= 3, len(a)))   # 1 — a[1] là phần tử đầu tiên >= 3
 \`\`\`
 
-Với bài tìm giá trị chính xác:
+Với bài tìm giá trị chính xác trong list đã sắp (khuôn "đóng" \`[lo, hi]\`, kinh điển hơn):
+
 \`\`\`python
-lo, hi = 0, n - 1
-while lo <= hi:
-    mid = lo + (hi - lo) // 2
-    if a[mid] == target:
-        return mid
-    if a[mid] < target:
-        lo = mid + 1
-    else:
-        hi = mid - 1
-return -1
+def tim_kiem_nhi_phan(a, target):
+    lo, hi = 0, len(a) - 1
+    while lo <= hi:
+        mid = lo + (hi - lo) // 2
+        if a[mid] == target:
+            return mid
+        if a[mid] < target:
+            lo = mid + 1              # target lớn hơn a[mid] -> bỏ nửa trái, kể cả mid
+        else:
+            hi = mid - 1               # target nhỏ hơn a[mid] -> bỏ nửa phải, kể cả mid
+    return -1
+
+print(tim_kiem_nhi_phan([1, 3, 5, 7, 9, 11], 7))   # 3
+print(tim_kiem_nhi_phan([1, 3, 5, 7, 9, 11], 4))   # -1 — không tồn tại
 \`\`\`
 
-Python cũng có \`bisect_left\`/\`bisect_right\` trong module \`bisect\` — hữu ích để tra cứu nhanh
-trên list đã sắp, nhưng trong phỏng vấn bạn vẫn nên biết tự viết vòng lặp này từ trí nhớ.
+Python cũng có sẵn \`bisect_left\`/\`bisect_right\` trong module \`bisect\` để tra cứu nhanh trên list đã
+sắp mà không cần tự viết vòng lặp, nhưng trong phỏng vấn bạn vẫn nên biết tự viết khuôn này từ trí nhớ
+— vì phần lớn bài không phải "tìm chính xác một giá trị", mà là biến thể của "tìm điểm chuyển F→T".
 
-## 4. Binary search on answer — mở khoá cả một lớp bài
+## 5. Binary search on answer — mở khoá cả một lớp bài
 
-Dấu hiệu: đề hỏi **"giá trị nhỏ nhất/lớn nhất sao cho ... khả thi"**, và bạn kiểm tra được tính khả thi dễ dàng.
+Dấu hiệu nhận ra dạng bài này: đề hỏi **"giá trị nhỏ nhất/lớn nhất sao cho ... là khả thi"**, và bạn
+có thể kiểm tra tính khả thi của MỘT giá trị cụ thể một cách dễ dàng (thường bằng một vòng lặp O(n)).
 
-Ví dụ *Koko ăn chuối*: "tốc độ ăn nhỏ nhất k để ăn xong trong h giờ".
-- Không gian đáp án: k ∈ [1, max(piles)].
-- \`check(k)\` = "ăn với tốc độ k có kịp trong h giờ không?" — tính trong O(n) (dùng \`math.ceil\`).
-- **Đơn điệu**: k càng lớn thì càng dễ kịp → F F F T T T. ✔ Tìm nhị phân được.
+Ví dụ kinh điển — *Koko ăn chuối*: "tìm tốc độ ăn nhỏ nhất k để ăn hết mọi đống chuối trong h giờ".
 
-Ba bước luôn giống nhau:
-1. Xác định **khoảng đáp án** [lo, hi].
-2. Viết hàm \`check(x)\` (thường là mô phỏng tham lam O(n)).
-3. Chứng minh \`check\` **đơn điệu** — nếu không đơn điệu thì không được dùng!
+- **Không gian đáp án**: \`k\` có thể là bất kỳ số nguyên nào từ \`1\` đến \`max(piles)\` — đây chính là
+  "mảng" để tìm nhị phân, dù nó không phải dữ liệu đề bài cho sẵn mà là *tập giá trị k khả dĩ*.
+- \`check(k)\` = "nếu ăn với tốc độ \`k\`, có kịp trong \`h\` giờ không?" — tính được trong O(n) bằng cách
+  cộng dồn \`math.ceil(pile / k)\` cho từng đống chuối.
+- **Tính đơn điệu**: \`k\` càng lớn thì càng dễ ăn kịp giờ hơn → dãy kết quả của \`check\` có dạng
+  \`F F F T T T\` (k nhỏ thì không kịp, k đủ lớn thì kịp). Có tính đơn điệu → tìm nhị phân được.
 
-## 5. Bẫy thường gặp
+\`\`\`python
+import math
 
-- Python số nguyên không tràn (không như số 32-bit ở Java/C++), nhưng vẫn nên viết
-  \`lo + (hi-lo)//2\` thay vì \`(lo+hi)//2\` như một thói quen tốt cho phỏng vấn đa ngôn ngữ.
-- Vòng lặp vô hạn khi \`lo = mid\` mà mid không tiến. Quy tắc: nếu gán \`lo = mid\` thì phải làm tròn lên.
-- \`//\` là floor division — với số âm nó làm tròn về âm vô cực chứ không phải về 0
-  (khác với việc bạn quen \`Math.trunc\` ở JS). Cẩn thận nếu công thức tính \`mid\`/\`check\` liên quan số âm.
-- Quên rằng list xoay vòng vẫn dùng được binary search: **luôn có ít nhất một nửa đã sắp xếp**.
-- Áp binary search lên hàm không đơn điệu → kết quả sai một cách khó phát hiện.
+def toc_do_an_nho_nhat(piles, h):
+    def kip_gio(k):
+        return sum(math.ceil(pile / k) for pile in piles) <= h
 
-## 6. Ứng dụng thực tế
+    lo, hi = 1, max(piles)
+    while lo < hi:
+        mid = lo + (hi - lo) // 2
+        if kip_gio(mid):
+            hi = mid           # tốc độ mid đã đủ nhanh -> thử tốc độ chậm hơn nữa xem có được không
+        else:
+            lo = mid + 1        # tốc độ mid chưa đủ nhanh -> cần nhanh hơn
+    return lo
+\`\`\`
 
-- **Chỉ mục B-tree** trong database: mỗi lần truy vấn theo khoá là tìm nhị phân trên đĩa.
-- **git bisect**: tìm commit gây lỗi trong lịch sử — tìm nhị phân trên trục thời gian!
-- **Điều chỉnh tham số hệ thống**: tìm mức tải tối đa mà độ trễ vẫn dưới ngưỡng (đúng mẫu "search on answer").
+Ba bước luôn giống nhau khi gặp dạng bài này:
+1. Xác định **khoảng đáp án** \`[lo, hi]\` — giá trị nhỏ nhất và lớn nhất có thể của đáp án.
+2. Viết hàm \`check(x)\` (thường là mô phỏng tham lam, chạy O(n) hoặc O(n log n)).
+3. **Chứng minh \`check\` đơn điệu** trước khi áp dụng — nếu không đơn điệu (không có dạng F...FT...T
+   sạch sẽ) thì binary search sẽ cho kết quả sai mà không hề báo lỗi.
+
+## 6. Bẫy thường gặp
+
+- Python số nguyên không tràn (không như số 32-bit cố định ở Java/C++), nhưng vẫn nên viết
+  \`lo + (hi - lo) // 2\` thay vì \`(lo + hi) // 2\` như một thói quen tốt, áp dụng được cả khi chuyển
+  ngôn ngữ khác lúc phỏng vấn.
+- Vòng lặp vô hạn khi gán \`lo = mid\` mà \`mid\` không tiến lên (vì \`//\` làm tròn xuống, \`mid\` có thể
+  bằng \`lo\`). Quy tắc nhớ: nếu nhánh nào gán \`lo = mid\` (giữ lại \`mid\`), nhánh \`mid\` phải được tính
+  làm tròn LÊN (\`mid = lo + (hi - lo + 1) // 2\`) để đảm bảo luôn tiến.
+- \`//\` là floor division — với số âm nó làm tròn về **âm vô cực**, khác với thói quen \`Math.trunc\`
+  cắt về 0 ở nhiều ngôn ngữ khác. Cẩn thận nếu \`mid\`/\`check\` có liên quan tới số âm.
+- Quên rằng mảng đã bị xoay (rotated) vẫn dùng được binary search: **luôn tồn tại ít nhất một nửa
+  (trái hoặc phải của \`mid\`) vẫn còn được sắp xếp bình thường**, chỉ cần xác định đúng nửa nào.
+- Áp binary search lên một hàm KHÔNG đơn điệu → kết quả sai một cách âm thầm, không có exception nào
+  báo hiệu — đây là lỗi khó phát hiện nhất trong cả chủ đề này.
+
+## 7. Ứng dụng thực tế
+
+- **Chỉ mục B-tree** trong database: mỗi lần truy vấn theo khoá là một lượt tìm nhị phân trên đĩa.
+- **git bisect**: tìm commit gây lỗi trong lịch sử — tìm nhị phân trên trục thời gian của các commit!
+- **Điều chỉnh tham số hệ thống**: tìm mức tải tối đa mà độ trễ vẫn dưới ngưỡng cho phép (đúng mẫu
+  "binary search on answer").
 - **Tìm phiên bản lỗi đầu tiên** trong CI; **rate limit tuning**; **tìm ngưỡng nhị phân** trong xử lý ảnh.
 `,
   quiz: [
@@ -1456,77 +1570,129 @@ Mỗi bước, khoảng cách giữa chúng trong vòng giảm đúng 1 → ch�
   lessonPy: `
 ## 1. Vấn đề gốc
 
-List (array) có nhược điểm chí mạng: **chèn/xoá ở giữa tốn O(n)** vì phải dịch chuyển toàn bộ phần đuôi.
-Danh sách liên kết đổi lại: chèn/xoá tại một nút đã biết chỉ tốn **O(1)** — chỉ cần đổi vài con trỏ \`.next\`.
-Cái giá phải trả: mất truy cập ngẫu nhiên (muốn tới phần tử thứ k phải đi từ đầu).
+\`list\` (mảng động) của Python có một nhược điểm chí mạng khi cần **chèn/xoá ở giữa**: vì các phần
+tử nằm liên tiếp nhau trong bộ nhớ, chèn một phần tử vào giữa buộc Python phải **dịch chuyển toàn bộ
+phần đuôi** sang phải một ô để nhường chỗ — tốn O(n). Thử hình dung một hàng người xếp ghế liền nhau:
+muốn chen thêm một người vào giữa hàng, mọi người phía sau phải đứng dậy, dịch sang một ghế.
 
-| | List (array) | Linked List |
+\`\`\`python
+a = [1, 2, 4, 5]
+a.insert(2, 3)     # chèn giá trị 3 vào chỉ số 2 -> [1, 2, 3, 4, 5]
+# Python phải dịch chuyển 4 và 5 sang phải một ô để có chỗ trống cho 3 — đây là chi phí O(n) ẩn
+# đằng sau một lệnh trông rất đơn giản.
+\`\`\`
+
+**Danh sách liên kết (linked list)** giải quyết đúng vấn đề này bằng cách từ bỏ tính liên tục: mỗi
+phần tử ("nút") nằm ở một vị trí bộ nhớ bất kỳ, và chỉ giữ một **con trỏ** trỏ tới nút tiếp theo. Chèn
+một nút mới chỉ cần đổi vài con trỏ \`.next\` — không phải dịch chuyển bất cứ ai — nên chỉ tốn **O(1)**
+nếu bạn đã có sẵn tham chiếu tới vị trí cần chèn. Cái giá phải trả: mất khả năng "nhảy thẳng" tới
+phần tử thứ k — muốn tới đó phải đi bộ từ đầu, ghé qua từng nút một, tốn O(k).
+
+| | list (array) | Linked List |
 |---|---|---|
 | Truy cập phần tử thứ k | O(1) | O(k) |
-| Chèn/xoá tại vị trí đã biết | O(n) | **O(1)** |
-| Bộ nhớ | liên tục, cache-friendly | rời rạc, mỗi nút tốn thêm con trỏ |
+| Chèn/xoá tại vị trí ĐÃ CÓ con trỏ tới | O(n) | **O(1)** |
+| Bộ nhớ | liên tục, cache-friendly | rời rạc, mỗi nút tốn thêm bộ nhớ cho con trỏ |
 
 ## 2. Ý tưởng cốt lõi
 
-> Làm việc với linked list = **duy trì bất biến trên vài con trỏ**.
-> Luôn vẽ sơ đồ trước khi viết code. Người giỏi nhất cũng vẽ.
+> Làm việc với linked list = **duy trì đúng bất biến trên một vài con trỏ**, từng bước một.
+> Luôn vẽ sơ đồ mũi tên ra giấy trước khi viết code — người giải giỏi nhất cũng vẽ, đây không phải
+> việc "dành cho người mới".
 
-Trong Python, một nút thường là một class đơn giản:
+Trong Python, một nút thường là một class rất đơn giản, chỉ giữ giá trị và con trỏ tới nút kế:
+
 \`\`\`python
 class ListNode:
     def __init__(self, val=0, next=None):
-        self.val = val
-        self.next = next
+        self.val = val    # dữ liệu của nút
+        self.next = next   # con trỏ tới nút TIẾP THEO, hoặc None nếu đây là nút cuối
 \`\`\`
-(Trong bài tập, lớp \`ListNode\` đã có sẵn — không cần tự định nghĩa lại.)
+(Trong bài tập, lớp \`ListNode\` đã có sẵn — không cần tự định nghĩa lại, chỉ cần biết nó có hai
+thuộc tính \`.val\` và \`.next\`.)
 
-Ba kỹ thuật giải quyết ~90% bài:
+## 3. Cấu trúc & hàm Python thường dùng trong chủ đề này
 
-**(a) Nút giả (dummy node)** — xoá bỏ mọi trường hợp đặc biệt ở đầu danh sách:
+| Tên | Vai trò | Ví dụ dùng nhanh |
+|---|---|---|
+| \`node.val\` / \`node.next\` | Đọc giá trị / con trỏ kế tiếp của một nút | \`print(node.val); node = node.next\` |
+| \`ListNode(v, n)\` | Tạo một nút mới với giá trị \`v\` và con trỏ kế \`n\` | \`dummy = ListNode(0, head)\` |
+| \`x is None\` / \`x is not None\` | Kiểm tra con trỏ có trỏ tới "không có gì" hay không — dùng liên tục để tránh truy cập lỗi | \`while node is not None: ...\` |
+| \`a, b = b, a\` | Gán song song — hữu ích khi cần đổi nhiều con trỏ "cùng lúc" mà không ghi đè nhầm | dùng cẩn trọng, xem bẫy ở mục 6 |
+| \`slow, fast = head, head\` | Khởi tạo hai con trỏ cùng xuất phát từ một điểm trong một dòng | mở đầu kỹ thuật rùa & thỏ |
+| \`node1 is node2\` | So sánh **định danh** — kiểm tra hai biến có trỏ tới CÙNG một nút vật lý hay không (khác \`==\`) | \`if slow is fast: co_chu_trinh = True\` |
+
+## 4. Ba kỹ thuật giải quyết phần lớn bài trong chủ đề này
+
+**(a) Nút giả (dummy node)** — xoá bỏ mọi trường hợp đặc biệt khi thao tác xảy ra ngay tại đầu danh
+sách (ví dụ: xoá nút đầu tiên nghĩa là phải đổi luôn biến \`head\`, dễ quên xử lý riêng):
+
 \`\`\`python
-dummy = ListNode(0, head)
-# ...thao tác...
-return dummy.next      # không cần if head is None rải rác
+def xoa_gia_tri(head, val):
+    dummy = ListNode(0, head)   # dummy đứng TRƯỚC head thật, dummy.next luôn trỏ đúng "đầu hiện tại"
+    cur = dummy
+    while cur.next:
+        if cur.next.val == val:
+            cur.next = cur.next.next   # nhảy qua nút cần xoá — kể cả khi đó là head ban đầu
+        else:
+            cur = cur.next
+    return dummy.next    # không cần viết riêng nhánh "nếu head bị xoá thì..."
 \`\`\`
 
-**(b) Hai con trỏ nhanh/chậm** — tìm giữa, phát hiện chu trình, lấy nút thứ k từ cuối:
+**(b) Hai con trỏ nhanh/chậm** — tìm nút giữa, phát hiện chu trình, lấy nút thứ k từ cuối:
+
 \`\`\`python
-slow = fast = head
-while fast and fast.next:
-    slow = slow.next
-    fast = fast.next.next
-# slow đang ở giữa danh sách
+def tim_nut_giua(head):
+    slow = fast = head          # cả hai cùng bắt đầu ở head
+    while fast and fast.next:    # fast còn ĐỦ CHỖ để đi 2 bước
+        slow = slow.next          # slow đi 1 bước
+        fast = fast.next.next      # fast đi 2 bước -> khi fast tới cuối, slow mới đi được nửa đường
+    return slow                    # slow đang đứng đúng ở giữa danh sách
 \`\`\`
 
-**(c) Đảo con trỏ** — mẫu ba biến kinh điển:
+**(c) Đảo con trỏ** — mẫu ba biến kinh điển, xuất hiện trong rất nhiều bài biến đổi danh sách:
+
 \`\`\`python
-prev, cur = None, head
-while cur:
-    nxt = cur.next     # 1. NHỚ trước khi phá
-    cur.next = prev    # 2. đảo mũi tên
-    prev = cur         # 3. tiến prev
-    cur = nxt          # 4. tiến cur
-return prev             # prev là đầu mới
+def dao_nguoc(head):
+    prev, cur = None, head
+    while cur:
+        nxt = cur.next     # BƯỚC 1 — bắt buộc: nhớ nút tiếp theo TRƯỚC KHI phá mũi tên của cur
+        cur.next = prev    # BƯỚC 2 — đảo mũi tên: cur giờ trỏ NGƯỢC về nút trước nó
+        prev = cur         # BƯỚC 3 — tiến prev lên, chuẩn bị cho vòng lặp kế
+        cur = nxt           # BƯỚC 4 — tiến cur lên (dùng giá trị đã lưu ở bước 1, không bị mất)
+    return prev              # khi cur == None, prev đang đứng ở nút CUỐI CÙNG của danh sách gốc — đó là đầu mới
 \`\`\`
 
-## 3. Vì sao rùa & thỏ phát hiện được chu trình?
+Chạy tay với \`1 -> 2 -> 3 -> None\`: vòng 1 biến \`1 -> None\` (prev=1, cur=2); vòng 2 biến
+\`2 -> 1\` (prev=2, cur=3); vòng 3 biến \`3 -> 2\` (prev=3, cur=None) — kết quả \`3 -> 2 -> 1 -> None\`,
+trả về \`prev = 3\` làm đầu danh sách mới.
 
-Nếu có vòng lặp, con trỏ nhanh (2 bước) sẽ vào vòng và **đuổi kịp** con chậm (1 bước).
-Mỗi bước, khoảng cách giữa chúng trong vòng giảm đúng 1 → chắc chắn gặp nhau sau tối đa
-(độ dài vòng) bước. Nếu không có vòng, con nhanh chạm \`None\` trước. Đây là thuật toán
-**Floyd cycle detection** — O(n) thời gian, **O(1) bộ nhớ**, đẹp hơn hẳn cách dùng \`set\` O(n) bộ nhớ.
+## 5. Vì sao rùa & thỏ phát hiện được chu trình?
 
-## 4. Bẫy thường gặp
+Nếu danh sách có vòng lặp, con trỏ nhanh (đi 2 bước mỗi lượt) sẽ đi vào vòng và dần dần **đuổi kịp**
+con trỏ chậm (đi 1 bước mỗi lượt) — vì mỗi lượt, khoảng cách giữa chúng bên trong vòng giảm đúng 1.
+Do đó chúng chắc chắn gặp nhau sau tối đa (độ dài của vòng) bước. Nếu danh sách KHÔNG có vòng, con
+trỏ nhanh sẽ chạm tới \`None\` trước khi kịp gặp con chậm. Đây chính là thuật toán **Floyd cycle
+detection** — chạy trong O(n) thời gian và chỉ tốn **O(1) bộ nhớ**, đẹp hơn hẳn cách thay thế là dùng
+một \`set\` để ghi nhớ "đã ghé qua nút nào chưa" (cách đó đúng nhưng tốn O(n) bộ nhớ).
 
-- **Mất con trỏ**: gán \`cur.next = prev\` trước khi lưu \`nxt\` → mất phần đuôi vĩnh viễn.
-- **Truy cập None**: luôn kiểm tra \`fast and fast.next\` trước khi \`fast.next.next\`.
-- **Quên cập nhật head** khi xoá nút đầu → dùng dummy node là hết lo.
-- **Tạo vòng lặp vô tình** khi nối sai thứ tự → chương trình treo (và trong Pyodide sẽ bị timeout).
-- **So sánh bằng \`is\` chứ không \`==\`** khi kiểm tra hai nút có phải cùng một đối tượng
-  (ví dụ phát hiện chu trình: \`slow is fast\`, không phải \`slow == fast\` — vì \`ListNode\` không định nghĩa \`__eq__\`
-  nên \`==\` mặc định cũng hoạt động như \`is\`, nhưng dùng \`is\` cho rõ ý định).
+## 6. Bẫy thường gặp
 
-## 5. Ứng dụng thực tế
+- **Mất con trỏ**: gán \`cur.next = prev\` TRƯỚC khi lưu \`nxt = cur.next\` → phần đuôi phía sau \`cur\`
+  bị mất vĩnh viễn, không còn cách nào lấy lại (không giống \`list\` nơi dữ liệu vẫn còn trong bộ nhớ).
+- **Truy cập thuộc tính trên \`None\`**: luôn kiểm tra \`fast and fast.next\` (theo đúng thứ tự này,
+  nhờ short-circuit của \`and\`) trước khi viết \`fast.next.next\` — viết ngược thứ tự hoặc bỏ qua kiểm
+  tra sẽ gây \`AttributeError: 'NoneType' object has no attribute 'next'\`.
+- **Quên cập nhật \`head\`** khi xoá đúng nút đầu tiên → dùng dummy node (mục 4a) để không phải nhớ xử
+  lý riêng trường hợp này.
+- **Tạo vòng lặp vô tình** khi nối con trỏ sai thứ tự → chương trình chạy mãi không dừng (và khi chấm
+  bằng Pyodide trong trình duyệt sẽ bị timeout, không có traceback rõ ràng để debug).
+- **So sánh bằng \`is\` chứ không \`==\`** khi kiểm tra hai biến có đang trỏ tới cùng một nút vật lý hay
+  không (ví dụ phát hiện chu trình: \`slow is fast\`, không phải \`slow == fast\` — dù \`ListNode\` mặc
+  định không tự định nghĩa \`__eq__\` nên \`==\` ở đây tình cờ cũng hoạt động giống \`is\`, dùng \`is\` vẫn
+  rõ ý định hơn và an toàn hơn nếu sau này lớp \`ListNode\` được định nghĩa lại \`__eq__\`).
+
+## 7. Ứng dụng thực tế
 
 - **LRU Cache** = dict (hash map) + doubly linked list (bài phỏng vấn hệ thống kinh điển,
   cũng chính là cách \`functools.lru_cache\` của Python được cài đặt bên trong CPython).
