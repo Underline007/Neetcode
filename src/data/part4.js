@@ -156,9 +156,9 @@ chỉ sao chép tham chiếu chứ không sao chép dữ liệu.
 | \`itertools.combinations(it, r)\` | Sinh sẵn mọi tổ hợp chọn \`r\` phần tử — khỏi tự viết backtracking nếu chỉ cần liệt kê | \`list(combinations([1,2,3], 2))\` |
 | \`itertools.permutations(it)\` | Sinh sẵn mọi hoán vị của một dãy | \`list(permutations([1,2,3]))\` |
 | \`itertools.product(*iterables)\` | Sinh sẵn tích Đề-các — mọi tổ hợp chọn một phần tử từ mỗi danh sách | \`list(product([0,1],[0,1]))\` |
-| \`set()\` / \`list \`used\`\`\` | Đánh dấu phần tử đã được dùng trong nhánh hiện tại — cần cho bài hoán vị | \`used = [False] * n\` |
+| \`set()\` hoặc list \`used\` | Đánh dấu phần tử đã được dùng trong nhánh hiện tại — cần cho bài hoán vị | \`used = [False] * n\` |
 
-## 5. Ba biến thể — khác nhau ở tham số \`start\`
+## 4. Ba biến thể — khác nhau ở tham số \`start\`
 
 | Bài | Vòng lặp bắt đầu từ | Ý nghĩa |
 |---|---|---|
@@ -208,7 +208,7 @@ print(sinh_hoan_vi([1, 2, 3]))
 # [[1,2,3], [1,3,2], [2,1,3], [2,3,1], [3,1,2], [3,2,1]]
 \`\`\`
 
-## 6. Cắt tỉa — thứ biến "bất khả thi" thành "chạy được"
+## 5. Cắt tỉa — thứ biến "bất khả thi" thành "chạy được"
 
 Số lời giải có thể lên tới \`2ⁿ\` (tập con) hoặc \`n!\` (hoán vị) — với \`n = 20\`, \`2²⁰\` đã hơn 1 triệu và
 \`20!\` là một con số khổng lồ. Cắt tỉa sớm (bỏ qua nhánh chắc chắn không dẫn tới lời giải hợp lệ) là
@@ -232,7 +232,7 @@ Lưu ý riêng của Python: đệ quy quá sâu (ví dụ \`n\` rất lớn) c�
 \`sys.getrecursionlimit()\` (khoảng 1000). Với backtracking, độ sâu đệ quy thường bằng \`n\` (số phần tử
 đã chọn tính tới hiện tại), nên hiếm khi là vấn đề thực sự trừ khi \`n\` rất lớn.
 
-## 7. Bẫy thường gặp
+## 6. Bẫy thường gặp
 
 - Quên \`state.pop()\` → trạng thái "rò rỉ" sang nhánh anh em kế tiếp, khiến kết quả sai một cách kỳ
   lạ và khó dò ra nguyên nhân (thường thấy nhất: kết quả có nhiều phần tử hơn hẳn dự kiến).
@@ -243,7 +243,7 @@ Lưu ý riêng của Python: đệ quy quá sâu (ví dụ \`n\` rất lớn) c�
 - Nhầm giữa \`i + 1\` (không được dùng lại phần tử đó nữa — dùng cho tổ hợp/tập con thường) và \`i\`
   (được dùng lại chính phần tử đó — dùng cho tổ hợp cho phép lặp lại, như Combination Sum gốc).
 
-## 8. Ứng dụng thực tế
+## 7. Ứng dụng thực tế
 
 - **Bộ giải Sudoku, sinh mê cung, xếp lịch thi**.
 - **Trình giải ràng buộc (CSP solver)**: phân công ca làm việc, xếp phòng học, tô màu bản đồ.
@@ -1070,7 +1070,7 @@ thay cho call stack ngầm của đệ quy.
 > Quy tắc chọn nhanh: **"ngắn nhất / ít bước nhất" → BFS. "có tồn tại / đếm số vùng / cần một thứ
 > tự" → DFS.**
 
-## 6. Sắp xếp tôpô (topological sort)
+## 5. Sắp xếp tôpô (topological sort)
 
 Dành cho **đồ thị có hướng không chu trình (DAG — Directed Acyclic Graph)**: sắp xếp các đỉnh thành
 một dãy sao cho với mọi cạnh \`u -> v\`, đỉnh \`u\` phải đứng trước \`v\` trong dãy đó. Đây chính là mô
@@ -1113,7 +1113,7 @@ print(sap_xep_topo(4, [(0, 1), (0, 2), (1, 3), (2, 3)]))   # [0, 1, 2, 3] (hoặ
 Bước kiểm tra "\`len(thu_tu) == n\`" ở cuối chính là cách phát hiện phụ thuộc vòng — đúng thứ mà
 \`pip\`/\`poetry\` dùng để báo lỗi "circular dependency" khi hai package phụ thuộc vòng vo lẫn nhau.
 
-## 7. Bẫy thường gặp
+## 6. Bẫy thường gặp
 
 - **Quên đánh dấu đã thăm** → lặp vô hạn đi qua lại giữa các đỉnh trong một chu trình (khác hẳn cây,
   nơi việc này thường không cần thiết).
@@ -1125,7 +1125,7 @@ Bước kiểm tra "\`len(thu_tu) == n\`" ở cuối chính là cách phát hi�
 - Dùng \`list.pop(0)\` cho hàng đợi BFS thay vì \`collections.deque.popleft()\` → âm thầm biến độ phức
   tạp từ O(V+E) thành O(V²), chương trình vẫn chạy đúng nhưng chậm hẳn với đồ thị lớn.
 
-## 8. Ứng dụng thực tế
+## 7. Ứng dụng thực tế
 
 - **Mạng xã hội**: bạn chung, gợi ý kết bạn, đường đi ngắn nhất giữa hai người ("6 độ phân cách").
 - **Bản đồ & định tuyến**: Google Maps, định tuyến gói tin trên Internet.

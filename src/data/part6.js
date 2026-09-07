@@ -87,72 +87,119 @@ mỗi \`start\` làm số phòng +1, mỗi \`end\` làm -1. Đỉnh cao nhất c
   lessonPy: `
 ## 1. Vấn đề gốc
 
-Khoảng \`[start, end]\` mô tả **thời gian** hoặc **phạm vi**: lịch họp, ca trực, đoạn bộ nhớ,
-khoảng giá trị. Câu hỏi thường gặp: có chồng lấn không, gộp lại thế nào, cần bao nhiêu tài nguyên.
+Một khoảng \`[start, end]\` mô tả **thời gian** hoặc **phạm vi**: một cuộc họp diễn ra từ 9h tới 10h,
+một ca trực từ thứ Hai tới thứ Tư, một đoạn bộ nhớ được cấp phát từ địa chỉ 100 tới 200, một khoảng
+giá trị hợp lệ từ 0 tới 100. Câu hỏi thường gặp xoay quanh các khoảng này: hai khoảng có chồng lấn
+lên nhau không, nếu chồng thì gộp lại thành một khoảng lớn hơn ra sao, và tại một thời điểm bất kỳ
+cần bao nhiêu tài nguyên (phòng họp, nhân viên...) để phục vụ hết mọi khoảng đang diễn ra.
+
+Nếu duyệt các khoảng theo đúng thứ tự đề bài cho (không sắp xếp gì cả), ta không có cách nào biết
+khoảng nào "đứng cạnh" khoảng nào trên trục thời gian — phải so sánh từng cặp một, tốn O(n²). Ví dụ
+thử gộp \`[[1,3], [8,10], [2,6]]\` mà không sắp xếp: rất khó biết \`[1,3]\` và \`[2,6]\` chồng nhau trong
+khi \`[8,10]\` đứng tách biệt, vì chúng không nằm cạnh nhau theo thứ tự xuất hiện trong đề.
 
 ## 2. Ý tưởng cốt lõi
 
-> **Bước đầu tiên của 95% bài khoảng: SẮP XẾP.**
-> Câu hỏi duy nhất là: sắp theo \`start\` hay theo \`end\`?
+> **Bước đầu tiên của khoảng 95% bài toán về khoảng: SẮP XẾP.** Một khi đã sắp xếp đúng tiêu chí, các
+> khoảng liên quan tới nhau sẽ đứng CẠNH NHAU, biến bài toán so sánh từng cặp O(n²) thành một lượt
+> quét tuyến tính O(n). Câu hỏi duy nhất còn lại là: sắp theo \`start\` hay theo \`end\`?
 
 | Mục tiêu | Sắp theo | Lý do |
 |---|---|---|
-| Gộp các khoảng chồng nhau | **start** (\`key=lambda x: x[0]\`) | duyệt trái sang phải, gộp dần |
-| Chọn **nhiều nhất** khoảng không chồng nhau | **end** (\`key=lambda x: x[1]\`) | kết thúc sớm để lại nhiều chỗ nhất |
-| Đếm số phòng họp cần thiết | tách start/end riêng, hoặc dùng \`heapq\` theo end | đếm số khoảng "đang mở" |
+| Gộp các khoảng chồng nhau | start (\`key=lambda x: x[0]\`) | duyệt trái sang phải, khoảng nào chồng khoảng đang xét sẽ đứng ngay kế tiếp |
+| Chọn nhiều nhất khoảng không chồng nhau | end (\`key=lambda x: x[1]\`) | khoảng kết thúc sớm nhất luôn để lại nhiều chỗ trống nhất cho các lựa chọn sau |
+| Đếm số phòng họp cần thiết cùng lúc | tách riêng danh sách start/end, hoặc dùng \`heapq\` theo end | cần đếm số khoảng "đang mở" tại mỗi thời điểm |
 
-Chọn sai tiêu chí sắp xếp = thuật toán sai. Đây là nơi bài khoảng "bẫy" người mới.
+Chọn sai tiêu chí sắp xếp sẽ cho ra thuật toán sai một cách âm thầm — chương trình vẫn chạy, chỉ là
+kết quả không đúng. Đây chính là nơi bài toán khoảng "bẫy" người mới học nhiều nhất.
 
-## 3. Điều kiện chồng lấn — nhớ chính xác
+## 3. Cấu trúc & hàm Python thường dùng trong chủ đề này
+
+| Tên | Vai trò | Ví dụ dùng nhanh |
+|---|---|---|
+| \`sorted(a, key=lambda x: x[0])\` | Sắp xếp theo điểm bắt đầu, tạo bản sao mới | dùng khi cần giữ nguyên mảng gốc |
+| \`a.sort(key=lambda x: x[1])\` | Sắp xếp tại chỗ theo điểm kết thúc | dùng khi được phép sửa mảng gốc |
+| \`max(a, b)\` | Lấy điểm kết thúc lớn hơn khi gộp hai khoảng chồng nhau | \`last[1] = max(last[1], e)\` |
+| \`list(interval)\` | Sao chép một khoảng thành list có thể sửa được (nếu đề cho tuple bất biến) | \`res = [list(intervals[0])]\` |
+| \`heapq\` | Theo dõi khoảng nào "đóng sớm nhất" trong số các khoảng đang mở | dùng trong bài đếm phòng họp |
+| Biến đếm chạy (\`rooms\`, \`best\`) | Đếm số khoảng đang mở tại một thời điểm khi quét qua trục thời gian | xem thuật toán quét đường ở mục 5 |
+
+## 4. Điều kiện chồng lấn — nhớ chính xác
 
 Hai khoảng \`[a1, a2]\` và \`[b1, b2]\` **chồng nhau** khi và chỉ khi:
 \`\`\`
 a1 <= b2 and b1 <= a2
 \`\`\`
-Nhớ dạng phủ định thì dễ hơn: **không** chồng ⟺ \`a2 < b1 or b2 < a1\` (cái này kết thúc trước cái kia bắt đầu).
+Nhớ dạng phủ định thì thường dễ hình dung hơn: **không** chồng khi và chỉ khi
+\`a2 < b1 or b2 < a1\` — nghĩa là một trong hai khoảng đã kết thúc hẳn trước khi khoảng kia bắt đầu.
 
-⚠️ Luôn hỏi người phỏng vấn: **hai khoảng chạm nhau tại một điểm (\`[1,2]\` và \`[2,3]\`) có tính là chồng không?**
-Với lịch họp thì thường **không** (họp xong lúc 2h, họp sau bắt đầu lúc 2h là hợp lệ);
-với đoạn số nguyên thì thường **có**. Hỏi trước khi code là điểm cộng lớn.
+Luôn hỏi rõ (với đề bài, hoặc người phỏng vấn nếu đang phỏng vấn trực tiếp): **hai khoảng chạm nhau
+đúng tại một điểm** (ví dụ \`[1,2]\` và \`[2,3]\`) **có được tính là chồng lấn không?** Với bài lịch họp
+thì thường KHÔNG (họp trước kết thúc lúc 2h, họp sau bắt đầu đúng lúc 2h vẫn là hợp lệ, không xung
+đột); với bài đoạn số nguyên liên tục thì thường CÓ. Hỏi rõ điều này trước khi viết code là một điểm
+cộng lớn, vì nó quyết định dùng \`<\` hay \`<=\` trong điều kiện so sánh.
 
-## 4. Hai mẫu code cần thuộc
+## 5. Hai mẫu code cần thuộc
 
-**(a) Gộp khoảng:**
+**(a) Gộp khoảng chồng nhau:**
+
 \`\`\`python
-intervals.sort(key=lambda x: x[0])
-res = [list(intervals[0])]
-for s, e in intervals[1:]:
-    last = res[-1]
-    if s <= last[1]:
-        last[1] = max(last[1], e)   # chồng -> nới rộng
-    else:
-        res.append([s, e])          # rời nhau -> khoảng mới
+def gop_khoang(intervals):
+    intervals = sorted(intervals, key=lambda x: x[0])   # bước 1 bắt buộc: sắp theo điểm BẮT ĐẦU
+    res = [list(intervals[0])]                             # khoảng đầu tiên luôn được giữ nguyên
+    for s, e in intervals[1:]:
+        last = res[-1]                                       # khoảng cuối cùng đã có trong kết quả
+        if s <= last[1]:                                       # khoảng mới CHỒNG với khoảng cuối cùng
+            last[1] = max(last[1], e)                            # nới rộng đầu mút phải, PHẢI dùng max()
+        else:
+            res.append([s, e])                                  # rời nhau hẳn -> thêm khoảng mới riêng
+    return res
+
+print(gop_khoang([[1, 3], [8, 10], [2, 6], [15, 18]]))
+# Sau khi sắp xếp: [[1,3],[2,6],[8,10],[15,18]]
+# [1,3] và [2,6] chồng nhau (2 <= 3) -> gộp thành [1,6]
+# [1,6] và [8,10] KHÔNG chồng (8 > 6) -> [8,10] là khoảng mới
+# Kết quả: [[1, 6], [8, 10], [15, 18]]
 \`\`\`
 
-**(b) Quét đường (sweep line) — đếm số khoảng đang mở:**
+Chú ý dòng \`last[1] = max(last[1], e)\`, không phải \`last[1] = e\`: nếu khoảng \`[1,10]\` gộp với một
+khoảng nằm gọn bên trong như \`[2,3]\`, đầu mút phải phải giữ nguyên là \`10\` (lớn hơn \`3\`), không được
+ghi đè thành \`3\`.
+
+**(b) Quét đường (sweep line) — đếm số phòng họp cần thiết tại một thời điểm:**
+
 \`\`\`python
-starts = sorted(i[0] for i in intervals)
-ends = sorted(i[1] for i in intervals)
-rooms = best = j = 0
-for s in starts:
-    while ends[j] <= s:      # các cuộc họp đã kết thúc
-        rooms -= 1
-        j += 1
-    rooms += 1
-    best = max(best, rooms)
+def so_phong_can_thiet(intervals):
+    starts = sorted(i[0] for i in intervals)     # tách riêng mọi điểm BẮT ĐẦU, sắp tăng dần
+    ends = sorted(i[1] for i in intervals)         # tách riêng mọi điểm KẾT THÚC, sắp tăng dần
+    rooms = best = j = 0
+    for s in starts:
+        while ends[j] <= s:       # mọi cuộc họp đã kết thúc TRƯỚC khi cuộc họp mới này bắt đầu
+            rooms -= 1              # giải phóng phòng của các cuộc họp đó
+            j += 1
+        rooms += 1                  # cuộc họp mới bắt đầu -> chiếm thêm một phòng
+        best = max(best, rooms)      # ghi nhận số phòng đang dùng nhiều nhất từ trước tới giờ
+    return best
+
+print(so_phong_can_thiet([[0, 30], [5, 10], [15, 20]]))   # 2
 \`\`\`
-Trực giác: tưởng tượng một đường thẳng quét từ trái sang phải trên trục thời gian;
-mỗi \`start\` làm số phòng +1, mỗi \`end\` làm -1. Đỉnh cao nhất chính là đáp án.
 
-## 5. Bẫy thường gặp
+Trực giác: tưởng tượng một đường thẳng đứng quét từ trái sang phải dọc theo trục thời gian; mỗi khi
+gặp một điểm \`start\`, số phòng đang dùng \`+1\`; mỗi khi gặp một điểm \`end\`, số phòng \`-1\`. Giá trị
+lớn nhất mà biến đếm từng đạt tới trong suốt quá trình quét chính là đáp án — số phòng tối đa cần
+dùng cùng lúc tại một thời điểm bất kỳ.
 
-- Quên sắp xếp, hoặc sắp theo tiêu chí sai.
-- Nhầm \`<\` và \`<=\` ở điều kiện chồng lấn (khác biệt ở trường hợp chạm biên).
-- Khi gộp: quên \`max()\` ở đầu mút phải — \`[1,10]\` gộp với \`[2,3]\` vẫn phải là \`[1,10]\`.
-- Sửa mảng đầu vào khi đề không cho phép (dùng \`sorted(intervals, ...)\` thay vì \`intervals.sort(...)\`
-  nếu cần giữ nguyên đầu vào).
+## 6. Bẫy thường gặp
 
-## 6. Ứng dụng thực tế
+- Quên sắp xếp trước khi xử lý, hoặc sắp xếp theo tiêu chí sai (\`start\` khi cần \`end\`, hoặc ngược lại).
+- Nhầm lẫn \`<\` và \`<=\` ở điều kiện chồng lấn — khác biệt chỉ lộ ra ở trường hợp hai khoảng chạm nhau
+  đúng tại một điểm biên, dễ bị bỏ sót khi tự viết test.
+- Khi gộp khoảng: quên dùng \`max()\` ở đầu mút phải — \`[1,10]\` gộp với \`[2,3]\` (nằm gọn bên trong)
+  vẫn phải cho ra \`[1,10]\`, không phải \`[1,3]\`.
+- Sửa mảng đầu vào khi đề không cho phép: dùng \`sorted(intervals, key=...)\` (tạo bản sao mới) thay vì
+  \`intervals.sort(key=...)\` (sửa tại chỗ) nếu cần giữ nguyên mảng gốc sau khi hàm chạy xong.
+
+## 7. Ứng dụng thực tế
 
 - **Lịch & đặt phòng**: Google Calendar tìm khung giờ trống chính là bài gộp khoảng.
 - **Cấp phát tài nguyên**: số máy chủ/nhân viên cần tại giờ cao điểm = bài phòng họp.
@@ -582,7 +629,7 @@ Bit là **ngôn ngữ gốc của máy tính**. Hiểu bit giúp bạn:
 | Phép | Ký hiệu | Quy tắc | Dùng để |
 |---|---|---|---|
 | AND | \`&\` | 1 khi **cả hai** là 1 | **kiểm tra** bit, xoá bit |
-| OR | \`\\|\` | 1 khi **ít nhất một** là 1 | **bật** bit |
+| OR | pipe đơn | 1 khi **ít nhất một** là 1 | **bật** bit |
 | XOR | \`^\` | 1 khi **khác nhau** | **đảo** bit, tìm khác biệt |
 | NOT | \`~\` | đảo mọi bit | tạo mặt nạ |
 | Dịch trái | \`<<\` | nhân 2 mỗi bước | tạo bit thứ k |
@@ -639,72 +686,136 @@ và tính chẵn lẻ (parity) trong mã sửa lỗi.
   lessonPy: `
 ## 1. Vì sao cần biết?
 
-Bit là **ngôn ngữ gốc của máy tính**. Hiểu bit giúp bạn:
-- Giải một số bài với O(1) bộ nhớ mà cách thường cần O(n).
-- Hiểu cách hệ thống thật hoạt động: cờ quyền, bitmask, IP subnet, bloom filter.
-- Viết code nhanh hơn nhiều lần trong các vòng lặp nóng.
+Mọi số nguyên trong máy tính, ở tầng thấp nhất, đều là một dãy **bit** — các chữ số nhị phân chỉ gồm
+\`0\` và \`1\`. Số \`13\` mà bạn viết trong Python thực chất được lưu trữ dưới dạng \`1101\` (đọc từ trái
+sang phải: \`1×8 + 1×4 + 0×2 + 1×1 = 13\`). Bit là **ngôn ngữ gốc của máy tính**, và các phép toán trên
+bit chạy trực tiếp trên phần cứng, không qua bất kỳ lớp trừu tượng nào — vì vậy hiểu bit giúp bạn:
+- Giải một số bài với **O(1) bộ nhớ** mà cách thông thường (dùng \`set\`, \`dict\`...) cần O(n).
+- Hiểu cách các hệ thống thật hoạt động bên dưới: cờ quyền truy cập, bitmask, subnet mạng, bloom filter.
+- Viết code chạy nhanh hơn hẳn trong các vòng lặp được gọi rất nhiều lần ("vòng lặp nóng").
 
 ## 2. Bảng phép toán — thuộc lòng
 
 | Phép | Ký hiệu | Quy tắc | Dùng để |
 |---|---|---|---|
-| AND | \`&\` | 1 khi **cả hai** là 1 | **kiểm tra** bit, xoá bit |
-| OR | \`\\|\` | 1 khi **ít nhất một** là 1 | **bật** bit |
-| XOR | \`^\` | 1 khi **khác nhau** | **đảo** bit, tìm khác biệt |
+| AND | \`&\` | 1 khi cả hai bit đều là 1 | kiểm tra bit, xoá bit |
+| OR | pipe đơn | 1 khi ít nhất một bit là 1 | bật bit |
+| XOR | \`^\` | 1 khi hai bit khác nhau | đảo bit, tìm khác biệt |
 | NOT | \`~\` | đảo mọi bit (Python: \`~x == -x-1\`, số nguyên lớn tuỳ ý) | tạo mặt nạ |
-| Dịch trái | \`<<\` | nhân 2 mỗi bước | tạo bit thứ k |
-| Dịch phải | \`>>\` | chia 2, làm tròn về ÂM VÔ CỰC | duyệt từng bit |
+| Dịch trái | \`<<\` | nhân 2 mỗi bước dịch | tạo số chỉ có bit thứ k bật |
+| Dịch phải | \`>>\` | chia 2, làm tròn về ÂM VÔ CỰC | duyệt qua từng bit |
 
-**Khác biệt lớn nhất với JS: Python không có toán tử \`>>>\` vì không cần** — số nguyên Python
-có độ dài tuỳ ý (không bị "ép" về 32-bit có dấu), nên không có khái niệm "bit dấu" bị lẫn vào
-khi dịch phải. Điều này giúp code bit ở Python đơn giản hơn JS, nhưng cũng có nghĩa nếu bạn
-thực sự cần mô phỏng số nguyên 32-bit có dấu (một số bài yêu cầu điều này), bạn phải tự làm
-bằng \`& 0xFFFFFFFF\` và xử lý bit dấu thủ công.
-
-## 3. Bảy mẹo cần thuộc
+Ví dụ cụ thể với \`x = 13\` (nhị phân \`1101\`) và \`y = 6\` (nhị phân \`0110\`):
 
 \`\`\`python
-x & 1              # x lẻ?
-x >> 1             # chia 2
-1 << k             # số chỉ có bit thứ k bằng 1
-x & (1 << k)       # bit thứ k của x có bật không?
-x | (1 << k)       # bật bit thứ k
-x & ~(1 << k)      # tắt bit thứ k
-x ^ (1 << k)       # đảo bit thứ k
-x & (x - 1)        # XOÁ bit 1 THẤP NHẤT   <- mẹo quan trọng nhất
-x & (-x)           # GIỮ LẠI bit 1 thấp nhất
+x, y = 13, 6
+print(bin(x), bin(y))     # 0b1101  0b110  — bin() hiển thị dạng nhị phân, tiền tố "0b"
+print(x & y)               # 4  (0100) — mỗi vị trí: cả hai đều 1 mới giữ 1
+print(x | y)               # 15 (1111) — mỗi vị trí: một trong hai là 1 thì giữ 1
+print(x ^ y)               # 11 (1011) — mỗi vị trí: khác nhau thì thành 1
+print(x << 1)               # 26 (11010) — dịch trái 1 bước = nhân đôi
+print(x >> 1)               # 6  (110)  — dịch phải 1 bước = chia đôi, bỏ phần dư
 \`\`\`
 
-**\`x & (x-1)\`** là mẹo đáng giá nhất. \`x-1\` biến bit 1 thấp nhất thành 0 và mọi bit sau nó thành 1;
-AND lại sẽ xoá đúng bit đó. Nhờ vậy đếm số bit 1 chỉ cần lặp đúng **số bit 1 lần**,
-thay vì lặp cố định. Hệ quả đẹp: \`x & (x-1) == 0\` ⟺ x là **luỹ thừa của 2**.
-Python cũng có sẵn \`x.bit_count()\` (từ Python 3.10) hoặc \`bin(x).count('1')\` để đếm bit 1 trực tiếp —
-tiện cho việc kiểm tra nhanh, nhưng trong phỏng vấn vẫn nên biết cách tự cài.
+**Khác biệt lớn nhất với nhiều ngôn ngữ khác (JS, Java): Python không có toán tử dịch phải không dấu
+(kiểu \`>>>\` của JS) vì hoàn toàn không cần tới nó** — số nguyên trong Python có độ dài tuỳ ý (không
+bị "ép" về đúng 32-bit có dấu như nhiều ngôn ngữ khác), nên không tồn tại khái niệm "bit dấu" gây
+nhiễu khi dịch phải. Điều này giúp code thao tác bit ở Python đơn giản hơn hẳn, nhưng cũng có nghĩa
+là nếu một bài toán yêu cầu mô phỏng đúng hành vi số nguyên 32-bit có dấu (một số đề kiểm tra hành vi
+này), bạn phải tự làm bằng \`x & 0xFFFFFFFF\` rồi xử lý bit dấu thủ công.
 
-## 4. Tính chất kỳ diệu của XOR
+## 3. Cấu trúc & hàm Python thường dùng trong chủ đề này
+
+| Tên | Vai trò | Ví dụ dùng nhanh |
+|---|---|---|
+| \`bin(x)\` | Hiển thị \`x\` dưới dạng chuỗi nhị phân (tiền tố \`0b\`) — hữu ích để debug bằng mắt | \`bin(13)\` → \`'0b1101'\` |
+| \`x.bit_count()\` | Đếm số bit \`1\` trong \`x\` (Python 3.10+) — khỏi tự cài vòng lặp | \`(13).bit_count()\` → \`3\` |
+| \`bin(x).count('1')\` | Cách đếm bit 1 tương thích với Python cũ hơn 3.10 | dùng khi không chắc phiên bản Python |
+| \`x.bit_length()\` | Số bit cần thiết để biểu diễn \`x\` (không tính số 0 ở đầu) | \`(13).bit_length()\` → \`4\` |
+| \`functools.reduce\` + \`operator.xor\` | XOR dồn tất cả phần tử của một danh sách trong một dòng | \`reduce(xor, nums, 0)\` |
+| \`1 << k\` | Tạo nhanh một số chỉ có đúng bit thứ \`k\` bật (dùng làm "mặt nạ") | \`mask = 1 << 3\` → \`8\` (\`1000\`) |
+
+## 4. Bảy mẹo cần thuộc
+
+\`\`\`python
+x & 1              # x có LẺ không? (bit cuối cùng là 1 <=> số lẻ)
+x >> 1             # chia 2 (bỏ phần dư, tương đương // 2 với số không âm)
+1 << k             # số chỉ có DUY NHẤT bit thứ k bằng 1, còn lại toàn 0
+x & (1 << k)       # bit thứ k của x có đang BẬT không? (khác 0 nghĩa là có)
+x | (1 << k)       # BẬT bit thứ k của x lên (dù trước đó là 0 hay 1)
+x & ~(1 << k)      # TẮT bit thứ k của x xuống 0 (dù trước đó là gì)
+x ^ (1 << k)       # ĐẢO bit thứ k của x (0 thành 1, 1 thành 0)
+x & (x - 1)        # XOÁ bit 1 THẤP NHẤT của x   <- mẹo quan trọng nhất, xem giải thích dưới
+x & (-x)           # GIỮ LẠI đúng bit 1 thấp nhất, xoá hết các bit còn lại
+\`\`\`
+
+**\`x & (x - 1)\`** là mẹo đáng giá nhất trong cả chủ đề. Cơ chế: phép trừ \`x - 1\` biến bit \`1\` thấp
+nhất của \`x\` thành \`0\`, và biến MỌI bit đứng sau nó (bên phải) từ \`0\` thành \`1\` — giống hệt phép
+"mượn" khi trừ trong hệ thập phân, chỉ là ở hệ nhị phân. AND hai số đó lại sẽ xoá đúng bit \`1\` thấp
+nhất, giữ nguyên mọi bit khác:
+
+\`\`\`python
+def dem_so_bit_1(x):
+    dem = 0
+    while x:
+        x &= (x - 1)      # mỗi vòng lặp XOÁ ĐÚNG MỘT bit 1, dù x có bao nhiêu bit tổng cộng
+        dem += 1
+    return dem
+
+print(dem_so_bit_1(13))   # 13 = 1101 -> có 3 bit 1 -> kết quả 3
+\`\`\`
+
+Nhờ cơ chế này, đếm số bit \`1\` chỉ cần lặp đúng **số lần bằng số bit \`1\` đang có**, thay vì phải
+lặp đủ 32/64 lần cố định để xét từng bit một. Hệ quả đẹp đi kèm: \`x & (x - 1) == 0\` khi và chỉ khi
+\`x\` là một **luỹ thừa của 2** (một số chỉ có đúng một bit \`1\` duy nhất, xoá bit đó đi là về 0 ngay).
+Python cũng có sẵn \`x.bit_count()\` (từ Python 3.10) hoặc \`bin(x).count('1')\` để đếm bit 1 trực tiếp
+mà không cần tự viết vòng lặp — tiện cho việc kiểm tra nhanh, nhưng trong phỏng vấn vẫn nên biết cách
+tự cài đặt bằng tay như trên.
+
+## 5. Tính chất kỳ diệu của XOR
 
 \`\`\`
-a ^ a = 0          (tự triệt tiêu)
-a ^ 0 = a          (phần tử trung hoà)
-a ^ b ^ a = b      (giao hoán + kết hợp)
+a ^ a = 0          (một số XOR với chính nó luôn triệt tiêu về 0)
+a ^ 0 = a          (XOR với 0 không đổi gì cả — 0 là "phần tử trung hoà")
+a ^ b ^ a = b      (giao hoán + kết hợp: hai lần XOR với cùng một giá trị a sẽ TỰ HUỶ nhau)
 \`\`\`
 
-Hệ quả: XOR toàn bộ một mảng mà **mọi phần tử xuất hiện 2 lần trừ một** → kết quả chính là
-phần tử lẻ loi đó. O(n) thời gian, **O(1) bộ nhớ** — trong khi cách dùng set cần O(n) bộ nhớ.
-Python có \`functools.reduce\` + \`operator.xor\` để viết gọn: \`reduce(xor, nums, 0)\`.
+Hệ quả trực tiếp và cực kỳ hữu ích: XOR dồn toàn bộ một mảng mà **mọi phần tử đều xuất hiện đúng 2
+lần, trừ đúng một phần tử xuất hiện 1 lần** → kết quả cuối cùng chính là phần tử lẻ loi đó, vì mọi
+cặp trùng nhau sẽ tự triệt tiêu về 0 theo tính chất \`a ^ a = 0\`, chỉ còn phần tử không có cặp sống
+sót:
 
-XOR còn dùng để: hoán đổi hai biến không cần biến tạm (dù Python đã có \`a, b = b, a\` gọn hơn),
-tìm số bị thiếu, mã hoá đơn giản, và tính chẵn lẻ (parity) trong mã sửa lỗi.
+\`\`\`python
+from functools import reduce
+from operator import xor
 
-## 5. Không còn cạm bẫy 32-bit như JS — nhưng có cạm bẫy khác
+def tim_so_le_loi(nums):
+    return reduce(xor, nums, 0)     # 0 ban đầu là "phần tử trung hoà", không ảnh hưởng kết quả
 
-- Không cần lo \`1 << 31\` cho ra số âm bất ngờ như JS — Python cứ tính đúng theo toán học.
-- Nhưng nếu đề bài mô phỏng hành vi một ngôn ngữ có số nguyên 32-bit có dấu (ví dụ để so khớp
-  test được sinh ra từ Java/C++), bạn phải tự ép: \`x & 0xFFFFFFFF\`, rồi nếu bit 31 bật thì
-  trừ thêm \`0x100000000\` để có giá trị âm tương ứng.
-- \`x >> 1\` với x âm làm tròn về ÂM VÔ CỰC (floor), không phải về 0 — khác \`Math.trunc\` quen thuộc.
+print(tim_so_le_loi([4, 1, 2, 1, 2]))   # 4 — mọi số khác đều có cặp, chỉ 4 xuất hiện lẻ
+# Diễn giải: 4^1^2^1^2 = 4^(1^1)^(2^2) = 4^0^0 = 4
+\`\`\`
 
-## 6. Ứng dụng thực tế
+Cách này chạy trong O(n) thời gian và chỉ tốn **O(1) bộ nhớ** — trong khi cách thay thế bằng \`set\`
+(thêm vào rồi loại bỏ phần tử trùng) đúng nhưng tốn O(n) bộ nhớ để lưu tập hợp.
+
+XOR còn được dùng để: hoán đổi hai biến mà không cần biến tạm (dù trong Python đã có cách gọn hơn hẳn
+là \`a, b = b, a\`, không cần thủ thuật XOR như ở các ngôn ngữ khác), tìm số bị thiếu trong một dãy,
+mã hoá đơn giản (XOR cipher — mã hoá và giải mã dùng chung một phép toán), và tính chẵn lẻ (parity)
+trong các mã sửa lỗi truyền dữ liệu.
+
+## 6. Không còn cạm bẫy 32-bit như JS — nhưng có cạm bẫy khác
+
+- Không cần lo lắng về việc \`1 << 31\` cho ra một số âm bất ngờ như ở JavaScript — Python luôn tính
+  đúng theo toán học vì số nguyên có độ dài tuỳ ý, không bị "ép khuôn" về 32-bit có dấu.
+- Nhưng nếu đề bài yêu cầu mô phỏng đúng hành vi của một ngôn ngữ có số nguyên 32-bit có dấu (ví dụ
+  để so khớp kết quả với test được sinh ra từ Java/C++), bạn phải tự ép kiểu bằng tay: tính
+  \`x & 0xFFFFFFFF\` trước, rồi nếu bit thứ 31 (bit dấu) đang bật thì trừ thêm \`0x100000000\` để ra
+  đúng giá trị âm tương ứng.
+- \`x >> 1\` với \`x\` âm làm tròn về phía ÂM VÔ CỰC (floor), không phải cắt về 0 — khác với thói quen
+  \`Math.trunc\` ở nhiều ngôn ngữ khác, cần lưu ý khi bài toán có liên quan tới số âm.
+
+## 7. Ứng dụng thực tế
 
 - **Cờ quyền (permission flags)**: quyền Unix \`rwx\` = 3 bit; kiểm tra quyền là một phép AND.
 - **Bitmask trong DP**: biểu diễn tập con bằng một số nguyên (bitmask DP cho n ≤ 20).
@@ -1159,40 +1270,81 @@ hơn là bạn có nhớ mẹo hay không.
   lessonPy: `
 ## 1. Đặc điểm của nhóm bài này
 
-Đây là nhóm ít "mẫu hình" nhất — mỗi bài thường có một **mẹo riêng**.
-Nhưng có vài kỹ thuật lặp lại đủ nhiều để đáng học:
+Đây là nhóm ít "mẫu hình chung" nhất trong toàn bộ lộ trình — khác với sliding window hay two pointers
+(nơi một khung code giải được hàng chục bài), mỗi bài toán/hình học thường có một **mẹo quan sát
+riêng**, đặc thù cho chính bài đó. Dù vậy, vẫn có vài kỹ thuật lặp lại đủ nhiều lần để đáng học kỹ,
+vì chúng xuất hiện trở lại ở rất nhiều bài khác nhau về ma trận và số học.
 
 ## 2. Ma trận: ba kỹ thuật cốt lõi
 
 **(a) Chuyển vị (transpose) + đảo hàng = xoay 90°**
+
 \`\`\`
 xoay 90° theo chiều kim đồng hồ = chuyển vị rồi đảo mỗi HÀNG
 xoay 90° ngược chiều kim đồng hồ = chuyển vị rồi đảo mỗi CỘT
 \`\`\`
-Đây là mẹo đáng giá nhất: nó biến "xoay ma trận tại chỗ" từ bài rối rắm thành hai vòng lặp đơn giản.
-Trong Python, \`row.reverse()\` đảo một list tại chỗ; \`matrix[i][j], matrix[j][i] = matrix[j][i], matrix[i][j]\`
-hoán đổi hai phần tử không cần biến tạm.
 
-**(b) Duyệt theo lớp (layer)** — cho các bài xoắn ốc, xoay:
-duy trì bốn biên \`top, bottom, left, right\` và thu hẹp dần vào trong.
+Đây là mẹo đáng giá nhất của cả chủ đề: nó biến bài "xoay ma trận tại chỗ" từ một bài toán rối rắm về
+tính chỉ số thành hai vòng lặp cực kỳ đơn giản.
 
-**(c) Dùng chính ma trận làm bộ nhớ đánh dấu** — khi đề yêu cầu O(1) bộ nhớ phụ:
-dùng hàng 0 và cột 0 làm cờ (bài Set Matrix Zeroes).
+\`\`\`python
+def xoay_90_do(matrix):
+    n = len(matrix)
+    # Bước 1: CHUYỂN VỊ — biến (i, j) thành (j, i), làm tại chỗ trên ma trận vuông
+    for i in range(n):
+        for j in range(i + 1, n):    # chỉ xét NỬA TRÊN đường chéo, tránh hoán đổi hai lần
+            matrix[i][j], matrix[j][i] = matrix[j][i], matrix[i][j]   # gán bội, không cần biến tạm
+    # Bước 2: ĐẢO NGƯỢC từng hàng
+    for row in matrix:
+        row.reverse()               # reverse() đảo NGƯỢC một list TẠI CHỖ, không tạo bản sao
+    return matrix
 
-**Lưu ý tạo ma trận trong Python:** luôn dùng \`[[0]*n for _ in range(m)]\`,
-**không bao giờ** \`[[0]*n] * m\` (tạo m tham chiếu tới cùng một hàng — sửa một ô sẽ sửa cả cột).
+print(xoay_90_do([[1,2,3],[4,5,6],[7,8,9]]))
+# [[7, 4, 1], [8, 5, 2], [9, 6, 3]]
+\`\`\`
 
-## 3. Số học: những điều nên biết
+**(b) Duyệt theo lớp (layer)** — dùng cho các bài xoắn ốc, xoay theo vòng: duy trì bốn biên
+\`top, bottom, left, right\` đánh dấu phần ma trận CHƯA được xử lý, rồi thu hẹp dần bốn biên đó vào
+trong sau mỗi vòng duyệt trọn một lớp (một "vòng khung" quanh biên hiện tại).
 
-- **Modulo**: \`(a + b) % m\`, \`(a * b) % m\` để tránh giá trị quá lớn (dù Python không tràn số,
-  modulo vẫn cần thiết khi đề yêu cầu "trả về kết quả mod 10⁹+7").
-- **Ước chung lớn nhất (Euclid)**: \`gcd(a,b) = gcd(b, a % b)\` — hoặc dùng thẳng \`math.gcd(a, b)\`.
-- **Sàng Eratosthenes**: liệt kê số nguyên tố tới n trong O(n log log n).
-- **Luỹ thừa nhanh**: \`x^n\` trong O(log n) bằng chia đôi số mũ — hoặc dùng \`pow(x, n, mod)\` có sẵn
-  của Python, vốn đã cài đặt luỹ thừa nhanh có modulo cực kỳ hiệu quả.
-- **Phát hiện chu trình trên hàm số**: rùa-thỏ (bài Happy Number) — cùng ý tưởng với linked list!
+**(c) Dùng chính ma trận làm bộ nhớ đánh dấu** — áp dụng khi đề yêu cầu chỉ dùng O(1) bộ nhớ phụ: ví
+dụ bài "đặt cả hàng và cột về 0 nếu có một ô bằng 0" có thể dùng chính hàng 0 và cột 0 của ma trận để
+làm "cờ đánh dấu" thay vì cấp phát thêm mảng phụ.
 
-## 4. Chiến lược khi gặp bài lạ
+**Lưu ý bắt buộc khi tạo ma trận trong Python:** luôn dùng \`[[0]*n for _ in range(m)]\` — list
+comprehension tạo MỖI HÀNG là một object độc lập. **Không bao giờ** viết \`[[0]*n] * m\`, vì cách đó
+tạo ra \`m\` cái tên cùng trỏ tới MỘT list hàng duy nhất — sửa một ô sẽ vô tình sửa luôn cả cột tương
+ứng ở mọi hàng khác (xem lại bẫy này ở chủ đề [[DP hai chiều]], nó lặp lại y hệt ở đây).
+
+## 3. Cấu trúc & hàm Python thường dùng trong chủ đề này
+
+| Tên | Vai trò | Ví dụ dùng nhanh |
+|---|---|---|
+| \`row.reverse()\` | Đảo ngược một list tại chỗ, không tạo bản sao mới | dùng trong bước 2 của phép xoay ma trận |
+| \`a, b = b, a\` | Hoán đổi hai phần tử ma trận không cần biến tạm | \`matrix[i][j], matrix[j][i] = matrix[j][i], matrix[i][j]\` |
+| \`math.gcd(a, b)\` | Ước chung lớn nhất — có sẵn, khỏi tự cài thuật toán Euclid | \`math.gcd(12, 18)\` → \`6\` |
+| \`pow(x, n, mod)\` | Luỹ thừa nhanh CÓ modulo, tự động dùng thuật toán O(log n) bên trong | \`pow(2, 100, 10**9+7)\` |
+| \`x % m\` | Lấy phần dư — bắt buộc khi đề yêu cầu "trả kết quả theo modulo" | \`(a * b) % (10**9 + 7)\` |
+| \`[[0]*n for _ in range(m)]\` | Cách ĐÚNG để tạo ma trận \`m×n\` với các hàng độc lập | xem cảnh báo ở mục 2 |
+| \`zip(*matrix)\` | Chuyển vị nhanh một ma trận bằng một dòng (không tại chỗ, tạo cấu trúc mới) | \`list(zip(*matrix))\` |
+
+## 4. Số học: những điều nên biết
+
+- **Modulo**: \`(a + b) % m\`, \`(a * b) % m\` giúp giữ giá trị trung gian trong phạm vi kiểm soát được
+  (dù Python không giới hạn kích thước số nguyên như nhiều ngôn ngữ khác, phép modulo vẫn cần thiết
+  khi đề yêu cầu tường minh "trả về kết quả theo modulo \`10⁹+7\`").
+- **Ước chung lớn nhất (thuật toán Euclid)**: \`gcd(a, b) = gcd(b, a % b)\`, dừng khi \`b == 0\` — hoặc
+  dùng thẳng hàm có sẵn \`math.gcd(a, b)\`, không cần tự cài trong hầu hết trường hợp.
+- **Sàng Eratosthenes**: liệt kê mọi số nguyên tố nhỏ hơn hoặc bằng \`n\` trong O(n log log n), bằng
+  cách đánh dấu dần bội số của từng số nguyên tố tìm được.
+- **Luỹ thừa nhanh**: tính \`x^n\` trong O(log n) bằng cách chia đôi số mũ liên tục (bình phương hoá
+  lặp lại), thay vì nhân tuần tự O(n) lần — hoặc dùng thẳng \`pow(x, n, mod)\` có sẵn của Python, vốn
+  đã cài đặt sẵn thuật toán luỹ thừa nhanh kèm modulo cực kỳ hiệu quả.
+- **Phát hiện chu trình trên một hàm số** (ví dụ bài Happy Number — lặp lại phép "tính tổng bình
+  phương các chữ số" và kiểm tra có rơi vào vòng lặp không): dùng đúng kỹ thuật rùa-thỏ (Floyd cycle
+  detection) — cùng một ý tưởng đã học ở chủ đề [[Danh sách liên kết]]!
+
+## 5. Chiến lược khi gặp bài lạ
 
 1. **Thử ví dụ nhỏ bằng tay** và tìm quy luật.
 2. **Vẽ ra giấy** — đặc biệt với bài ma trận, hình học.
@@ -1202,7 +1354,7 @@ dùng hàng 0 và cột 0 làm cờ (bài Set Matrix Zeroes).
 Nếu bí, hãy nói to suy nghĩ. Với nhóm bài này, người phỏng vấn quan tâm **cách bạn khám phá quy luật**
 hơn là bạn có nhớ mẹo hay không.
 
-## 5. Ứng dụng thực tế
+## 6. Ứng dụng thực tế
 
 - **Xử lý ảnh**: xoay/lật ảnh chính là các phép biến đổi ma trận này (thư viện Pillow/NumPy của Python).
 - **Đồ hoạ 3D**: mọi phép quay/tịnh tiến là nhân ma trận (NumPy).

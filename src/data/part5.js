@@ -134,12 +134,26 @@ trên để hiểu rõ bản chất đang diễn ra bên dưới.
 2. **Công thức truy hồi?** \`dp[i]\` tính từ các trạng thái nhỏ hơn thế nào?
 3. **Trường hợp cơ sở và thứ tự tính?** Bắt đầu từ đâu, đi theo hướng nào?
 
-Ví dụ với bài Trộm nhà (House Robber):
+Ví dụ với bài Trộm nhà (House Robber — không được trộm hai nhà liền kề, tối đa hoá tổng số tiền):
 1. \`dp[i]\` = số tiền lớn nhất trộm được khi **chỉ xét i căn nhà đầu tiên**.
-2. \`dp[i] = max(dp[i-1], dp[i-2] + nums[i])\` — bỏ qua nhà i, hoặc trộm nhà i (cộng với dp cách 2 nhà).
-3. \`dp[0] = nums[0]\`, \`dp[1] = max(nums[0], nums[1])\`, tính tăng dần.
+2. \`dp[i] = max(dp[i-1], dp[i-2] + nums[i])\` — hoặc bỏ qua nhà thứ \`i\` (giữ nguyên kết quả tốt nhất
+   của \`i-1\` nhà trước), hoặc trộm nhà thứ \`i\` (cộng thêm giá trị nhà đó vào kết quả tốt nhất của
+   \`i-2\` nhà trước, vì không được trộm nhà liền kề \`i-1\`).
+3. \`dp[0] = nums[0]\` (chỉ có một nhà thì trộm luôn nhà đó), \`dp[1] = max(nums[0], nums[1])\` (hai nhà
+   thì chọn nhà nào có giá trị lớn hơn), rồi tính tăng dần từ \`i = 2\` trở đi.
 
-## 3. Dấu hiệu nhận biết bài DP
+## 3. Cấu trúc & hàm Python thường dùng trong chủ đề này
+
+| Tên | Vai trò | Ví dụ dùng nhanh |
+|---|---|---|
+| \`dict\` làm \`memo\` | Lưu kết quả bài toán con đã tính, tra cứu O(1) trước khi tính lại | \`memo = {}; if i in memo: return memo[i]\` |
+| \`functools.lru_cache\` | Decorator tự động memo hoá một hàm đệ quy, khỏi tự quản lý dict | \`@lru_cache(maxsize=None)\` đặt trên hàm |
+| \`[0] * n\` | Khởi tạo bảng \`dp\` với \`n\` phần tử, dùng cho bottom-up | \`dp = [0] * (n + 1)\` |
+| \`float('inf')\` | Giá trị "chưa đạt được / vô cùng lớn" — dùng làm giá trị khởi tạo cho bài tối thiểu hoá | \`dp = [float('inf')] * (target + 1)\` |
+| \`max(a, b)\` / \`min(a, b)\` | So sánh hai lựa chọn ở bước truy hồi — xuất hiện trong hầu hết công thức DP | \`dp[i] = max(dp[i-1], dp[i-2] + nums[i])\` |
+| Gán bội để tối ưu bộ nhớ | Thay bảng \`dp\` bằng vài biến khi chỉ cần vài trạng thái gần nhất | \`prev2, prev1 = prev1, max(prev1, prev2 + x)\` |
+
+## 4. Dấu hiệu nhận biết bài DP
 
 | Đề bài nói | Khả năng cao là DP |
 |---|---|
@@ -154,55 +168,91 @@ Ví dụ với bài Trộm nhà (House Robber):
 DP giữ **mọi khả năng** và chọn tốt nhất ở cuối. Nếu lựa chọn tốt cục bộ có thể sai về sau
 → bắt buộc dùng DP.
 
-## 4. Hai cách viết — nên biết cả hai
+## 5. Hai cách viết — nên biết cả hai
 
-**Top-down (đệ quy + memo)** — gần với suy nghĩ tự nhiên:
+**Top-down (đệ quy + memo)** — gần với suy nghĩ tự nhiên nhất, thường là cách bạn nghĩ ra lời giải
+đầu tiên trước khi tối ưu:
+
 \`\`\`python
-memo = {}
-def f(i):
-    if i < 0:
-        return 0
-    if i in memo:
-        return memo[i]
-    res = max(f(i - 1), f(i - 2) + nums[i])
-    memo[i] = res
-    return res
+def trom_nha_top_down(nums):
+    memo = {}
+    def f(i):                      # f(i) = tiền nhiều nhất trộm được khi chỉ xét i căn nhà đầu
+        if i < 0:
+            return 0                 # trường hợp cơ sở: không còn nhà nào để xét
+        if i in memo:
+            return memo[i]            # ĐÃ TÍNH RỒI -> lấy lại, không tính lại từ đầu
+        res = max(f(i - 1), f(i - 2) + nums[i])
+        memo[i] = res
+        return res
+    return f(len(nums) - 1)
+
+print(trom_nha_top_down([2, 7, 9, 3, 1]))   # 12 (trộm nhà 0, 2, 4: 2+9+1=12)
 \`\`\`
-Hoặc gọn hơn với decorator có sẵn:
+
+Hoặc viết gọn hơn với decorator có sẵn của Python, khỏi tự quản lý \`dict memo\`:
+
 \`\`\`python
 from functools import lru_cache
 
-@lru_cache(maxsize=None)
-def f(i):
-    if i < 0:
-        return 0
-    return max(f(i - 1), f(i - 2) + nums[i])
+def trom_nha_top_down_v2(nums):
+    @lru_cache(maxsize=None)
+    def f(i):
+        if i < 0:
+            return 0
+        return max(f(i - 1), f(i - 2) + nums[i])
+    return f(len(nums) - 1)
 \`\`\`
 
-**Bottom-up (bảng lặp)** — nhanh hơn, không lo \`RecursionError\`:
+**Bottom-up (bảng lặp)** — nhanh hơn một chút vì không tốn chi phí gọi hàm, và không lo
+\`RecursionError\` với \`n\` lớn:
+
 \`\`\`python
-dp = [0] * n
-dp[0] = nums[0]
-for i in range(1, n):
-    dp[i] = max(dp[i-1], (dp[i-2] if i >= 2 else 0) + nums[i])
+def trom_nha_bottom_up(nums):
+    n = len(nums)
+    dp = [0] * n
+    dp[0] = nums[0]
+    dp[1] = max(nums[0], nums[1]) if n > 1 else nums[0]
+    for i in range(2, n):
+        dp[i] = max(dp[i - 1], dp[i - 2] + nums[i])   # công thức truy hồi Y HỆT bản top-down
+    return dp[n - 1]
+
+print(trom_nha_bottom_up([2, 7, 9, 3, 1]))   # 12 — cùng kết quả, không cần đệ quy
 \`\`\`
 
-**Tối ưu bộ nhớ:** nếu \`dp[i]\` chỉ phụ thuộc vài trạng thái gần nhất, hãy thay list bằng **vài biến**
-→ O(1) bộ nhớ. Đây là "câu hỏi tiếp theo" gần như chắc chắn sẽ được hỏi.
+**Tối ưu bộ nhớ:** để ý rằng \`dp[i]\` chỉ phụ thuộc vào đúng hai giá trị gần nhất (\`dp[i-1]\` và
+\`dp[i-2]\`), không cần cả bảng. Có thể thay hẳn \`list dp\` bằng hai biến, giảm bộ nhớ từ O(n) xuống O(1):
 
-**Lưu ý Python:** top-down đệ quy có thể chạm giới hạn \`sys.getrecursionlimit()\` (~1000) với n lớn.
-Bottom-up không có rủi ro này — đó là lý do nhiều lời giải "chuẩn" trong Python ưu tiên bottom-up
-khi n có thể lớn.
+\`\`\`python
+def trom_nha_toi_uu_bo_nho(nums):
+    prev2, prev1 = 0, 0        # prev2 = dp[i-2], prev1 = dp[i-1], ban đầu coi như "0 nhà"
+    for x in nums:
+        prev2, prev1 = prev1, max(prev1, prev2 + x)   # cập nhật CẢ HAI biến cùng lúc bằng gán bội
+    return prev1
+\`\`\`
 
-## 5. Bẫy thường gặp
+Đây gần như chắc chắn là "câu hỏi tiếp theo" khi phỏng vấn viên thấy bạn dùng bảng \`dp\` đầy đủ — họ
+sẽ hỏi "có tối ưu được bộ nhớ không?".
 
-- **Định nghĩa trạng thái mơ hồ** → công thức truy hồi sai. Hãy viết ra bằng lời trước khi code.
-- Quên trường hợp cơ sở (mảng 1 phần tử, mảng rỗng).
-- Với bài "khả thi/không", giá trị khởi tạo phải là \`False\`/\`float('inf')\` đúng ngữ nghĩa
-  (ví dụ Coin Change dùng \`float('inf')\` để đánh dấu "không đạt được").
-- Nhầm **dãy con** (subsequence, không cần liên tiếp) với **đoạn con** (subarray, phải liên tiếp).
+**Lưu ý riêng của Python:** cách viết top-down bằng đệ quy có thể chạm giới hạn
+\`sys.getrecursionlimit()\` (mặc định khoảng 1000) khi \`n\` lớn. Bottom-up không có rủi ro này vì nó
+chỉ là một vòng lặp thông thường — đây là lý do nhiều lời giải "chuẩn" trong Python ưu tiên viết
+bottom-up khi \`n\` có thể lớn.
 
-## 6. Ứng dụng thực tế
+## 6. Bẫy thường gặp
+
+- **Định nghĩa trạng thái mơ hồ** → công thức truy hồi sai ngay từ gốc. Hãy viết trạng thái ra bằng
+  lời hoàn chỉnh trước khi code (ví dụ: "\`dp[i]\` là số tiền lớn nhất trộm được khi chỉ xét i căn nhà
+  đầu tiên" — không chỉ viết "\`dp[i]\` là kết quả").
+- Quên trường hợp cơ sở, đặc biệt là các trường hợp biên nhỏ (mảng chỉ có 1 phần tử, mảng rỗng) —
+  đây thường là nơi \`IndexError\` xuất hiện đầu tiên khi chạy thử.
+- Với bài "khả thi hay không" (có đạt được hay không), giá trị khởi tạo của \`dp\` phải đúng ngữ nghĩa
+  \`False\` (chưa đạt được) hoặc \`float('inf')\` (chi phí vô cùng lớn, coi như bất khả thi) — ví dụ bài
+  Coin Change dùng \`float('inf')\` để đánh dấu "không thể đổi được số tiền này bằng các đồng xu đã cho".
+- Nhầm lẫn **dãy con (subsequence)** — chỉ cần giữ đúng thứ tự, KHÔNG cần liên tiếp — với **đoạn con
+  (subarray)** — bắt buộc phải liên tiếp nhau trong mảng gốc. Hai khái niệm này dẫn tới công thức
+  truy hồi hoàn toàn khác nhau.
+
+## 7. Ứng dụng thực tế
 
 - **So sánh chuỗi (diff)**: \`git diff\` dùng thuật toán dãy con chung dài nhất.
 - **Sinh học tính toán**: căn chỉnh chuỗi DNA (Needleman-Wunsch) là DP 2 chiều — thư viện Biopython
@@ -813,45 +863,80 @@ quyết định bạn đang giải bài 0/1 hay bài không giới hạn — hay
   lessonPy: `
 ## 1. Khi nào cần 2 chiều?
 
-Khi một chỉ số không đủ mô tả trạng thái. Ba tình huống điển hình:
+Khi MỘT chỉ số không đủ để mô tả đầy đủ trạng thái của bài toán — cần hai thông tin độc lập cùng lúc
+để biết "mình đang đứng ở đâu". Ba tình huống điển hình:
 
-1. **Hai dãy dữ liệu**: \`dp[i][j]\` = kết quả khi xét i ký tự đầu của chuỗi A và j ký tự đầu của B.
-   *(so sánh chuỗi, khoảng cách chỉnh sửa, dãy con chung)*
-2. **Lưới**: \`dp[r][c]\` = kết quả khi đứng tại ô (r, c). *(đếm đường đi, tổng nhỏ nhất)*
-3. **Vị trí + tài nguyên**: \`dp[i][w]\` = giá trị tốt nhất khi xét i món đầu với sức chứa w.
-   *(bài toán cái túi — knapsack)*
+1. **Hai dãy dữ liệu cùng lúc**: \`dp[i][j]\` = kết quả khi xét \`i\` ký tự đầu của chuỗi A VÀ \`j\` ký
+   tự đầu của chuỗi B. *(so sánh chuỗi, khoảng cách chỉnh sửa, dãy con chung dài nhất)*
+2. **Vị trí trên lưới hai chiều**: \`dp[r][c]\` = kết quả khi đứng tại ô \`(r, c)\`. *(đếm số đường đi,
+   tổng đường đi nhỏ nhất)*
+3. **Vị trí đang xét + tài nguyên còn lại**: \`dp[i][w]\` = giá trị tốt nhất khi đã xét \`i\` món đồ đầu
+   tiên với sức chứa còn lại là \`w\`. *(bài toán cái túi — knapsack)*
 
-## 2. Khung tư duy — vẫn là ba câu hỏi cũ
+## 2. Khung tư duy — vẫn là ba câu hỏi cũ, chỉ thêm một chiều
 
-Chỉ khác là trạng thái có hai chiều:
-1. \`dp[i][j]\` nghĩa là gì? (phát biểu bằng lời!)
-2. Truy hồi: \`dp[i][j]\` phụ thuộc những ô nào? *(thường là ô trên, ô trái, và ô chéo trên-trái)*
-3. Cơ sở: hàng 0 và cột 0 bằng bao nhiêu?
+Hoàn toàn giống [[dp-1d|DP một chiều]], chỉ khác trạng thái giờ có hai chiều thay vì một:
+1. \`dp[i][j]\` nghĩa là gì? (bắt buộc phát biểu ra bằng lời hoàn chỉnh trước khi viết công thức!)
+2. Truy hồi: \`dp[i][j]\` phụ thuộc vào những ô nào đã tính trước đó? (thường là ô phía trên, ô bên
+   trái, và ô chéo trên-trái — ba "hàng xóm gần nhất" của một ô trong bảng)
+3. Cơ sở: hàng thứ 0 và cột thứ 0 của bảng bằng bao nhiêu?
 
-**Mẹo cực kỳ hữu ích:** dùng bảng kích thước **(m+1) × (n+1)** với hàng/cột 0 làm "biên rỗng".
-Nó xoá bỏ hầu hết các phép kiểm tra biên rườm rà. Trong Python, tạo bảng 2D đúng cách là
-\`[[0] * (n+1) for _ in range(m+1)]\` — **không** dùng \`[[0]*(n+1)] * (m+1)\`, vì cách đó tạo
-\`m+1\` tham chiếu tới **cùng một** list con, và sửa một hàng sẽ vô tình sửa tất cả các hàng khác!
+**Mẹo cực kỳ hữu ích — biên rỗng:** dùng một bảng kích thước **(m+1) × (n+1)** thay vì \`m × n\`, với
+hàng 0 và cột 0 đại diện cho "chưa xét ký tự/phần tử nào cả" (một dãy rỗng). Cách này xoá bỏ hầu hết
+các phép kiểm tra biên rườm rà (khỏi phải viết \`if i == 0: ...\` riêng ở mọi nơi).
+
+\`\`\`python
+def khoi_tao_bang_2d(m, n):
+    # ĐÚNG: mỗi hàng là một list RIÊNG BIỆT, list comprehension tạo mới ở mỗi vòng lặp
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    return dp
+
+# SAI — bẫy kinh điển của Python, đừng bao giờ viết thế này:
+# dp_sai = [[0] * (n + 1)] * (m + 1)
+# Cách viết trên tạo ra (m+1) TÊN cùng trỏ tới MỘT list con duy nhất — sửa dp_sai[0][0] = 1
+# sẽ khiến MỌI hàng khác cũng đổi theo, vì chúng thực chất là cùng một object trong bộ nhớ.
+\`\`\`
 
 ## 3. Bài toán cái túi 0/1 — mẫu hình phải thuộc
 
+\`\`\`python
+def knapsack_01(weights, values, W):
+    n = len(weights)
+    # dp[i][w] = giá trị lớn nhất khi xét i món đồ đầu tiên với sức chứa còn lại w
+    dp = [[0] * (W + 1) for _ in range(n + 1)]
+
+    for i in range(1, n + 1):
+        for w in range(W + 1):
+            dp[i][w] = dp[i - 1][w]                       # PHƯƠNG ÁN 1: không lấy món thứ i
+            if weights[i - 1] <= w:                          # món i có VỪA túi (còn đủ chỗ) không?
+                dp[i][w] = max(dp[i][w],
+                                dp[i - 1][w - weights[i - 1]] + values[i - 1])   # PHƯƠNG ÁN 2: lấy món i
+    return dp[n][W]
+
+print(knapsack_01([2, 3, 4], [3, 4, 5], 5))   # 7 (lấy món 0 và món 1: 2+3=5kg, giá trị 3+4=7)
 \`\`\`
-dp[i][w] = giá trị lớn nhất khi xét i món đầu tiên với sức chứa w
 
-dp[i][w] = max(
-    dp[i-1][w],                            # không lấy món i
-    dp[i-1][w - weight[i]] + value[i]      # lấy món i (nếu vừa túi)
-)
-\`\`\`
+Rất nhiều bài toán "khó" trông không giống túi đồ chút nào thực chất chỉ là knapsack đội lốt:
+- *Partition Equal Subset Sum* (chia mảng thành hai phần bằng tổng nhau) → knapsack với sức chứa
+  bằng \`tổng mảng / 2\`, hỏi tính khả thi.
+- *Target Sum* (gán dấu +/- để đạt tổng target) → knapsack đếm số cách thay vì tối ưu giá trị.
+- *Coin Change II* (đếm số cách đổi tiền) → knapsack "không giới hạn" (unbounded — mỗi loại đồng xu
+  được dùng lại nhiều lần, khác 0/1 chỉ được chọn tối đa một lần).
 
-Rất nhiều bài "khó" chỉ là knapsack đội lốt:
-- *Partition Equal Subset Sum* → knapsack với sức chứa \`tổng/2\`, hỏi khả thi.
-- *Target Sum* → knapsack đếm số cách.
-- *Coin Change II* → knapsack không giới hạn số lượng (unbounded).
+Nhận ra "đây thực chất là bài toán cái túi" là kỹ năng đáng giá nhất của cả chủ đề DP hai chiều.
 
-Nhận ra "đây là knapsack" là kỹ năng đáng giá nhất của chủ đề này.
+## 4. Cấu trúc & hàm Python thường dùng trong chủ đề này
 
-## 4. Nén bộ nhớ từ 2D xuống 1D
+| Tên | Vai trò | Ví dụ dùng nhanh |
+|---|---|---|
+| \`[[0]*(n+1) for _ in range(m+1)]\` | Cách ĐÚNG để tạo bảng 2D — mỗi hàng là list độc lập | xem giải thích chi tiết ở mục 2 |
+| \`[[0]*(n+1)] * (m+1)\` | Cách SAI — mọi hàng trỏ chung một list, sửa một hàng sửa hết | không bao giờ dùng cho \`dp\` 2D |
+| \`dp[i-1][j]\`, \`dp[i][j-1]\` | Đọc "ô hàng xóm" phía trên và bên trái — nguồn của phần lớn công thức truy hồi | \`dp[i][j] = dp[i-1][j-1] + 1\` (khi khớp) |
+| \`range(W, weight-1, -1)\` | Duyệt NGƯỢC khi nén 2D xuống 1D cho bài 0/1 — xem mục 5 | \`for w in range(W, weight-1, -1):\` |
+| \`s1[i-1] == s2[j-1]\` | So sánh ký tự thứ \`i\`/\`j\` của hai chuỗi khi dùng bảng có biên rỗng (lệch chỉ số đi 1) | dùng trong LCS, edit distance |
+| \`max(a, b, c)\` | So sánh nhiều phương án cùng lúc ở một ô — Python cho phép truyền nhiều tham số | \`dp[i][j] = max(dp[i-1][j], dp[i][j-1])\` |
+
+## 5. Nén bộ nhớ từ 2D xuống 1D
 
 Nếu \`dp[i][*]\` chỉ phụ thuộc \`dp[i-1][*]\`, ta chỉ cần **một list**:
 
@@ -862,21 +947,31 @@ for item in items:
         dp[w] = max(dp[w], dp[w - item.weight] + item.value)
 \`\`\`
 
-**Vì sao duyệt ngược?** Vì duyệt xuôi sẽ dùng giá trị *đã cập nhật ở vòng này* →
-biến thành "được lấy món nhiều lần" (unbounded knapsack). Chi tiết một dòng này
-quyết định bạn đang giải bài 0/1 hay bài không giới hạn — hay bị hỏi trong phỏng vấn.
-\`range(W, item.weight - 1, -1)\` là cách viết Python cho "từ W xuống tới item.weight, bước -1".
+**Vì sao phải duyệt ngược?** Vì duyệt xuôi (từ \`0\` tới \`W\`) sẽ dùng \`dp[w - item.weight]\` là giá trị
+**đã được cập nhật NGAY TRONG VÒNG LẶP NÀY** của cùng món đồ \`item\` — tức là món đồ đó vô tình được
+tính như thể có thể lấy nhiều lần, biến bài toán 0/1 (mỗi món chỉ một lần) thành unbounded knapsack
+(mỗi món lấy được nhiều lần). Duyệt ngược (từ \`W\` xuống \`item.weight\`) đảm bảo \`dp[w - item.weight]\`
+tại thời điểm đọc vẫn còn là giá trị **của vòng lặp TRƯỚC** (khi chưa xét \`item\`), giữ đúng ngữ nghĩa
+"món này chỉ được cân nhắc đúng một lần". Chi tiết chỉ một dòng này quyết định bạn đang giải đúng bài
+0/1 hay đã vô tình đổi thành bài không giới hạn — là câu hỏi bẫy rất hay gặp khi phỏng vấn.
+\`range(W, item.weight - 1, -1)\` là cách viết Python cho "đếm ngược từ \`W\` xuống tới \`item.weight\`,
+mỗi bước trừ 1" — chú ý cận dưới phải trừ thêm 1 (\`item.weight - 1\`) vì \`range\` không bao gồm giá
+trị cuối.
 
-## 5. Bẫy thường gặp
+## 6. Bẫy thường gặp
 
-- Sai thứ tự vòng lặp → dùng giá trị chưa được tính.
-- Nhầm chỉ số: \`dp[i][j]\` ứng với ký tự \`A[i-1]\` và \`B[j-1]\` khi dùng biên rỗng.
-- Quên khởi tạo hàng/cột 0.
-- Bảng quá lớn: \`dp[10⁴][10⁴]\` = 10⁸ ô → hết bộ nhớ. Phải nén xuống 1 chiều.
-- **Bẫy Python riêng:** \`[[0]*n] * m\` tạo ra \`m\` tham chiếu tới CÙNG MỘT hàng — dùng list
-  comprehension \`[[0]*n for _ in range(m)]\` để có các hàng độc lập.
+- Sai thứ tự vòng lặp (xuôi thay vì ngược khi nén 1D) → dùng nhầm giá trị chưa được tính đúng ngữ
+  nghĩa của vòng lặp hiện tại.
+- Nhầm chỉ số: khi dùng bảng có biên rỗng, \`dp[i][j]\` (với \`i, j\` bắt đầu từ 1) tương ứng với ký tự
+  \`A[i-1]\` và \`B[j-1]\` của chuỗi gốc (chỉ số 0), không phải \`A[i]\`/\`B[j]\` — lệch đi đúng 1.
+- Quên khởi tạo hàng 0 và cột 0 (trường hợp cơ sở — "đã xét 0 ký tự/phần tử").
+- Bảng quá lớn: \`dp\` kích thước \`10⁴ × 10⁴\` là \`10⁸\` ô, có thể vượt quá bộ nhớ cho phép — phải nén
+  xuống 1 chiều khi có thể (xem mục 5).
+- **Bẫy Python riêng, nhắc lại vì rất dễ tái phạm:** \`[[0]*n] * m\` tạo ra \`m\` tham chiếu tới CÙNG
+  MỘT list con — luôn dùng list comprehension \`[[0]*n for _ in range(m)]\` để mỗi hàng là một object
+  độc lập trong bộ nhớ.
 
-## 6. Ứng dụng thực tế
+## 7. Ứng dụng thực tế
 
 - **git diff / so sánh văn bản**: dãy con chung dài nhất (LCS).
 - **Sửa lỗi chính tả, gợi ý tìm kiếm**: khoảng cách Levenshtein (thư viện \`python-Levenshtein\`).
@@ -1382,54 +1477,99 @@ lựa chọn hiện tại có **chặn** khả năng tương lai hay không.
   lessonPy: `
 ## 1. Ý tưởng cốt lõi
 
-> Greedy = ở mỗi bước, chọn phương án **tốt nhất tại thời điểm đó** và **không bao giờ nhìn lại**.
+> Greedy (tham lam) = ở mỗi bước, chọn phương án **tốt nhất ngay tại thời điểm đó**, và **không bao
+> giờ quay lại xem xét lựa chọn cũ nữa** — dù về sau có thể phát hiện lựa chọn đó chưa hẳn tối ưu.
 
-Ưu điểm: thường O(n) hoặc O(n log n), code ngắn gọn.
-Nhược điểm chí mạng: **rất hay sai** và cái sai đó khó phát hiện — nó chạy đúng với ví dụ trong đề
-nhưng sai với test ẩn.
+Ưu điểm: thường chỉ tốn O(n) hoặc O(n log n), code ngắn gọn hơn hẳn DP vì không cần bảng trạng thái.
+Nhược điểm chí mạng: **greedy rất hay sai**, và cái sai đó khó phát hiện — nó thường chạy đúng với ví
+dụ minh hoạ trong đề bài (vì đề thường chọn ví dụ "đẹp"), nhưng sai với những trường hợp ẩn tinh vi
+hơn.
+
+Ví dụ cụ thể để thấy greedy có thể sai ra sao — đổi tiền lẻ với các mệnh giá \`[1, 3, 4]\`, cần đổi
+đúng \`6\`:
+
+\`\`\`python
+def doi_tien_greedy(menh_gia, target):
+    menh_gia = sorted(menh_gia, reverse=True)   # thử mệnh giá LỚN NHẤT trước — trực giác "tham lam"
+    so_dong = 0
+    for coin in menh_gia:
+        so_dong += target // coin
+        target %= coin
+    return so_dong if target == 0 else -1
+
+print(doi_tien_greedy([1, 3, 4], 6))   # 3 (dùng 4 + 1 + 1) — nhưng đáp án TỐI ƯU thật sự chỉ cần 2 đồng (3 + 3)!
+\`\`\`
+
+Greedy chọn đồng \`4\` trước vì nó lớn nhất, nhưng lựa chọn "tốt nhất tại chỗ" đó lại KHOÁ mất khả năng
+dùng hai đồng \`3\` — một lựa chọn tổng thể tốt hơn. Đây chính là bản chất rủi ro của greedy: tối ưu
+cục bộ ở từng bước không đảm bảo tối ưu toàn cục.
 
 ## 2. Khi nào greedy đúng?
 
-Cần một trong hai tính chất (lý tưởng là cả hai):
+Cần chứng minh được một trong hai tính chất sau (lý tưởng là cả hai):
 
-1. **Tính chất lựa chọn tham lam** (greedy choice property):
-   tồn tại một lời giải tối ưu *chứa* lựa chọn tham lam ở bước đầu tiên.
-2. **Cấu trúc con tối ưu**: sau khi chọn, bài toán còn lại vẫn cùng dạng.
+1. **Tính chất lựa chọn tham lam** (greedy choice property): tồn tại một lời giải tối ưu toàn cục
+   *chứa* đúng lựa chọn tham lam ở bước đầu tiên — nghĩa là chọn tham lam ngay từ đầu không bao giờ
+   khiến ta bỏ lỡ đáp án tốt nhất.
+2. **Cấu trúc con tối ưu**: sau khi đã chọn tham lam ở bước đầu, phần bài toán còn lại vẫn có cùng
+   cấu trúc và việc giải tối ưu phần còn lại (cũng bằng greedy) cho ra lời giải tối ưu của toàn bộ.
 
-**Ba cách kiểm tra nhanh trong phỏng vấn:**
-- Thử tìm **phản ví dụ** trong 30 giây. Không tìm được → có thể greedy đúng.
-- **Lập luận trao đổi (exchange argument)**: giả sử có lời giải tối ưu khác lựa chọn của tôi;
-  chứng minh có thể "đổi" nó về lựa chọn của tôi mà không tệ đi.
-- So sánh với DP trên vài ví dụ nhỏ.
+**Ba cách kiểm tra nhanh trong lúc phỏng vấn (không có thời gian chứng minh hình thức):**
+- Thử tìm một **phản ví dụ** trong khoảng 30 giây bằng cách tự nghĩ một bộ dữ liệu nhỏ, khó (ví dụ:
+  bài đổi tiền ở trên). Không tìm được phản ví dụ nào sau vài lần thử → có cơ sở tin greedy đúng.
+- **Lập luận trao đổi (exchange argument)**: giả sử có một lời giải tối ưu khác không dùng lựa chọn
+  tham lam của bạn ở bước đầu; thử chứng minh rằng luôn có thể "đổi" lời giải đó thành một lời giải
+  dùng đúng lựa chọn tham lam, mà kết quả không hề tệ đi.
+- So sánh kết quả của greedy với kết quả của DP (chắc chắn đúng) trên vài ví dụ nhỏ, tự tính bằng tay.
 
-## 3. Greedy vs DP — bảng phân biệt
+## 3. Cấu trúc & hàm Python thường dùng trong chủ đề này
+
+| Tên | Vai trò | Ví dụ dùng nhanh |
+|---|---|---|
+| \`sorted(items, key=...)\` | Sắp xếp theo đúng tiêu chí greedy cần (ví dụ: theo thời gian kết thúc) | \`sorted(intervals, key=lambda x: x[1])\` |
+| \`list.sort(key=...)\` | Sắp xếp tại chỗ, không tạo bản sao — dùng khi không cần giữ mảng gốc | \`items.sort(key=lambda x: -x[0])\` |
+| \`heapq\` | Luôn lấy ra "yêu cầu cấp bách nhất" tiếp theo trong các bài greedy có hàng đợi ưu tiên | xem lại chủ đề [[Heap]] |
+| Biến "cực trị đang chạy" | Giữ một biến duy nhất cập nhật liên tục (tổng lớn nhất, tầm xa nhất...), không cần bảng | \`best = max(best, x)\` mỗi bước |
+| \`enumerate(arr)\` | Duyệt vừa có chỉ số vừa có giá trị — hay dùng khi lựa chọn phụ thuộc vị trí | \`for i, x in enumerate(arr):\` |
+| \`float('-inf')\` | Giá trị khởi tạo an toàn cho bài toán tối đa hoá (Kadane...) | \`best = float('-inf')\` |
+
+## 4. Greedy vs DP — bảng phân biệt
 
 | | Greedy | DP |
 |---|---|---|
-| Số lựa chọn xét ở mỗi bước | 1 (tốt nhất tại chỗ) | tất cả |
-| Có quay lại không | không | có (qua bảng trạng thái) |
-| Chi phí | O(n) ~ O(n log n) | thường O(n²) trở lên |
-| Rủi ro | có thể sai | luôn đúng nếu trạng thái đúng |
+| Số lựa chọn xét ở mỗi bước | 1 (chỉ lựa chọn tốt nhất tại chỗ) | tất cả các lựa chọn khả dĩ |
+| Có quay lại xem xét lựa chọn cũ không | không | có (thông qua bảng trạng thái) |
+| Chi phí | O(n) đến O(n log n) | thường O(n²) trở lên |
+| Rủi ro sai | có thể sai nếu chưa chứng minh | luôn đúng nếu định nghĩa trạng thái đúng |
 
-**Ví dụ kinh điển:** Coin Change với \`[1,3,4]\`, target 6 → greedy cho 3 đồng, DP cho 2 đồng.
-Nhưng bài *Jump Game* thì greedy đúng và DP là thừa thãi. Sự khác biệt nằm ở việc
-lựa chọn hiện tại có **chặn** khả năng tương lai hay không.
+**Ví dụ kinh điển đã thấy ở mục 1:** Coin Change với mệnh giá \`[1, 3, 4]\`, target \`6\` — greedy cho
+ra 3 đồng, DP cho ra đáp án đúng là 2 đồng. Nhưng với bài *Jump Game* (kiểm tra có tới được ô cuối
+không), greedy lại đúng hoàn toàn và dùng DP chỉ là làm phức tạp hoá không cần thiết. Sự khác biệt
+nằm ở việc: lựa chọn tham lam ở bước hiện tại có **khoá chặn mất** một khả năng tốt hơn ở tương lai
+hay không — với Coin Change nó có (chọn đồng 4 khoá mất khả năng ghép hai đồng 3), với Jump Game
+thì không (luôn nên đi xa nhất có thể, không có gì để đánh đổi).
 
-## 4. Ba mẫu greedy hay gặp
+## 5. Ba mẫu greedy hay gặp
 
-1. **Sắp xếp rồi quét** (\`sorted(..., key=...)\`): xếp lịch (sắp theo thời gian kết thúc), gộp khoảng, bài toán phân công.
-2. **Duy trì một cực trị đang chạy**: Kadane (tổng lớn nhất), Jump Game (tầm xa nhất),
-   Best Time to Buy Stock (đáy thấp nhất).
-3. **Đổi tài nguyên bằng heap** (\`heapq\`): luôn phục vụ yêu cầu "cấp bách nhất" tiếp theo.
+1. **Sắp xếp rồi quét một lượt** (\`sorted(..., key=...)\`): dùng cho bài xếp lịch (sắp theo thời gian
+   kết thúc), gộp khoảng thời gian chồng lấn, bài toán phân công công việc.
+2. **Duy trì một cực trị đang chạy**, cập nhật liên tục qua một lượt duyệt: thuật toán Kadane (tổng
+   đoạn con lớn nhất), Jump Game (tầm xa nhất có thể vươn tới), Best Time to Buy Stock (giá đáy thấp
+   nhất tính tới hiện tại).
+3. **Đổi tài nguyên bằng heap** (\`heapq\`): luôn phục vụ đúng yêu cầu "cấp bách nhất" tiếp theo trong
+   số các yêu cầu đang chờ.
 
-## 5. Bẫy thường gặp
+## 6. Bẫy thường gặp
 
-- Áp greedy mà không kiểm chứng → sai âm thầm.
-- Sắp xếp theo **tiêu chí sai** (bài xếp lịch: phải sắp theo *thời gian kết thúc*, không phải thời gian bắt đầu
-  hay độ dài) — nhớ dùng đúng \`key=lambda x: x[1]\`.
-- Bỏ qua trường hợp biên: mảng rỗng, toàn số âm.
+- Áp dụng greedy mà chưa hề kiểm chứng bằng một trong ba cách ở mục 2 → sai âm thầm, đặc biệt nguy
+  hiểm vì code vẫn chạy trơn tru, không có exception nào báo hiệu.
+- Sắp xếp theo **tiêu chí sai**: ví dụ bài xếp lịch phải sắp theo *thời gian kết thúc* (\`key=lambda x: x[1]\`),
+  không phải thời gian bắt đầu hay độ dài khoảng thời gian — dùng sai tiêu chí cho ra kết quả sai mà
+  code trông vẫn hợp lý.
+- Bỏ qua trường hợp biên: mảng rỗng, toàn số âm (đặc biệt quan trọng với Kadane — nếu mọi phần tử đều
+  âm, đáp án là phần tử âm lớn nhất, không phải \`0\`).
 
-## 6. Ứng dụng thực tế
+## 7. Ứng dụng thực tế
 
 - **Nén Huffman**: luôn gộp hai nút tần suất nhỏ nhất — greedy có chứng minh chặt chẽ.
 - **Lập lịch CPU**: shortest job first tối ưu thời gian chờ trung bình.
